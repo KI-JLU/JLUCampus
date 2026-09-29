@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    uses: ./.github/workflows/check.yml
+
+  build:
+    uses: ./.github/workflows/build.yml
+    with:
+      artifact-suffix: ${{ github.sha }}

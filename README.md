@@ -58,6 +58,13 @@ the web app (`apps/web/dist`). Set `SERVE_WEB_DIR=../web/dist` (or an absolute
 path) and the server serves the web app itself, so one origin hosts both. Run
 migrations with `bun run db:migrate` before starting `node apps/server/dist/index.js`.
 
+## CI
+
+GitHub Actions run lint, typecheck, tests and `bun run build` on every pull
+request and every push to `master` (`.github/workflows/ci.yml`). Publishing a
+GitHub release runs the same checks and build again (`release.yml`) and keeps
+`web-<tag>` and `server-<tag>` as workflow artifacts for 90 days.
+
 ## Scripts
 
 | Command                 | Purpose                                     |

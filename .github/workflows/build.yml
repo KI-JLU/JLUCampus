@@ -1,0 +1,45 @@
+# Builds the shared package, server and web app and uploads both dist folders.
+# Called by ci.yml and release.yml.
+name: Build
+
+on:
+  workflow_call:
+    inputs:
+      artifact-suffix:
+        description: Appended to the artifact names, e.g. the release tag
+        type: string
+        required: true
+      retention-days:
+        type: number
+        default: 7
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build web and server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+
+      - run: bun run build
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: web-${{ inputs.artifact-suffix }}
+          path: apps/web/dist
+          if-no-files-found: error
+          retention-days: ${{ inputs.retention-days }}
+
+      # Migrations travel with the server bundle so a deployment can apply them.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: server-${{ inputs.artifact-suffix }}
+          path: |
+            apps/server/dist
+            apps/server/drizzle
+            apps/server/package.json
+          if-no-files-found: error
+          retention-days: ${{ inputs.retention-days }}
