@@ -16,3 +16,7 @@ linux:
     - AppImage
     - deb
   category: Office
+protocols:
+  - name: JLU Campus
+    schemes:
+      - jlucampus
