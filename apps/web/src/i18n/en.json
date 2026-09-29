@@ -24,7 +24,6 @@
   "nav": {
     "dashboard": "Dashboard",
     "allApps": "All apps",
-    "editSidebar": "Edit sidebar",
     "newEntries": "(new entries)"
   },
   "account": {
@@ -372,7 +371,6 @@
     "clear": "Remove icon"
   },
   "sidebarEditor": {
-    "done": "Done",
     "title": "Available components",
     "hint": "Drag components into the sidebar and arrange them there. Drag one back here to take it out of the sidebar.",
     "sidebarLabel": "Components in the sidebar",
@@ -398,6 +396,7 @@
     }
   },
   "allApps": {
+    "hint": "Drag apps into the sidebar and arrange them there, or use + and ×. Dragged back here, they leave the sidebar.",
     "empty": "No apps are available yet.",
     "loadFailed": "The apps could not be loaded.",
     "search": "Search apps",

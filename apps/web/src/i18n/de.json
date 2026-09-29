@@ -24,7 +24,6 @@
   "nav": {
     "dashboard": "Dashboard",
     "allApps": "Alle Apps",
-    "editSidebar": "Seitenleiste bearbeiten",
     "newEntries": "(neue Einträge)"
   },
   "account": {
@@ -372,7 +371,6 @@
     "clear": "Symbol entfernen"
   },
   "sidebarEditor": {
-    "done": "Fertig",
     "title": "Verfügbare Komponenten",
     "hint": "Ziehen Sie Komponenten in die Seitenleiste und ordnen Sie sie dort an. Zurück hierher gezogen, verschwinden sie aus der Seitenleiste.",
     "sidebarLabel": "Komponenten in der Seitenleiste",
@@ -398,6 +396,7 @@
     }
   },
   "allApps": {
+    "hint": "Ziehen Sie Apps in die Seitenleiste und ordnen Sie sie dort an, oder nutzen Sie + und ×. Zurück hierher gezogen, verschwinden sie aus der Seitenleiste.",
     "empty": "Es sind noch keine Apps verfügbar.",
     "loadFailed": "Die Apps konnten nicht geladen werden.",
     "search": "Apps durchsuchen",
