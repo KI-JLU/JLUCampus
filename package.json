@@ -1,0 +1,30 @@
+{
+  "name": "justcampus",
+  "private": true,
+  "version": "0.1.0",
+  "description": "JLU Campus: a customizable dashboard of campus widgets for web and desktop",
+  "workspaces": ["apps/*", "packages/*"],
+  "packageManager": "bun@1.3.14",
+  "scripts": {
+    "postinstall": "node scripts/build-design-system.mjs",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "dev": "bun run --filter '@justcampus/server' --filter '@justcampus/web' dev",
+    "dev:server": "bun run --filter '@justcampus/server' dev",
+    "dev:web": "bun run --filter '@justcampus/web' dev",
+    "dev:desktop": "bun run --filter '@justcampus/desktop' dev",
+    "build": "bun run --filter '@justcampus/shared' --filter '@justcampus/server' --filter '@justcampus/web' build",
+    "build:desktop": "bun run --filter '@justcampus/web' build && bun run --filter '@justcampus/desktop' build",
+    "typecheck": "bun run --filter '*' typecheck",
+    "lint": "bun run --filter '*' lint",
+    "test": "bun run --filter '*' test",
+    "format": "prettier --write .",
+    "db:generate": "bun run --filter '@justcampus/server' db:generate",
+    "db:migrate": "bun run --filter '@justcampus/server' db:migrate",
+    "db:seed": "bun run --filter '@justcampus/server' db:seed"
+  },
+  "devDependencies": {
+    "prettier": "^3.7.4",
+    "typescript": "^5.9.3"
+  }
+}

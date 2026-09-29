@@ -1,0 +1,104 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import '@ki4jlu/design-system/tokens.css';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+@import '@fontsource/manrope/600.css';
+@import '@fontsource/manrope/700.css';
+@import 'react-grid-layout/css/styles.css';
+@source '../..';
+@source '../../node_modules/@ki4jlu/design-system/dist';
+
+/*
+ * Colours, radii, type and elevation come from the JLU design system's tokens.
+ * The theme is `data-theme` on <html>, set by `theme-init.js` before the first
+ * paint and by ThemeProvider afterwards. Nothing here uses a literal colour.
+ */
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+    @apply bg-surface font-body-base text-on-surface;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+  }
+
+  * {
+    @apply border-outline-variant;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-outline) transparent;
+  }
+}
+
+/* react-grid-layout ships its own colours; point them at tokens. */
+.react-grid-item.react-grid-placeholder {
+  background: var(--color-primary);
+  opacity: 0.15;
+  border-radius: var(--radius-xl);
+}
+
+.react-grid-item > .react-resizable-handle {
+  z-index: 2;
+}
+
+.react-grid-item > .react-resizable-handle::after {
+  border-right-color: var(--color-on-surface-variant);
+  border-bottom-color: var(--color-on-surface-variant);
+}
+
+/* While a tile is dragged or resized, embedded pages must not swallow the pointer. */
+.react-grid-layout:has(.react-draggable-dragging, .resizing) iframe {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (forced-colors: active) {
+  [aria-current],
+  [aria-selected='true'],
+  [aria-checked='true'],
+  [aria-pressed='true'],
+  [data-state='checked'],
+  [data-state='active'],
+  [data-state='on'] {
+    outline: 2px solid currentColor;
+    outline-offset: -2px;
+  }
+}
+
+/*
+ * The dashboard's grid while tiles are arranged: a dot at every corner where
+ * four cells meet, placed with react-grid-layout's cell size and gap, so a
+ * tile's corners land on the dots.
+ */
+.dashboard-grid[data-grid-visible] {
+  --grid-period-w: calc(var(--grid-cell-w) + var(--grid-gap));
+  --grid-period-h: calc(var(--grid-cell-h) + var(--grid-gap));
+  background-image: radial-gradient(circle, var(--color-outline) 1.5px, transparent 2px);
+  background-size: var(--grid-period-w) var(--grid-period-h);
+  /* The gradient's centre is mid-period; shift it into the middle of the gap. */
+  background-position: calc(var(--grid-cell-w) / 2) calc(var(--grid-cell-h) / 2);
+  background-repeat: repeat;
+}

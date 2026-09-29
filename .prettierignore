@@ -1,0 +1,7 @@
+node_modules
+dist
+out
+release
+bun.lock
+infra/keycloak/*.json
+apps/server/drizzle

@@ -1,0 +1,12 @@
+node_modules/
+dist/
+out/
+release/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.eslintcache
+.DS_Store
+infra/postgres-data/
+apps/web/dev-dist/

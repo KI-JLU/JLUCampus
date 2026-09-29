@@ -1,0 +1,393 @@
+{
+  "common": {
+    "cancel": "Abbrechen",
+    "close": "Schließen",
+    "delete": "Löschen",
+    "loading": "Wird geladen …",
+    "retry": "Erneut versuchen",
+    "save": "Speichern",
+    "saving": "Wird gespeichert …"
+  },
+  "toast": {
+    "label": "Benachrichtigung",
+    "viewport": "Benachrichtigungen ({hotkey})"
+  },
+  "shell": {
+    "navLabel": "Hauptnavigation",
+    "collapse": "Seitenleiste einklappen",
+    "expand": "Seitenleiste ausklappen",
+    "resize": "Breite der Seitenleiste ändern",
+    "tabsLabel": "Bereich wechseln",
+    "tabNavigation": "Navigation",
+    "tabPage": "Seite"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "editSidebar": "Seitenleiste bearbeiten"
+  },
+  "account": {
+    "settings": "Einstellungen",
+    "admin": "Adminbereich",
+    "signOut": "Abmelden",
+    "signOutFailed": "Die Abmeldung ist fehlgeschlagen. Bitte versuchen Sie es erneut."
+  },
+  "language": {
+    "label": "Sprache",
+    "de": "Deutsch",
+    "en": "English",
+    "saveFailed": "Die Sprache konnte nicht in Ihrem Profil gespeichert werden."
+  },
+  "theme": {
+    "label": "Farbschema",
+    "light": "Helles Design",
+    "system": "Systemdesign",
+    "dark": "Dunkles Design"
+  },
+  "login": {
+    "title": "Willkommen bei JLU Campus",
+    "description": "Melden Sie sich mit Ihrem JLU-Konto an, um Ihr persönliches Dashboard zu öffnen.",
+    "signIn": "Mit JLU-Konto anmelden",
+    "redirecting": "Sie werden weitergeleitet …",
+    "failed": "Die Anmeldung ist fehlgeschlagen. Bitte versuchen Sie es erneut."
+  },
+  "errors": {
+    "notFoundTitle": "Seite nicht gefunden",
+    "notFoundDescription": "Diese Adresse gibt es in JLU Campus nicht.",
+    "toDashboard": "Zum Dashboard",
+    "unavailableTitle": "JLU Campus ist gerade nicht erreichbar",
+    "unavailableDescription": "Der Server antwortet nicht. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut."
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "edit": "Bearbeiten",
+    "done": "Fertig",
+    "editingHint": "Ziehen Sie Kacheln an eine neue Position und ändern Sie ihre Größe an der unteren rechten Ecke. Ziehen Sie eine Widget- oder Verknüpfungskachel auf einen Ordner, um sie darin abzulegen, oder einen Eintrag aus dem Ordner auf das Raster. Änderungen werden automatisch gespeichert.",
+    "addWidget": "Widget hinzufügen",
+    "addTitle": "Widget hinzufügen",
+    "addDescription": "Fügen Sie einen eigenen Ordner, eine Verknüpfung oder einen Feed hinzu, einen vordefinierten Ordner oder ein Widget der JLU. Die neue Kachel erscheint unten auf Ihrem Dashboard.",
+    "addOwn": "Eigene Kacheln",
+    "addTemplates": "Vordefinierte Ordner",
+    "addCatalogue": "Widgets der JLU",
+    "noWidgetsAvailable": "Es sind noch keine Widgets verfügbar.",
+    "openPage": "{{name}} als Seite öffnen",
+    "removeTile": "{{name}} vom Dashboard entfernen",
+    "editTile": "{{name}} bearbeiten",
+    "emptyTitle": "Ihr Dashboard ist noch leer",
+    "emptyDescription": "Stellen Sie sich Ihr Dashboard aus den Widgets der JLU und eigenen Verknüpfungen und Feeds zusammen und ordnen Sie die Kacheln so an, wie es für Sie passt.",
+    "saveFailed": "Das Dashboard konnte nicht gespeichert werden.",
+    "loadFailed": "Das Dashboard konnte nicht geladen werden.",
+    "gridLabel": "Raster mit {{cols}} Spalten",
+    "folder": {
+      "new": "Neuer Ordner",
+      "defaultTitle": "Ordner",
+      "empty": "Dieser Ordner ist noch leer. Im Bearbeiten-Modus können Sie Widgets und Verknüpfungen hinzufügen.",
+      "editTitle": "Ordner bearbeiten",
+      "editDescription": "Name, Symbol und Inhalt des Ordners. Ein angehaktes Widget erscheint im Ordner; eine Verknüpfung legen Sie ab, indem Sie ihre Kachel auf den Ordner ziehen.",
+      "title": "Name",
+      "titleError": "Geben Sie einen Namen mit höchstens {{max}} Zeichen ein.",
+      "icon": "Symbol",
+      "iconHint": "Ohne gewähltes Symbol wird ein Ordnersymbol angezeigt.",
+      "widgets": "Widgets im Ordner",
+      "shortcuts": "Verknüpfungen im Ordner",
+      "noShortcuts": "Noch keine Verknüpfungen. Ziehen Sie eine Verknüpfungskachel auf den Ordner, um sie hier abzulegen.",
+      "removeShortcut": "{{name}} aus dem Ordner entfernen",
+      "dropHint": "Ziehen Sie Widget- oder Verknüpfungskacheln hierher.",
+      "dragOut": "{{name}} aus dem Ordner ziehen"
+    }
+  },
+  "component": {
+    "loadFailedTitle": "Komponente konnte nicht geladen werden",
+    "loadFailedDescription": "Der Server antwortet nicht. Bitte versuchen Sie es erneut.",
+    "notFoundTitle": "Komponente nicht gefunden",
+    "notFoundDescription": "Diese Komponente gibt es nicht mehr oder sie wurde deaktiviert.",
+    "iframe": {
+      "openInNewTab": "In neuem Tab öffnen",
+      "embedHint": "Manche Websites lassen sich nicht einbetten. Bleibt der Bereich leer, öffnen Sie die Seite in einem neuen Tab.",
+      "urlLabel": "Adresse (URL)",
+      "urlHint": "Die Website, die auf der Seite der Komponente eingebettet wird. Nur https, http nur für localhost."
+    },
+    "rss": {
+      "feedUrlLabel": "Feed-Adresse (URL)",
+      "feedUrlHint": "Ein RSS-, Atom- oder JSON-Feed. http oder https."
+    },
+    "link": {
+      "open": "Website öffnen",
+      "pageDescription": "Diese Verknüpfung öffnet {{host}} außerhalb von JLU Campus.",
+      "urlLabel": "Adresse (URL)",
+      "urlHint": "Die Website, die die Verknüpfung außerhalb von JLU Campus öffnet. http oder https."
+    }
+  },
+  "componentTypes": {
+    "iframe": "Eingebettete Website",
+    "rss": "RSS-Feed",
+    "link": "Verknüpfung"
+  },
+  "shortcut": {
+    "new": "Neue Verknüpfung",
+    "open": "{{name}} in neuem Fenster öffnen",
+    "opensOutside": "(öffnet sich außerhalb von JLU Campus)",
+    "createTitle": "Neue Verknüpfung",
+    "editTitle": "Verknüpfung bearbeiten",
+    "description": "Ein Link zu einer beliebigen Website. Er öffnet sich in einem neuen Browser-Tab, in der Desktop-App in Ihrem Browser.",
+    "url": "Adresse (URL)",
+    "urlHint": "http oder https. Fehlt beides, wird https:// ergänzt.",
+    "title": "Titel",
+    "titleHint": "Leer lassen, um die Adresse der Website zu verwenden.",
+    "icon": "Symbol",
+    "iconHint": "Ohne gewähltes Symbol wird das Symbol der Website (Favicon) angezeigt.",
+    "add": "Verknüpfung hinzufügen",
+    "errors": {
+      "url": "Geben Sie eine vollständige Webadresse ein, die mit http:// oder https:// beginnt.",
+      "title": "Geben Sie einen Titel mit höchstens {{max}} Zeichen ein."
+    }
+  },
+  "feed": {
+    "new": "Neuer RSS-Feed",
+    "loading": "Feed wird geladen …",
+    "empty": "Dieser Feed hat noch keine Einträge.",
+    "fallbackName": "Feed von {{host}}",
+    "openSite": "Website von {{name}} öffnen",
+    "openSiteButton": "Website öffnen",
+    "errors": {
+      "unavailable": "Der Feed konnte nicht geladen werden. Die Website ist vielleicht nicht erreichbar, oder unter dieser Adresse liegt kein Feed.",
+      "invalidUrl": "Diese Feed-Adresse ist ungültig.",
+      "failed": "Der Feed konnte nicht geladen werden. Bitte versuchen Sie es erneut."
+    },
+    "check": {
+      "checking": "Feed wird geprüft …",
+      "found_one": "Gefunden: {{title}} ({{count}} Eintrag)",
+      "found_other": "Gefunden: {{title}} ({{count}} Einträge)"
+    },
+    "dialog": {
+      "createTitle": "Neuer RSS-Feed",
+      "editTitle": "RSS-Feed bearbeiten",
+      "description": "Zeigt die neuesten Einträge eines beliebigen RSS-, Atom- oder JSON-Feeds auf Ihrem Dashboard.",
+      "url": "Feed-Adresse (URL)",
+      "urlHint": "Die Adresse des Feeds selbst, sie endet oft auf /feed, /rss oder .xml.",
+      "title": "Titel (optional)",
+      "titleHint": "Leer lassen, um den Titel des Feeds zu verwenden.",
+      "add": "Feed hinzufügen",
+      "errors": {
+        "url": "Geben Sie eine vollständige Webadresse ein, die mit http:// oder https:// beginnt.",
+        "title": "Geben Sie einen Titel mit höchstens {{max}} Zeichen ein."
+      }
+    }
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "description": "Passen Sie JLU Campus an. Die Einstellungen gelten auf allen Ihren Geräten; das Farbschema gilt pro Gerät.",
+    "language": {
+      "title": "Sprache",
+      "label": "Sprache der Oberfläche",
+      "description": "Wird in Ihrem Profil gespeichert."
+    },
+    "appearance": {
+      "title": "Darstellung",
+      "description": "Hell, dunkel oder wie im Betriebssystem eingestellt."
+    }
+  },
+  "admin": {
+    "title": "Komponenten verwalten",
+    "description": "Der Katalog, aus dem alle Nutzenden ihre Seitenleiste und ihr Dashboard zusammenstellen. Jede Komponente ist eine Seite und bringt Widgets für das Dashboard mit.",
+    "newComponent": "Neue Komponente",
+    "loadFailed": "Die Komponenten konnten nicht geladen werden.",
+    "forbiddenTitle": "Kein Zugriff",
+    "forbiddenDescription": "Der Adminbereich steht nur Administratorinnen und Administratoren zur Verfügung.",
+    "nav": {
+      "label": "Adminbereich",
+      "components": "Komponenten",
+      "folders": "Ordner-Vorlagen",
+      "presets": "Layout-Vorlagen"
+    },
+    "table": {
+      "caption": "Alle Komponenten in Katalogreihenfolge",
+      "icon": "Symbol",
+      "name": "Name",
+      "type": "Typ",
+      "url": "URL",
+      "enabled": "Aktiv",
+      "actions": "Aktionen",
+      "empty": "Noch keine Komponenten angelegt.",
+      "enabledFor": "{{name}} aktiv",
+      "moveUp": "{{name}} nach oben verschieben",
+      "moveDown": "{{name}} nach unten verschieben",
+      "edit": "{{name}} bearbeiten",
+      "delete": "{{name}} löschen",
+      "toggleFailed": "Die Komponente konnte nicht geändert werden.",
+      "reorderFailed": "Die Reihenfolge konnte nicht gespeichert werden."
+    },
+    "form": {
+      "createTitle": "Neue Komponente",
+      "editTitle": "Komponente bearbeiten",
+      "description": "Name und Symbol erscheinen in der Seitenleiste und auf den Widgets der Komponente.",
+      "type": "Typ",
+      "name": "Name",
+      "icon": "Symbol",
+      "iconHint": "Ein Symbol aus der Lucide-Bibliothek.",
+      "iconUrl": "Bild-URL (optional)",
+      "iconUrlHint": "Ein Favicon oder Logo. Ersetzt das Symbol, wenn gesetzt.",
+      "enabled": "Aktiv",
+      "saveFailed": "Die Komponente konnte nicht gespeichert werden.",
+      "created": "Komponente angelegt.",
+      "updated": "Komponente gespeichert.",
+      "errors": {
+        "type": "Wählen Sie einen Typ.",
+        "name": "Geben Sie einen Namen mit höchstens 80 Zeichen ein.",
+        "icon": "Wählen Sie ein Symbol aus der Liste.",
+        "url": "Geben Sie eine vollständige https-Adresse ein (http nur für localhost).",
+        "externalUrl": "Geben Sie eine vollständige Webadresse ein, die mit http:// oder https:// beginnt."
+      }
+    },
+    "delete": {
+      "title": "Komponente löschen?",
+      "description": "„{{name}}“ wird mit ihren Widgets aus dem Katalog, aus allen Seitenleisten und Dashboards und aus den Ordner-Vorlagen entfernt.",
+      "done": "„{{name}}“ gelöscht.",
+      "failed": "Die Komponente konnte nicht gelöscht werden."
+    },
+    "folders": {
+      "title": "Ordner-Vorlagen verwalten",
+      "description": "Vordefinierte Ordner, die Nutzende unter „Widget hinzufügen“ auf ihr Dashboard übernehmen können. Übernommen wird eine Kopie: Spätere Änderungen an der Vorlage erreichen bereits angelegte Ordner nicht.",
+      "newFolder": "Neue Ordner-Vorlage",
+      "loadFailed": "Die Ordner-Vorlagen konnten nicht geladen werden.",
+      "table": {
+        "caption": "Alle Ordner-Vorlagen in der Reihenfolge, in der sie angeboten werden",
+        "widgets": "Widgets",
+        "widgetCount_one": "{{count}} Widget",
+        "widgetCount_other": "{{count}} Widgets",
+        "empty": "Noch keine Ordner-Vorlagen angelegt.",
+        "toggleFailed": "Die Ordner-Vorlage konnte nicht geändert werden."
+      },
+      "form": {
+        "createTitle": "Neue Ordner-Vorlage",
+        "editTitle": "Ordner-Vorlage bearbeiten",
+        "description": "Name, Symbol und Widgets des Ordners, den Nutzende auf ihr Dashboard übernehmen. Ein angehaktes Widget kommt ans Ende des Ordners.",
+        "name": "Name",
+        "icon": "Symbol (optional)",
+        "iconHint": "Ein Symbol aus der Lucide-Bibliothek. Ohne Symbol wird ein Ordnersymbol angezeigt.",
+        "widgets": "Widgets im Ordner",
+        "widgetDisabled": "Deaktiviert",
+        "order": "Reihenfolge im Ordner",
+        "orderEmpty": "Noch keine Widgets angehakt.",
+        "removeWidget": "{{name}} aus dem Ordner entfernen",
+        "enabled": "Aktiv",
+        "saveFailed": "Die Ordner-Vorlage konnte nicht gespeichert werden.",
+        "created": "Ordner-Vorlage angelegt.",
+        "updated": "Ordner-Vorlage gespeichert.",
+        "errors": {
+          "name": "Geben Sie einen Namen mit höchstens {{max}} Zeichen ein.",
+          "widgets": "Ein gewähltes Widget gibt es nicht mehr. Laden Sie die Seite neu und wählen Sie die Widgets erneut."
+        }
+      },
+      "delete": {
+        "title": "Ordner-Vorlage löschen?",
+        "description": "„{{name}}“ wird Nutzenden nicht mehr angeboten. Ordner, die bereits auf Dashboards liegen, bleiben erhalten.",
+        "done": "„{{name}}“ gelöscht.",
+        "failed": "Die Ordner-Vorlage konnte nicht gelöscht werden."
+      }
+    },
+    "presets": {
+      "title": "Layout-Vorlagen verwalten",
+      "description": "Die Seitenleiste und das Dashboard, mit denen neue Nutzende starten. Bei ihrer ersten Anmeldung wird die erste Vorlage dieser Liste, deren Keycloak-Rolle oder -Gruppe sie haben, einmalig in ihre eigene Seitenleiste und ihr Dashboard kopiert; passt keine, gilt die Vorlage „Alle“. Änderungen wirken nur für Nutzende, die sich zum ersten Mal anmelden, nie für bestehende.",
+      "newPreset": "Neue Vorlage",
+      "loadFailed": "Die Layout-Vorlagen konnten nicht geladen werden.",
+      "audience": {
+        "role": "Rolle",
+        "group": "Gruppe",
+        "everyone": "Alle",
+        "roleNamed": "Rolle {{name}}",
+        "groupNamed": "Gruppe {{name}}"
+      },
+      "table": {
+        "caption": "Alle Layout-Vorlagen in der Reihenfolge, in der sie geprüft werden",
+        "priority": "Priorität",
+        "audience": "Für",
+        "content": "Inhalt",
+        "last": "Zuletzt",
+        "contentSummary": "{{components}} · {{tiles}}",
+        "componentCount_one": "{{count}} Komponente",
+        "componentCount_other": "{{count}} Komponenten",
+        "tileCount_one": "{{count}} Kachel",
+        "tileCount_other": "{{count}} Kacheln",
+        "empty": "Noch keine Layout-Vorlagen angelegt. Neue Nutzende starten mit leerer Seitenleiste und leerem Dashboard."
+      },
+      "form": {
+        "createTitle": "Neue Layout-Vorlage",
+        "editTitle": "Name und Zielgruppe bearbeiten",
+        "description": "Für wen die Vorlage gilt. Seitenleiste und Dashboard stellen Sie im Editor zusammen, der sich danach öffnet.",
+        "editDescription": "Für wen die Vorlage gilt. Seitenleiste und Dashboard bleiben unverändert.",
+        "name": "Name",
+        "audience": "Für",
+        "everyoneTakenHint": "Es gibt bereits eine Vorlage für „Alle“; davon kann es nur eine geben.",
+        "roleName": "Keycloak-Rolle",
+        "roleHint": "Der Name einer Realm-Rolle in Keycloak, z. B. admin.",
+        "groupName": "Keycloak-Gruppe",
+        "groupHint": "Der vollständige Pfad einer Keycloak-Gruppe, z. B. /Studierende.",
+        "createAndEdit": "Anlegen und bearbeiten",
+        "saveFailed": "Die Layout-Vorlage konnte nicht gespeichert werden.",
+        "created": "Layout-Vorlage angelegt.",
+        "updated": "Layout-Vorlage gespeichert.",
+        "errors": {
+          "name": "Geben Sie einen Namen mit höchstens {{max}} Zeichen ein.",
+          "audienceName": "Geben Sie einen Namen mit höchstens {{max}} Zeichen ein.",
+          "everyoneTaken": "Es gibt bereits eine Vorlage für „Alle“. Wählen Sie eine Rolle oder Gruppe oder bearbeiten Sie die bestehende Vorlage."
+        }
+      },
+      "delete": {
+        "title": "Layout-Vorlage löschen?",
+        "description": "Neue Nutzende starten nicht mehr mit „{{name}}“. Wer sie bereits bekommen hat, behält Seitenleiste und Dashboard.",
+        "done": "„{{name}}“ gelöscht.",
+        "failed": "Die Layout-Vorlage konnte nicht gelöscht werden."
+      },
+      "editor": {
+        "description": "Für: {{audience}}. Änderungen werden automatisch gespeichert und erreichen nur Nutzende, die sich zum ersten Mal anmelden.",
+        "back": "Alle Vorlagen",
+        "details": "Name und Zielgruppe",
+        "saveFailed": "Die Layout-Vorlage konnte nicht gespeichert werden.",
+        "notFoundTitle": "Layout-Vorlage nicht gefunden",
+        "notFoundDescription": "Diese Vorlage gibt es nicht mehr.",
+        "loadFailedDescription": "Der Server antwortet nicht. Bitte versuchen Sie es erneut.",
+        "catalogueFailed": "Die Komponenten konnten nicht geladen werden, daher lässt sich die Vorlage gerade nicht bearbeiten.",
+        "sidebarTitle": "Seitenleiste",
+        "sidebarDescription": "Die Komponenten in der Seitenleiste neuer Nutzender, in dieser Reihenfolge. Ziehen Sie sie oder nutzen Sie die Schaltflächen.",
+        "dashboardTitle": "Dashboard",
+        "dashboardDescription": "Die Kacheln auf dem Dashboard neuer Nutzender. Wählen Sie „Bearbeiten“, um sie anzuordnen.",
+        "dashboardEmptyTitle": "Dieses Dashboard ist leer",
+        "dashboardEmptyDescription": "Fügen Sie JLU-Widgets, Ordner, Verknüpfungen und Feeds hinzu, die neue Nutzende auf ihrem Dashboard vorfinden sollen."
+      }
+    }
+  },
+  "iconPicker": {
+    "label": "Symbol auswählen",
+    "placeholder": "Symbol auswählen",
+    "search": "Symbole durchsuchen",
+    "empty": "Kein Symbol gefunden.",
+    "truncated": "{{shown}} von {{total}} Treffern, verfeinern Sie die Suche",
+    "clear": "Symbol entfernen"
+  },
+  "sidebarEditor": {
+    "done": "Fertig",
+    "title": "Verfügbare Komponenten",
+    "hint": "Ziehen Sie Komponenten in die Seitenleiste und ordnen Sie sie dort an. Zurück hierher gezogen, verschwinden sie aus der Seitenleiste.",
+    "sidebarLabel": "Komponenten in der Seitenleiste",
+    "sidebarEmpty": "Komponenten hierher ziehen",
+    "availableEmpty": "Alle Komponenten stehen bereits in der Seitenleiste.",
+    "add": "{{name}} zur Seitenleiste hinzufügen",
+    "remove": "{{name}} aus der Seitenleiste entfernen",
+    "move": "{{name}} verschieben",
+    "added": "{{name}} zur Seitenleiste hinzugefügt.",
+    "removed": "{{name}} aus der Seitenleiste entfernt.",
+    "saveFailed": "Die Seitenleiste konnte nicht gespeichert werden.",
+    "loadFailed": "Die Komponenten konnten nicht geladen werden.",
+    "dnd": {
+      "instructions": "Drücken Sie die Leertaste, um eine Komponente aufzunehmen. Verschieben Sie sie mit den Pfeiltasten, legen Sie sie mit der Leertaste ab oder brechen Sie mit Escape ab.",
+      "pickedUp": "{{name}} aufgenommen, Position {{position}} von {{total}}.",
+      "pickedUpAvailable": "{{name}} aufgenommen.",
+      "overSidebar": "{{name}} über der Seitenleiste, Position {{position}} von {{total}}.",
+      "overAvailable": "{{name}} über den verfügbaren Komponenten. Loslassen entfernt sie aus der Seitenleiste.",
+      "outside": "{{name}} befindet sich außerhalb der Listen.",
+      "droppedSidebar": "{{name}} in der Seitenleiste abgelegt, Position {{position}} von {{total}}.",
+      "droppedAvailable": "{{name}} liegt bei den verfügbaren Komponenten.",
+      "cancelled": "Verschieben abgebrochen, {{name}} bleibt an der bisherigen Position."
+    }
+  }
+}

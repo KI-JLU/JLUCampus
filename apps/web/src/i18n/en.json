@@ -1,0 +1,393 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "close": "Close",
+    "delete": "Delete",
+    "loading": "Loading …",
+    "retry": "Try again",
+    "save": "Save",
+    "saving": "Saving …"
+  },
+  "toast": {
+    "label": "Notification",
+    "viewport": "Notifications ({hotkey})"
+  },
+  "shell": {
+    "navLabel": "Main navigation",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar",
+    "resize": "Resize sidebar",
+    "tabsLabel": "Switch area",
+    "tabNavigation": "Navigation",
+    "tabPage": "Page"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "editSidebar": "Edit sidebar"
+  },
+  "account": {
+    "settings": "Settings",
+    "admin": "Administration",
+    "signOut": "Sign out",
+    "signOutFailed": "Signing out failed. Please try again."
+  },
+  "language": {
+    "label": "Language",
+    "de": "Deutsch",
+    "en": "English",
+    "saveFailed": "Your language could not be saved to your profile."
+  },
+  "theme": {
+    "label": "Colour scheme",
+    "light": "Light theme",
+    "system": "System theme",
+    "dark": "Dark theme"
+  },
+  "login": {
+    "title": "Welcome to JLU Campus",
+    "description": "Sign in with your JLU account to open your personal dashboard.",
+    "signIn": "Sign in with JLU account",
+    "redirecting": "Redirecting …",
+    "failed": "Signing in failed. Please try again."
+  },
+  "errors": {
+    "notFoundTitle": "Page not found",
+    "notFoundDescription": "This address does not exist in JLU Campus.",
+    "toDashboard": "Go to dashboard",
+    "unavailableTitle": "JLU Campus is unavailable right now",
+    "unavailableDescription": "The server is not responding. Check your connection and try again."
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "edit": "Edit",
+    "done": "Done",
+    "editingHint": "Drag tiles to a new position and resize them from the bottom-right corner. Drag a widget or shortcut tile onto a folder to put it inside, or an entry out of a folder onto the grid. Changes are saved automatically.",
+    "addWidget": "Add widget",
+    "addTitle": "Add widget",
+    "addDescription": "Add a folder, shortcut or feed of your own, a predefined folder, or one of JLU's widgets. The new tile appears at the bottom of your dashboard.",
+    "addOwn": "Your own",
+    "addTemplates": "Predefined folders",
+    "addCatalogue": "JLU widgets",
+    "noWidgetsAvailable": "No widgets are available yet.",
+    "openPage": "Open {{name}} as a page",
+    "removeTile": "Remove {{name}} from the dashboard",
+    "editTile": "Edit {{name}}",
+    "emptyTitle": "Your dashboard is empty",
+    "emptyDescription": "Build your dashboard from JLU's widgets and your own shortcuts and feeds, and arrange the tiles the way that suits you.",
+    "saveFailed": "The dashboard could not be saved.",
+    "loadFailed": "The dashboard could not be loaded.",
+    "gridLabel": "Grid with {{cols}} columns",
+    "folder": {
+      "new": "New folder",
+      "defaultTitle": "Folder",
+      "empty": "This folder is empty. Add widgets or shortcuts in edit mode.",
+      "editTitle": "Edit folder",
+      "editDescription": "The folder's name, icon and contents. A ticked widget appears in the folder; to add a shortcut, drag its tile onto the folder.",
+      "title": "Name",
+      "titleError": "Enter a name with at most {{max}} characters.",
+      "icon": "Icon",
+      "iconHint": "Without a chosen icon, a folder icon is shown.",
+      "widgets": "Widgets in the folder",
+      "shortcuts": "Shortcuts in the folder",
+      "noShortcuts": "No shortcuts yet. Drag a shortcut tile onto the folder to put it here.",
+      "removeShortcut": "Remove {{name}} from the folder",
+      "dropHint": "Drag widget or shortcut tiles here.",
+      "dragOut": "Drag {{name}} out of the folder"
+    }
+  },
+  "component": {
+    "loadFailedTitle": "Component could not be loaded",
+    "loadFailedDescription": "The server is not responding. Please try again.",
+    "notFoundTitle": "Component not found",
+    "notFoundDescription": "This component no longer exists or has been disabled.",
+    "iframe": {
+      "openInNewTab": "Open in new tab",
+      "embedHint": "Some websites cannot be embedded. If this area stays empty, open the page in a new tab.",
+      "urlLabel": "Address (URL)",
+      "urlHint": "The website embedded on the component's page. https only; http is allowed for localhost."
+    },
+    "rss": {
+      "feedUrlLabel": "Feed address (URL)",
+      "feedUrlHint": "An RSS, Atom or JSON feed. http or https."
+    },
+    "link": {
+      "open": "Open website",
+      "pageDescription": "This shortcut opens {{host}} outside JLU Campus.",
+      "urlLabel": "Address (URL)",
+      "urlHint": "The website the shortcut opens outside JLU Campus. http or https."
+    }
+  },
+  "componentTypes": {
+    "iframe": "Embedded website",
+    "rss": "RSS feed",
+    "link": "Shortcut"
+  },
+  "shortcut": {
+    "new": "New shortcut",
+    "open": "Open {{name}} in a new window",
+    "opensOutside": "(opens outside JLU Campus)",
+    "createTitle": "New shortcut",
+    "editTitle": "Edit shortcut",
+    "description": "A link to any website. It opens in a new browser tab, or in your browser when you use the desktop app.",
+    "url": "Address (URL)",
+    "urlHint": "http or https. Without either, https:// is added.",
+    "title": "Title",
+    "titleHint": "Leave empty to use the website's address.",
+    "icon": "Icon",
+    "iconHint": "Without a chosen icon, the website's own icon (favicon) is shown.",
+    "add": "Add shortcut",
+    "errors": {
+      "url": "Enter a full web address starting with http:// or https://.",
+      "title": "Enter a title with at most {{max}} characters."
+    }
+  },
+  "feed": {
+    "new": "New RSS feed",
+    "loading": "Loading feed …",
+    "empty": "This feed has no entries yet.",
+    "fallbackName": "Feed from {{host}}",
+    "openSite": "Open the website of {{name}}",
+    "openSiteButton": "Open website",
+    "errors": {
+      "unavailable": "The feed could not be loaded. The website may be unreachable, or there is no feed at this address.",
+      "invalidUrl": "This feed address is not valid.",
+      "failed": "The feed could not be loaded. Please try again."
+    },
+    "check": {
+      "checking": "Checking feed …",
+      "found_one": "Found: {{title}} ({{count}} entry)",
+      "found_other": "Found: {{title}} ({{count}} entries)"
+    },
+    "dialog": {
+      "createTitle": "New RSS feed",
+      "editTitle": "Edit RSS feed",
+      "description": "Shows the newest entries of any RSS, Atom or JSON feed on your dashboard.",
+      "url": "Feed address (URL)",
+      "urlHint": "The address of the feed itself, often ending in /feed, /rss or .xml.",
+      "title": "Title (optional)",
+      "titleHint": "Leave empty to use the feed's own title.",
+      "add": "Add feed",
+      "errors": {
+        "url": "Enter a full web address starting with http:// or https://.",
+        "title": "Enter a title with at most {{max}} characters."
+      }
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Adjust JLU Campus to your needs. Settings apply on all your devices; the colour scheme is per device.",
+    "language": {
+      "title": "Language",
+      "label": "Interface language",
+      "description": "Saved to your profile."
+    },
+    "appearance": {
+      "title": "Appearance",
+      "description": "Light, dark, or the same as your operating system."
+    }
+  },
+  "admin": {
+    "title": "Manage components",
+    "description": "The catalogue from which every user builds their sidebar and dashboard. Each component is a page and brings widgets for the dashboard.",
+    "newComponent": "New component",
+    "loadFailed": "The components could not be loaded.",
+    "forbiddenTitle": "No access",
+    "forbiddenDescription": "The administration area is only available to administrators.",
+    "nav": {
+      "label": "Administration",
+      "components": "Components",
+      "folders": "Folder templates",
+      "presets": "Layout presets"
+    },
+    "table": {
+      "caption": "All components in catalogue order",
+      "icon": "Icon",
+      "name": "Name",
+      "type": "Type",
+      "url": "URL",
+      "enabled": "Enabled",
+      "actions": "Actions",
+      "empty": "No components yet.",
+      "enabledFor": "{{name}} enabled",
+      "moveUp": "Move {{name}} up",
+      "moveDown": "Move {{name}} down",
+      "edit": "Edit {{name}}",
+      "delete": "Delete {{name}}",
+      "toggleFailed": "The component could not be changed.",
+      "reorderFailed": "The order could not be saved."
+    },
+    "form": {
+      "createTitle": "New component",
+      "editTitle": "Edit component",
+      "description": "The name and icon appear in the sidebar and on the component's widgets.",
+      "type": "Type",
+      "name": "Name",
+      "icon": "Icon",
+      "iconHint": "An icon from the Lucide library.",
+      "iconUrl": "Image URL (optional)",
+      "iconUrlHint": "A favicon or logo. Replaces the icon when set.",
+      "enabled": "Enabled",
+      "saveFailed": "The component could not be saved.",
+      "created": "Component created.",
+      "updated": "Component saved.",
+      "errors": {
+        "type": "Choose a type.",
+        "name": "Enter a name of at most 80 characters.",
+        "icon": "Choose an icon from the list.",
+        "url": "Enter a full https address (http only for localhost).",
+        "externalUrl": "Enter a full web address starting with http:// or https://."
+      }
+    },
+    "delete": {
+      "title": "Delete component?",
+      "description": "“{{name}}” and its widgets will be removed from the catalogue, from every sidebar and dashboard, and from the folder templates.",
+      "done": "“{{name}}” deleted.",
+      "failed": "The component could not be deleted."
+    },
+    "folders": {
+      "title": "Manage folder templates",
+      "description": "Predefined folders users can add to their dashboard under “Add widget”. They get a copy: later changes to the template do not reach folders already added.",
+      "newFolder": "New folder template",
+      "loadFailed": "The folder templates could not be loaded.",
+      "table": {
+        "caption": "All folder templates in the order they are offered",
+        "widgets": "Widgets",
+        "widgetCount_one": "{{count}} Widget",
+        "widgetCount_other": "{{count}} Widgets",
+        "empty": "No folder templates yet.",
+        "toggleFailed": "The folder template could not be changed."
+      },
+      "form": {
+        "createTitle": "New folder template",
+        "editTitle": "Edit folder template",
+        "description": "The name, icon and widgets of the folder users add to their dashboard. A ticked widget goes to the end of the folder.",
+        "name": "Name",
+        "icon": "Icon (optional)",
+        "iconHint": "An icon from the Lucide library. Without one, a folder icon is shown.",
+        "widgets": "Widgets in the folder",
+        "widgetDisabled": "Disabled",
+        "order": "Order in the folder",
+        "orderEmpty": "No widgets ticked yet.",
+        "removeWidget": "Remove {{name}} from the folder",
+        "enabled": "Enabled",
+        "saveFailed": "The folder template could not be saved.",
+        "created": "Folder template created.",
+        "updated": "Folder template saved.",
+        "errors": {
+          "name": "Enter a name with at most {{max}} characters.",
+          "widgets": "A chosen widget no longer exists. Reload the page and choose the widgets again."
+        }
+      },
+      "delete": {
+        "title": "Delete folder template?",
+        "description": "“{{name}}” will no longer be offered to users. Folders already on dashboards are kept.",
+        "done": "“{{name}}” deleted.",
+        "failed": "The folder template could not be deleted."
+      }
+    },
+    "presets": {
+      "title": "Manage layout presets",
+      "description": "The sidebar and dashboard a new user starts with. At their first sign-in, the first preset in this list whose Keycloak role or group they have is copied once into their own sidebar and dashboard; without a match, the “Everyone” preset is used. Changes only affect users signing in for the first time, never existing users.",
+      "newPreset": "New preset",
+      "loadFailed": "The layout presets could not be loaded.",
+      "audience": {
+        "role": "Role",
+        "group": "Group",
+        "everyone": "Everyone",
+        "roleNamed": "Role {{name}}",
+        "groupNamed": "Group {{name}}"
+      },
+      "table": {
+        "caption": "All layout presets in the order they are matched",
+        "priority": "Priority",
+        "audience": "For",
+        "content": "Content",
+        "last": "Last",
+        "contentSummary": "{{components}} · {{tiles}}",
+        "componentCount_one": "{{count}} component",
+        "componentCount_other": "{{count}} components",
+        "tileCount_one": "{{count}} tile",
+        "tileCount_other": "{{count}} tiles",
+        "empty": "No layout presets yet. New users start with an empty sidebar and dashboard."
+      },
+      "form": {
+        "createTitle": "New layout preset",
+        "editTitle": "Edit name and audience",
+        "description": "Who the preset is for. Its sidebar and dashboard are arranged in the editor that opens next.",
+        "editDescription": "Who the preset is for. The sidebar and dashboard stay as they are.",
+        "name": "Name",
+        "audience": "For",
+        "everyoneTakenHint": "There is already an “Everyone” preset; there can only be one.",
+        "roleName": "Keycloak role",
+        "roleHint": "The name of a Keycloak realm role, e.g. admin.",
+        "groupName": "Keycloak group",
+        "groupHint": "The full path of a Keycloak group, e.g. /Studierende.",
+        "createAndEdit": "Create and edit",
+        "saveFailed": "The layout preset could not be saved.",
+        "created": "Layout preset created.",
+        "updated": "Layout preset saved.",
+        "errors": {
+          "name": "Enter a name with at most {{max}} characters.",
+          "audienceName": "Enter a name with at most {{max}} characters.",
+          "everyoneTaken": "There is already an “Everyone” preset. Choose a role or group, or edit the existing one."
+        }
+      },
+      "delete": {
+        "title": "Delete layout preset?",
+        "description": "New users will no longer start with “{{name}}”. Users who already got it keep their sidebar and dashboard.",
+        "done": "“{{name}}” deleted.",
+        "failed": "The layout preset could not be deleted."
+      },
+      "editor": {
+        "description": "For: {{audience}}. Changes are saved automatically and only reach users signing in for the first time.",
+        "back": "All presets",
+        "details": "Name and audience",
+        "saveFailed": "The layout preset could not be saved.",
+        "notFoundTitle": "Layout preset not found",
+        "notFoundDescription": "This preset no longer exists.",
+        "loadFailedDescription": "The server is not responding. Please try again.",
+        "catalogueFailed": "The components could not be loaded, so the preset cannot be edited right now.",
+        "sidebarTitle": "Sidebar",
+        "sidebarDescription": "The components in the new user's sidebar, in this order. Drag them or use the buttons.",
+        "dashboardTitle": "Dashboard",
+        "dashboardDescription": "The tiles on the new user's dashboard. Choose “Edit” to arrange them.",
+        "dashboardEmptyTitle": "This dashboard is empty",
+        "dashboardEmptyDescription": "Add JLU widgets, folders, shortcuts and feeds that new users should find on their dashboard."
+      }
+    }
+  },
+  "iconPicker": {
+    "label": "Choose icon",
+    "placeholder": "Choose an icon",
+    "search": "Search icons",
+    "empty": "No icon found.",
+    "truncated": "{{shown}} of {{total}} matches, refine your search",
+    "clear": "Remove icon"
+  },
+  "sidebarEditor": {
+    "done": "Done",
+    "title": "Available components",
+    "hint": "Drag components into the sidebar and arrange them there. Drag one back here to take it out of the sidebar.",
+    "sidebarLabel": "Components in the sidebar",
+    "sidebarEmpty": "Drag components here",
+    "availableEmpty": "All components are already in the sidebar.",
+    "add": "Add {{name}} to the sidebar",
+    "remove": "Remove {{name}} from the sidebar",
+    "move": "Move {{name}}",
+    "added": "{{name}} added to the sidebar.",
+    "removed": "{{name}} removed from the sidebar.",
+    "saveFailed": "The sidebar could not be saved.",
+    "loadFailed": "The components could not be loaded.",
+    "dnd": {
+      "instructions": "Press space to pick up a component. Move it with the arrow keys, press space again to drop it, or press escape to cancel.",
+      "pickedUp": "Picked up {{name}}, position {{position}} of {{total}}.",
+      "pickedUpAvailable": "Picked up {{name}}.",
+      "overSidebar": "{{name}} over the sidebar, position {{position}} of {{total}}.",
+      "overAvailable": "{{name}} over the available components. Dropping it removes it from the sidebar.",
+      "outside": "{{name}} is outside the lists.",
+      "droppedSidebar": "{{name}} dropped in the sidebar, position {{position}} of {{total}}.",
+      "droppedAvailable": "{{name}} is with the available components.",
+      "cancelled": "Moving cancelled, {{name}} stays where it was."
+    }
+  }
+}

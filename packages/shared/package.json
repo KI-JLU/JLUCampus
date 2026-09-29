@@ -1,0 +1,23 @@
+{
+  "name": "@justcampus/shared",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Zod schemas and TypeScript types shared by the JLU Campus server, web and desktop apps",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1"
+  }
+}

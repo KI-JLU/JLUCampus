@@ -1,0 +1,51 @@
+import { useQuery } from '@tanstack/react-query'
+import { ExternalLinkIcon } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { Button, Card, Container } from '@ki4jlu/design-system'
+import { ComponentIcon } from '@/components/component-icon'
+import { FeedContent } from '@/components/feed-list'
+import { PageHeader } from '@/components/page-header'
+import { externalLinkProps } from '@/lib/external'
+import { feedQuery } from '@/lib/queries'
+import type { ComponentViewProps } from '../types'
+
+/** The whole feed with each entry's summary, in a reading-width column. */
+export function RssPage({ component }: ComponentViewProps<'rss'>): React.JSX.Element {
+  const { t } = useTranslation()
+  const { data: feed, error, isPending, refetch } = useQuery(feedQuery(component.config.feedUrl))
+  const site = feed?.link ?? null
+  const description = feed?.title && feed.title !== component.name ? feed.title : undefined
+
+  return (
+    <Container size="reading" className="flex flex-col gap-stack-lg py-gutter md:py-margin-page">
+      <PageHeader
+        title={
+          <>
+            <ComponentIcon icon={component.icon} iconUrl={component.iconUrl} />
+            <span className="truncate">{component.name}</span>
+          </>
+        }
+        description={description}
+        actions={
+          site ? (
+            <Button variant="outline" size="sm" asChild>
+              <a {...externalLinkProps(site)}>
+                <ExternalLinkIcon aria-hidden="true" width="1em" height="1em" />
+                {t('feed.openSiteButton')}
+              </a>
+            </Button>
+          ) : undefined
+        }
+      />
+      <Card className="flex min-h-40 flex-col overflow-hidden">
+        <FeedContent
+          feed={feed}
+          error={error}
+          pending={isPending}
+          onRetry={() => void refetch()}
+          variant="page"
+        />
+      </Card>
+    </Container>
+  )
+}

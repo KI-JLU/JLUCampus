@@ -1,0 +1,41 @@
+{
+  "name": "@justcampus/server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "JLU Campus API: Hono, Drizzle, Better-Auth with Keycloak, Postgres",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run --passWithNoTests",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:seed": "tsx src/db/seed.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.1",
+    "@hono/zod-validator": "^0.9.1",
+    "@justcampus/shared": "workspace:*",
+    "better-auth": "^1.7.6",
+    "dotenv": "^18.0.4",
+    "drizzle-orm": "^0.45.3",
+    "feedsmith": "^3.0.1",
+    "hono": "^4.13.10",
+    "postgres": "^3.4.9",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@electron-toolkit/eslint-config-prettier": "^3.0.0",
+    "@electron-toolkit/eslint-config-ts": "^3.1.0",
+    "@types/node": "^24.10.1",
+    "drizzle-kit": "^0.31.11",
+    "eslint": "^9.39.1",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1"
+  }
+}
