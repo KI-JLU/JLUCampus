@@ -66,8 +66,7 @@ export function LanguageSelect(props: LanguageSelectProps): React.JSX.Element {
         aria-invalid={props['aria-invalid']}
         className={cn(
           compact && 'h-8 px-3 py-0 text-sm',
-          inBar &&
-            'min-w-0 flex-1 px-3 text-sm @xl:w-auto @xl:min-w-44 @xl:flex-none @xl:px-4 @xl:text-base',
+          inBar && 'min-w-0 px-3 text-sm @xl:w-auto @xl:min-w-44 @xl:px-4 @xl:text-base',
           className
         )}
       >

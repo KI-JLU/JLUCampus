@@ -31,6 +31,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { SIDE_PANEL_MEDIA } from '@/lib/page-side-panel'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 import { useMediaQuery } from '@/lib/use-media-query'
+import { cn } from '@/lib/utils'
 import { useTranslatorEngines } from '@/lib/queries'
 import type { ComponentViewProps } from '../types'
 import { CopyButton } from './copy-button'
@@ -222,7 +223,15 @@ export function TranslatorPage({ component }: ComponentViewProps<'translator'>):
       ) : null}
       <Card className="@container overflow-hidden">
         <form noValidate onSubmit={submit} className="flex flex-col">
-          <div className="flex min-h-14 items-center justify-center gap-1 border-b border-outline-variant px-2 py-2 @xl:px-4">
+          <div
+            className={cn(
+              'min-h-14 items-center gap-1 border-b border-outline-variant px-2 py-2 @xl:px-4',
+              // The swap button in the middle column, above the line between the panes.
+              translating
+                ? 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]'
+                : 'flex justify-center'
+            )}
+          >
             {translating ? (
               <>
                 <Label htmlFor={`${id}-source`} className="sr-only">
@@ -231,6 +240,7 @@ export function TranslatorPage({ component }: ComponentViewProps<'translator'>):
                 <LanguageSelect
                   id={`${id}-source`}
                   inBar
+                  className="@xl:justify-self-end"
                   allowDetect
                   value={translator.source}
                   detected={translation?.response.detectedSource}
@@ -253,6 +263,7 @@ export function TranslatorPage({ component }: ComponentViewProps<'translator'>):
                 <LanguageSelect
                   id={`${id}-target`}
                   inBar
+                  className="@xl:justify-self-start"
                   value={translator.target}
                   onChange={translator.setTarget}
                 />
