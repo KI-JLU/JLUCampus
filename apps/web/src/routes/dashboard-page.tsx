@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Container } from '@ki4jlu/design-system'
 import { DashboardEditor } from '@/components/dashboard-editor'
-import { PageHeader } from '@/components/page-header'
 import { PageLoading } from '@/components/page-message'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { i18n } from '@/i18n'
@@ -38,19 +37,16 @@ export function DashboardPage(): React.JSX.Element {
   const loading = dashboard.isPending || components.isPending || catalogue.isPending
   const failed = dashboard.isError || components.isError || catalogue.isError
 
+  // No top bar here (see `AppFrame`): the heading is for assistive technology only.
   return (
     <Container className="flex flex-col gap-stack-lg py-gutter md:py-margin-page">
-      {loading || failed ? (
-        <>
-          <PageHeader title={t('dashboard.title')} />
-          {loading ? (
-            <PageLoading label={t('common.loading')} />
-          ) : (
-            <Alert variant="destructive">
-              <AlertDescription>{t('dashboard.loadFailed')}</AlertDescription>
-            </Alert>
-          )}
-        </>
+      <h1 className="sr-only">{t('dashboard.title')}</h1>
+      {loading ? (
+        <PageLoading label={t('common.loading')} />
+      ) : failed ? (
+        <Alert variant="destructive">
+          <AlertDescription>{t('dashboard.loadFailed')}</AlertDescription>
+        </Alert>
       ) : (
         <DashboardEditor
           tiles={dashboard.data ?? []}
@@ -62,11 +58,14 @@ export function DashboardPage(): React.JSX.Element {
             description: t('dashboard.emptyDescription')
           }}
           header={({ actions, editing }) => (
-            <PageHeader
-              title={t('dashboard.title')}
-              description={editing ? t('dashboard.editingHint') : undefined}
-              actions={actions}
-            />
+            <div className="flex flex-wrap items-center justify-end gap-stack-sm">
+              {editing ? (
+                <p className="m-0 min-w-0 flex-1 basis-80 text-body-base text-on-surface-variant">
+                  {t('dashboard.editingHint')}
+                </p>
+              ) : null}
+              {actions}
+            </div>
           )}
         />
       )}

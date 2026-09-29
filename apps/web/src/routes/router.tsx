@@ -20,7 +20,6 @@ import { AppLayout } from './app-layout'
 import { ComponentPage } from './component-page'
 import { DashboardPage } from './dashboard-page'
 import { LoginPage } from './login-page'
-import { SettingsPage } from './settings-page'
 
 async function requireSession({ location }: { location: ParsedLocation }): Promise<void> {
   try {
@@ -70,12 +69,6 @@ const componentRoute = createRoute({
   component: ComponentPage
 })
 
-const settingsRoute = createRoute({
-  getParentRoute: () => appRoute,
-  path: '/settings',
-  component: SettingsPage
-})
-
 const adminComponentsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/admin/components',
@@ -105,7 +98,6 @@ const routeTree = rootRoute.addChildren([
   appRoute.addChildren([
     dashboardRoute,
     componentRoute,
-    settingsRoute,
     adminComponentsRoute,
     adminFoldersRoute,
     adminPresetsRoute,
