@@ -7,7 +7,7 @@ import { db } from '../db/index.js'
 import { component } from '../db/schema.js'
 import { env } from '../env.js'
 import { decryptSecret } from '../secrets.js'
-import { moduleRegistry } from './registry.js'
+import { desktopComponentDefaults, moduleRegistry } from './registry.js'
 import type { AppEnvironment, ModuleConfigMap, ModuleRuntime, ModuleSecretsMap } from './types.js'
 
 export const moduleMiddleware: MiddlewareHandler<AppEnvironment> = async (context, next) => {
@@ -54,8 +54,27 @@ export function registerModuleRoutes(app: Hono<AppEnvironment>): void {
   }
 }
 
+/**
+ * Inserts every missing built-in component at the end of the catalogue: modules disabled, since
+ * they need configuring first, desktop components enabled, since they have nothing to configure.
+ */
 export async function ensureSingletonComponents(): Promise<void> {
-  for (const serverModule of Object.values(moduleRegistry)) {
+  const builtIns = [
+    ...Object.values(moduleRegistry).map((serverModule) => ({
+      type: serverModule.type,
+      name: serverModule.defaultName,
+      icon: serverModule.defaultIcon,
+      config: serverModule.defaultConfig,
+      enabled: false
+    })),
+    ...Object.entries(desktopComponentDefaults).map(([type, defaults]) => ({
+      type,
+      ...defaults,
+      config: {},
+      enabled: true
+    }))
+  ]
+  for (const builtIn of builtIns) {
     const [last] = await db
       .select({ sortOrder: component.sortOrder })
       .from(component)
@@ -64,12 +83,8 @@ export async function ensureSingletonComponents(): Promise<void> {
     await db
       .insert(component)
       .values({
-        name: serverModule.defaultName,
-        type: serverModule.type,
-        icon: serverModule.defaultIcon,
+        ...builtIn,
         iconUrl: null,
-        config: serverModule.defaultConfig,
-        enabled: false,
         singleton: true,
         secrets: {},
         sortOrder: (last?.sortOrder ?? -1) + 1

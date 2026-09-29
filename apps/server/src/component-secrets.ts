@@ -1,4 +1,4 @@
-import { isSingletonType, type ComponentType } from '@justcampus/shared'
+import { isBuiltInType, type ComponentType } from '@justcampus/shared'
 
 export type StoredSecrets = Record<string, string>
 export type SecretPatch = Record<string, string | null | undefined>
@@ -22,5 +22,5 @@ export function componentTypeChangeConflicts(
   stored: { type: string; singleton: boolean },
   nextType: ComponentType
 ): boolean {
-  return stored.singleton ? stored.type !== nextType : isSingletonType(nextType)
+  return stored.singleton ? stored.type !== nextType : isBuiltInType(nextType)
 }

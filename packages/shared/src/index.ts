@@ -62,12 +62,13 @@ export const TILE_DEFAULT_H = 6
 /**
  * Component adapters: `iframe` embeds a site, `rss` shows a feed, `link` is a
  * shortcut that opens its URL outside the app, `translator` is a module (see
- * `SINGLETON_COMPONENT_TYPES`). The type decides the page and the widgets a
+ * `SINGLETON_COMPONENT_TYPES`), `files` a desktop component (see
+ * `DESKTOP_COMPONENT_TYPES`). The type decides the page and the widgets a
  * component adds (see `COMPONENT_WIDGETS`). A future adapter (Stud.IP, …) adds
  * a literal here, a config schema, its widgets, and a renderer in the web
  * app's adapter registry.
  */
-export const COMPONENT_TYPES = ['iframe', 'rss', 'link', 'translator'] as const
+export const COMPONENT_TYPES = ['iframe', 'rss', 'link', 'translator', 'files'] as const
 export const componentTypeSchema = z.enum(COMPONENT_TYPES)
 export type ComponentType = z.infer<typeof componentTypeSchema>
 
@@ -84,6 +85,29 @@ export type SingletonComponentType = (typeof SINGLETON_COMPONENT_TYPES)[number]
 
 export function isSingletonType(type: ComponentType): type is SingletonComponentType {
   return (SINGLETON_COMPONENT_TYPES as readonly ComponentType[]).includes(type)
+}
+
+/**
+ * Desktop components: the catalogue's reference to a desktop module that has
+ * a page (see `DESKTOP_MODULE_IDS`). The page and everything it does live in
+ * the Electron app; the row only lets users place the page in their sidebar
+ * like any other component, and admins put it into layout presets. Like a
+ * module, each type exists as one component that the server creates (enabled,
+ * there is nothing to configure) and nobody can create a second of or delete.
+ * It has no endpoints, no secrets and no widgets. The web app and PWA hide
+ * these components; a type's name is the id of its desktop module.
+ */
+export const DESKTOP_COMPONENT_TYPES = ['files'] as const satisfies readonly (ComponentType &
+  DesktopModuleId)[]
+export type DesktopComponentType = (typeof DESKTOP_COMPONENT_TYPES)[number]
+
+export function isDesktopComponentType(type: ComponentType): type is DesktopComponentType {
+  return (DESKTOP_COMPONENT_TYPES as readonly ComponentType[]).includes(type)
+}
+
+/** Types the server creates itself, once each: modules and desktop components. */
+export function isBuiltInType(type: ComponentType): boolean {
+  return isSingletonType(type) || isDesktopComponentType(type)
 }
 
 /** `https:` anywhere, `http:` only for loopback hosts in development. */
@@ -145,6 +169,10 @@ export const linkComponentConfigSchema = z.object({
   url: externalUrlSchema
 })
 export type LinkComponentConfig = z.infer<typeof linkComponentConfigSchema>
+
+/** Desktop components keep their settings on the device, so their config is empty. */
+export const desktopComponentConfigSchema = z.strictObject({})
+export type DesktopComponentConfig = z.infer<typeof desktopComponentConfigSchema>
 
 /** Languages the translator offers, as ISO 639-1 codes. */
 export const TRANSLATOR_LANGUAGES = [
@@ -217,7 +245,11 @@ export const translatorComponentConfigSchema = z.object({
 export type TranslatorComponentConfig = z.infer<typeof translatorComponentConfigSchema>
 
 export type ComponentConfig =
-  IframeComponentConfig | RssComponentConfig | LinkComponentConfig | TranslatorComponentConfig
+  | IframeComponentConfig
+  | RssComponentConfig
+  | LinkComponentConfig
+  | TranslatorComponentConfig
+  | DesktopComponentConfig
 
 // ---------------------------------------------------------------------------
 // Component secrets (admin-only settings such as API keys)
@@ -233,7 +265,8 @@ export const COMPONENT_SECRETS = {
   iframe: [],
   rss: [],
   link: [],
-  translator: ['deeplApiKey', 'llmApiKey']
+  translator: ['deeplApiKey', 'llmApiKey'],
+  files: []
 } as const satisfies { [T in ComponentType]: readonly string[] }
 
 export type SecretKey<T extends ComponentType = ComponentType> = T extends ComponentType
@@ -281,9 +314,9 @@ const componentBaseSchema = z.object({
 })
 
 /**
- * What an admin sends to create or fully replace a component. Module types
- * (`SINGLETON_COMPONENT_TYPES`) cannot be created, only replaced, and a
- * component's type cannot change into or out of a module type.
+ * What an admin sends to create or fully replace a component. Built-in types
+ * (modules and desktop components, see `isBuiltInType`) cannot be created,
+ * only replaced, and a component's type cannot change into or out of one.
  */
 export const componentInputSchema = z.discriminatedUnion('type', [
   componentBaseSchema.extend({ type: z.literal('iframe'), config: iframeComponentConfigSchema }),
@@ -293,7 +326,8 @@ export const componentInputSchema = z.discriminatedUnion('type', [
     type: z.literal('translator'),
     config: translatorComponentConfigSchema,
     secrets: translatorSecretsInputSchema
-  })
+  }),
+  componentBaseSchema.extend({ type: z.literal('files'), config: desktopComponentConfigSchema })
 ])
 export type ComponentInput = z.infer<typeof componentInputSchema>
 
@@ -313,7 +347,8 @@ export const componentSchema = z.discriminatedUnion('type', [
   storedComponentSchema.extend({
     type: z.literal('translator'),
     config: translatorComponentConfigSchema
-  })
+  }),
+  storedComponentSchema.extend({ type: z.literal('files'), config: desktopComponentConfigSchema })
 ])
 export type Component = z.infer<typeof componentSchema>
 
@@ -341,6 +376,11 @@ export const adminComponentSchema = z.discriminatedUnion('type', [
     type: z.literal('translator'),
     config: translatorComponentConfigSchema,
     secrets: translatorSecretsStatusSchema
+  }),
+  storedComponentSchema.extend({
+    type: z.literal('files'),
+    config: desktopComponentConfigSchema,
+    secrets: noSecretsStatusSchema
   })
 ])
 export type AdminComponent = z.infer<typeof adminComponentSchema>
@@ -375,7 +415,8 @@ export const COMPONENT_WIDGETS = {
   iframe: { launcher: { minW: TILE_MIN_W, minH: TILE_MIN_H } },
   rss: { feed: { minW: TILE_MIN_W, minH: TILE_MIN_H } },
   link: { shortcut: { minW: TILE_MIN_W, minH: TILE_MIN_H } },
-  translator: { quick: { minW: 3, minH: 5 } }
+  translator: { quick: { minW: 3, minH: 5 } },
+  files: {}
 } as const satisfies { [T in ComponentType]: Record<string, WidgetDefinition> }
 
 export type WidgetKey<T extends ComponentType = ComponentType> = T extends ComponentType
@@ -918,11 +959,13 @@ export const KEYCLOAK_PROVIDER_ID = 'keycloak'
 /**
  * Desktop modules: features only the desktop app offers, because they need the
  * operating system (tray, native notifications, the file system, autostart,
- * `jlucampus://` links). They live entirely in the Electron app: no component
- * row, no admin switch, nothing on the server. The main process implements
- * them, the preload exposes each one as `DesktopBridge.modules[id]`, and the
- * web app draws their pages and settings only when the bridge offers them, so
- * the web app and PWA never show them. See `docs/DESKTOP-MODULES.md`.
+ * `jlucampus://` links). Their code lives entirely in the Electron app: the
+ * main process implements them, the preload exposes each one as
+ * `DesktopBridge.modules[id]`, and the web app draws their UI only when the
+ * bridge offers them, so the web app and PWA never show them. A module with a
+ * page also has a desktop component (`DESKTOP_COMPONENT_TYPES`), so its page
+ * sits in sidebars and presets like any component. See
+ * `docs/DESKTOP-MODULES.md`.
  */
 export const DESKTOP_MODULE_IDS = ['notifications', 'files', 'system'] as const
 export type DesktopModuleId = (typeof DESKTOP_MODULE_IDS)[number]
@@ -1007,6 +1050,11 @@ export interface DesktopRecentFile {
   name: string
   size: number
   modifiedAt: string
+  /**
+   * `false` for programs, installers and scripts, which the app never runs; they can still be
+   * shown in their folder.
+   */
+  openable: boolean
 }
 
 export interface DesktopFilesBridge {
