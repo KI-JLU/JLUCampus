@@ -19,7 +19,8 @@
     "resize": "Resize sidebar",
     "tabsLabel": "Switch area",
     "tabNavigation": "Navigation",
-    "tabPage": "Page"
+    "tabPage": "Page",
+    "tabSettings": "Settings"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -294,8 +295,9 @@
   },
   "settings": {
     "title": "Settings",
-    "search": "Search settings",
-    "noMatches": "No matches",
+    "collapse": "Collapse settings",
+    "expand": "Expand settings",
+    "resize": "Resize settings",
     "language": {
       "title": "Language",
       "label": "Interface language",

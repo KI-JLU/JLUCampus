@@ -209,7 +209,8 @@ strings).
   `/login`, `/` (dashboard), `/c/$componentId` (component full page),
   `/admin/components`, `/admin/folders`, `/admin/presets` and
   `/admin/presets/$presetId` (admin only). Settings (language, colour scheme)
-  are a `SettingsDialog` opened from the user menu, not a route.
+  are a collapsible right-hand column (`rightPanel`), opened from the user menu
+  or its rail, not a route.
   The preset editor reuses the user's dashboard grid and sidebar editor.
   The root route loads the session; unauthenticated users go to `/login`.
 - Design system: `@ki4jlu/design-system` exactly like JLU Mail — tokens.css,

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
-import { LayoutDashboardIcon, MenuIcon, PanelsTopLeftIcon } from 'lucide-react'
+import { LayoutDashboardIcon, MenuIcon, PanelsTopLeftIcon, SettingsIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   AppShellLayout,
@@ -14,16 +14,22 @@ import {
 } from '@ki4jlu/design-system'
 import type { Component, Me } from '@justcampus/shared'
 import { PageHeaderSlotsContext } from '@/lib/page-header-slots'
+import { useMediaQuery } from '@/lib/use-media-query'
+import { focusSetting, type SettingsSectionId } from '@/lib/user-settings'
 import { cn } from '@/lib/utils'
 import { AccountMenu } from './account-menu'
 import { MoreAppsButton } from './more-apps'
 import { SidebarComponents } from './sidebar-editor'
+import { UserSettings, UserSettingsRail } from './user-settings-panel'
 
 const LEFT_OPEN_KEY = 'justcampus.shell.left-open'
 const LEFT_WIDTH_KEY = 'justcampus.shell.left-width'
 const LEFT_WIDTH = { defaultWidth: 256, minWidth: 200, maxWidth: 420 }
+const RIGHT_OPEN_KEY = 'justcampus.shell.right-open'
+const RIGHT_WIDTH_KEY = 'justcampus.shell.right-width'
+const RIGHT_WIDTH = { defaultWidth: 320, minWidth: 260, maxWidth: 480 }
 
-type ShellTab = 'nav' | 'page'
+type ShellTab = 'nav' | 'page' | 'settings'
 
 interface AppFrameProps {
   me: Me
@@ -33,16 +39,17 @@ interface AppFrameProps {
 }
 
 /**
- * The chrome around every signed-in page: column with navigation and account, one <main>,
- * and one top bar that carries the page's title and actions (see `PageHeader`). The dashboard
- * has no top bar; its few actions sit on the page.
+ * The chrome around every signed-in page: column with navigation and account on the left, one
+ * <main>, a column with the user's settings on the right, and one top bar that carries the
+ * page's title and actions (see `PageHeader`). The dashboard has no top bar; its few actions
+ * sit on the page.
  */
 export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): React.JSX.Element {
   const { t } = useTranslation()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
   // "More apps" is open, and with it the sidebar's rows are being edited.
   const [moreAppsOpen, setMoreAppsOpen] = useState(false)
-  const [leftOpen, setLeftOpenState] = useLeftOpen()
+  const [leftOpen, setLeftOpenState] = useStoredOpen(LEFT_OPEN_KEY, true)
   // The panel was placed against the open column, so collapsing the column closes it.
   const setLeftOpen = useCallback(
     (open: boolean) => {
@@ -52,7 +59,20 @@ export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): Re
     [setLeftOpenState]
   )
   const [leftWidth, setLeftWidth] = usePersistedWidth(LEFT_WIDTH_KEY, LEFT_WIDTH)
+  const [rightOpen, setRightOpen] = useStoredOpen(RIGHT_OPEN_KEY, false)
+  const [rightWidth, setRightWidth] = usePersistedWidth(RIGHT_WIDTH_KEY, RIGHT_WIDTH)
   const [activeTab, setActiveTab] = useTabPerPath(pathname)
+  const wide = useMediaQuery('(min-width: 64rem)')
+
+  // Opens the settings, at one of them if asked, and moves focus there once it is on screen.
+  const openSettings = useCallback(
+    (section: SettingsSectionId = 'language') => {
+      if (wide) setRightOpen(true)
+      else setActiveTab('settings')
+      focusSetting(section)
+    },
+    [wide, setRightOpen, setActiveTab]
+  )
   const [titleSlot, setTitleSlot] = useState<HTMLElement | null>(null)
   const [actionsSlot, setActionsSlot] = useState<HTMLElement | null>(null)
   const slots = useMemo(
@@ -63,7 +83,8 @@ export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): Re
   const icon = { 'aria-hidden': true, width: '1em', height: '1em' } as const
   const mobileTabs: MobilePaneTab[] = [
     { id: 'nav', icon: <MenuIcon />, label: t('shell.tabNavigation'), pane: 'left' },
-    { id: 'page', icon: <PanelsTopLeftIcon />, label: t('shell.tabPage'), pane: 'main' }
+    { id: 'page', icon: <PanelsTopLeftIcon />, label: t('shell.tabPage'), pane: 'main' },
+    { id: 'settings', icon: <SettingsIcon />, label: t('shell.tabSettings'), pane: 'right' }
   ]
 
   const nav = (
@@ -95,7 +116,24 @@ export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): Re
         logo={<Logo product="Campus" size="sm" />}
         nav={nav}
         navLabel={t('shell.navLabel')}
-        sidebarFooter={<SidebarFooter me={me} />}
+        sidebarFooter={<SidebarFooter me={me} onOpenSettings={() => openSettings()} />}
+        rightPanel={{
+          label: t('settings.title'),
+          header: <h2 className="truncate text-base font-semibold">{t('settings.title')}</h2>,
+          content: <UserSettings />,
+          collapsedPreview: <UserSettingsRail onOpen={openSettings} />,
+          isOpen: rightOpen,
+          onOpenChange: setRightOpen,
+          width: rightWidth,
+          resize: {
+            minWidth: RIGHT_WIDTH.minWidth,
+            maxWidth: RIGHT_WIDTH.maxWidth,
+            onWidthChange: setRightWidth,
+            label: t('settings.resize')
+          },
+          collapseLabel: t('settings.collapse'),
+          expandLabel: t('settings.expand')
+        }}
         pageLabel={<span ref={setTitleSlot} className="flex min-w-0 items-center" />}
         headerActions={
           <>
@@ -121,7 +159,7 @@ export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): Re
         }}
         mobileTabs={mobileTabs}
         activeMobileTab={activeTab}
-        onMobileTabChange={(id) => setActiveTab(id === 'nav' ? 'nav' : 'page')}
+        onMobileTabChange={(id) => setActiveTab(isShellTab(id) ? id : 'page')}
         mobileTabBarLabel={t('shell.tabsLabel')}
       >
         <div id="main-content" tabIndex={-1} className="flex min-h-0 flex-1 flex-col outline-none">
@@ -135,34 +173,48 @@ export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): Re
 }
 
 /** The foot of the column: "More apps", then the user's menu. */
-function SidebarFooter({ me }: { me: Me }): React.JSX.Element {
+function SidebarFooter({
+  me,
+  onOpenSettings
+}: {
+  me: Me
+  onOpenSettings: () => void
+}): React.JSX.Element {
   const collapsed = useSidebarCollapsed()
   return (
     <div className={cn('flex flex-col gap-2', collapsed && 'items-center')}>
       <MoreAppsButton />
-      <AccountMenu me={me} />
+      <AccountMenu me={me} onOpenSettings={onOpenSettings} />
     </div>
   )
 }
 
-/** Whether the column is open, remembered per device. */
-function useLeftOpen(): [boolean, (open: boolean) => void] {
+/** Whether a column is open, remembered per device. */
+function useStoredOpen(key: string, fallback: boolean): [boolean, (open: boolean) => void] {
   const [open, setOpenState] = useState<boolean>(() => {
     try {
-      return window.localStorage.getItem(LEFT_OPEN_KEY) !== 'false'
+      const stored = window.localStorage.getItem(key)
+      return stored === null ? fallback : stored === 'true'
     } catch {
-      return true
+      return fallback
     }
   })
-  const setOpen = useCallback((next: boolean) => {
-    setOpenState(next)
-    try {
-      window.localStorage.setItem(LEFT_OPEN_KEY, String(next))
-    } catch {
-      /* A lost preference costs nothing but the preference. */
-    }
-  }, [])
+  const setOpen = useCallback(
+    (next: boolean) => {
+      setOpenState(next)
+      try {
+        window.localStorage.setItem(key, String(next))
+      } catch {
+        /* A lost preference costs nothing but the preference. */
+      }
+    },
+    [key]
+  )
   return [open, setOpen]
+}
+
+function isShellTab(id: string): id is ShellTab {
+  return id === 'nav' || id === 'page' || id === 'settings'
 }
 
 /** On a narrow screen, following a link from the navigation tab shows the page it opened. */

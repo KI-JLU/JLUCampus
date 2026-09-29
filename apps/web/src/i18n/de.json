@@ -19,7 +19,8 @@
     "resize": "Breite der Seitenleiste ändern",
     "tabsLabel": "Bereich wechseln",
     "tabNavigation": "Navigation",
-    "tabPage": "Seite"
+    "tabPage": "Seite",
+    "tabSettings": "Einstellungen"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -294,8 +295,9 @@
   },
   "settings": {
     "title": "Einstellungen",
-    "search": "Einstellungen suchen",
-    "noMatches": "Keine Treffer",
+    "collapse": "Einstellungen einklappen",
+    "expand": "Einstellungen ausklappen",
+    "resize": "Breite der Einstellungen ändern",
     "language": {
       "title": "Sprache",
       "label": "Sprache der Oberfläche",
