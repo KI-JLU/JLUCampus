@@ -23,7 +23,7 @@
   },
   "nav": {
     "dashboard": "Dashboard",
-    "allApps": "All apps",
+    "moreApps": "More apps",
     "newEntries": "(new entries)"
   },
   "account": {
@@ -398,9 +398,10 @@
       "cancelled": "Moving cancelled, {{name}} stays where it was."
     }
   },
-  "allApps": {
-    "hint": "Drag apps into the sidebar and arrange them there, or use + and ×. Dragged back here, they leave the sidebar.",
+  "moreApps": {
+    "hint": "Drag apps into the sidebar and arrange them there, or use +. Dragged back here, they leave the sidebar.",
     "empty": "No apps are available yet.",
+    "allInSidebar": "All apps are already in the sidebar.",
     "loadFailed": "The apps could not be loaded.",
     "search": "Search apps",
     "noMatches": "No app matches “{{query}}”.",

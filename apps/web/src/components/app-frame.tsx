@@ -16,7 +16,7 @@ import type { Component, Me } from '@justcampus/shared'
 import { PageHeaderSlotsContext } from '@/lib/page-header-slots'
 import { cn } from '@/lib/utils'
 import { AccountMenu } from './account-menu'
-import { AllAppsButton } from './all-apps'
+import { MoreAppsButton } from './more-apps'
 import { SidebarComponents } from './sidebar-editor'
 
 const LEFT_OPEN_KEY = 'justcampus.shell.left-open'
@@ -40,13 +40,13 @@ interface AppFrameProps {
 export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): React.JSX.Element {
   const { t } = useTranslation()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
-  // "All apps" is open, and with it the sidebar's rows are being edited.
-  const [allAppsOpen, setAllAppsOpen] = useState(false)
+  // "More apps" is open, and with it the sidebar's rows are being edited.
+  const [moreAppsOpen, setMoreAppsOpen] = useState(false)
   const [leftOpen, setLeftOpenState] = useLeftOpen()
   // The panel was placed against the open column, so collapsing the column closes it.
   const setLeftOpen = useCallback(
     (open: boolean) => {
-      if (!open) setAllAppsOpen(false)
+      if (!open) setMoreAppsOpen(false)
       setLeftOpenState(open)
     },
     [setLeftOpenState]
@@ -77,16 +77,15 @@ export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): Re
       <SidebarComponents
         components={sidebarComponents}
         pathname={pathname}
-        editing={allAppsOpen}
-        onClose={() => setAllAppsOpen(false)}
+        editing={moreAppsOpen}
       />
     </>
   )
 
   return (
-    // The "All apps" popover: its trigger sits in the column's footer, its panel and the sidebar
+    // The "More apps" popover: its trigger sits in the column's footer, its panel and the sidebar
     // rows it edits in the nav, so the root holds both. It renders no element of its own.
-    <Popover open={allAppsOpen} onOpenChange={setAllAppsOpen}>
+    <Popover open={moreAppsOpen} onOpenChange={setMoreAppsOpen}>
       <AppShellLayout
         className={cn(
           // The template always renders its bar (a `<header>`, the first child of the main column
@@ -135,12 +134,12 @@ export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): Re
   )
 }
 
-/** The foot of the column: "All apps", then the user's menu. */
+/** The foot of the column: "More apps", then the user's menu. */
 function SidebarFooter({ me }: { me: Me }): React.JSX.Element {
   const collapsed = useSidebarCollapsed()
   return (
     <div className={cn('flex flex-col gap-2', collapsed && 'items-center')}>
-      <AllAppsButton />
+      <MoreAppsButton />
       <AccountMenu me={me} />
     </div>
   )
