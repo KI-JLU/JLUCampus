@@ -16,8 +16,8 @@ import type { Component, Me } from '@justcampus/shared'
 import { PageHeaderSlotsContext } from '@/lib/page-header-slots'
 import { cn } from '@/lib/utils'
 import { AccountMenu } from './account-menu'
-import { AllApps } from './all-apps'
-import { EditSidebarButton, SidebarComponents } from './sidebar-editor'
+import { AllAppsButton } from './all-apps'
+import { SidebarComponents } from './sidebar-editor'
 
 const LEFT_OPEN_KEY = 'justcampus.shell.left-open'
 const LEFT_WIDTH_KEY = 'justcampus.shell.left-width'
@@ -40,12 +40,13 @@ interface AppFrameProps {
 export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): React.JSX.Element {
   const { t } = useTranslation()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
-  const [editingSidebar, setEditingSidebar] = useState(false)
+  // "All apps" is open, and with it the sidebar's rows are being edited.
+  const [allAppsOpen, setAllAppsOpen] = useState(false)
   const [leftOpen, setLeftOpenState] = useLeftOpen()
-  // The rail has no room for the editor's rows, so collapsing the column ends editing.
+  // The panel was placed against the open column, so collapsing the column closes it.
   const setLeftOpen = useCallback(
     (open: boolean) => {
-      if (!open) setEditingSidebar(false)
+      if (!open) setAllAppsOpen(false)
       setLeftOpenState(open)
     },
     [setLeftOpenState]
@@ -76,15 +77,16 @@ export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): Re
       <SidebarComponents
         components={sidebarComponents}
         pathname={pathname}
-        editing={editingSidebar}
+        editing={allAppsOpen}
+        onClose={() => setAllAppsOpen(false)}
       />
     </>
   )
 
   return (
-    // The sidebar editor's popover: its trigger sits in the column's footer, its panel beside
-    // the rows in the nav, so the root holds both. It renders no element of its own.
-    <Popover open={editingSidebar} onOpenChange={setEditingSidebar}>
+    // The "All apps" popover: its trigger sits in the column's footer, its panel and the sidebar
+    // rows it edits in the nav, so the root holds both. It renders no element of its own.
+    <Popover open={allAppsOpen} onOpenChange={setAllAppsOpen}>
       <AppShellLayout
         className={cn(
           // The template always renders its bar (a `<header>`, the first child of the main column
@@ -94,7 +96,7 @@ export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): Re
         logo={<Logo product="Campus" size="sm" />}
         nav={nav}
         navLabel={t('shell.navLabel')}
-        sidebarFooter={<SidebarFooter me={me} editingSidebar={editingSidebar} />}
+        sidebarFooter={<SidebarFooter me={me} />}
         pageLabel={<span ref={setTitleSlot} className="flex min-w-0 items-center" />}
         headerActions={
           <>
@@ -133,23 +135,13 @@ export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): Re
   )
 }
 
-interface SidebarFooterProps {
-  me: Me
-  editingSidebar: boolean
-}
-
-/** The foot of the column: "All apps", then the user's menu with the sidebar's edit button beside it. */
-function SidebarFooter({ me, editingSidebar }: SidebarFooterProps): React.JSX.Element {
+/** The foot of the column: "All apps", then the user's menu. */
+function SidebarFooter({ me }: { me: Me }): React.JSX.Element {
   const collapsed = useSidebarCollapsed()
   return (
     <div className={cn('flex flex-col gap-2', collapsed && 'items-center')}>
-      <AllApps />
-      <div className="flex items-center gap-1">
-        <div className="min-w-0 flex-1">
-          <AccountMenu me={me} />
-        </div>
-        {collapsed ? null : <EditSidebarButton editing={editingSidebar} />}
-      </div>
+      <AllAppsButton />
+      <AccountMenu me={me} />
     </div>
   )
 }

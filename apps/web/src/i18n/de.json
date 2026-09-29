@@ -24,7 +24,6 @@
   "nav": {
     "dashboard": "Dashboard",
     "allApps": "Alle Apps",
-    "editSidebar": "Seitenleiste bearbeiten",
     "newEntries": "(neue Einträge)"
   },
   "account": {
@@ -187,6 +186,9 @@
     "openSite": "Website von {{name}} öffnen",
     "openSiteButton": "Website öffnen",
     "newEntry": "Neu:",
+    "newBadge": "Neu",
+    "readMore": "Mehr lesen",
+    "showLess": "Weniger anzeigen",
     "markRead": "{{name}} als gelesen markieren",
     "markReadButton": "Als gelesen markieren",
     "markReadFailed": "Der Feed konnte nicht als gelesen markiert werden. Bitte versuchen Sie es erneut.",
@@ -426,7 +428,6 @@
     "clear": "Symbol entfernen"
   },
   "sidebarEditor": {
-    "done": "Fertig",
     "title": "Verfügbare Komponenten",
     "hint": "Ziehen Sie Komponenten in die Seitenleiste und ordnen Sie sie dort an. Zurück hierher gezogen, verschwinden sie aus der Seitenleiste.",
     "sidebarLabel": "Komponenten in der Seitenleiste",
@@ -452,6 +453,7 @@
     }
   },
   "allApps": {
+    "hint": "Ziehen Sie Apps in die Seitenleiste und ordnen Sie sie dort an, oder nutzen Sie + und ×. Zurück hierher gezogen, verschwinden sie aus der Seitenleiste.",
     "empty": "Es sind noch keine Apps verfügbar.",
     "loadFailed": "Die Apps konnten nicht geladen werden.",
     "search": "Apps durchsuchen",

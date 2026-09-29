@@ -1,13 +1,14 @@
 import type { ReactNode } from 'react'
 import { CloudOffIcon, RefreshCwIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Button, Spinner } from '@ki4jlu/design-system'
+import { Button, Card, Spinner } from '@ki4jlu/design-system'
 import type { Feed, FeedItem } from '@justcampus/shared'
 import { externalLinkProps } from '@/lib/external'
 import { feedErrorKey, formatFeedDate, isNewFeedItem } from '@/lib/feed'
 import { cn } from '@/lib/utils'
+import { FeedArticle } from './feed-article'
 
-/** `tile`: titles and dates, compact. `page`: roomier, with each entry's summary. */
+/** `tile`: titles and dates, compact. `page`: a card per entry, with its summary. */
 export type FeedVariant = 'tile' | 'page'
 
 interface FeedContentProps {
@@ -32,14 +33,14 @@ export function FeedContent({
   const { t } = useTranslation()
   if (pending) {
     return (
-      <FeedMessage>
+      <FeedMessage variant={variant}>
         <Spinner label={t('feed.loading')} />
       </FeedMessage>
     )
   }
   if (!feed) {
     return (
-      <FeedMessage>
+      <FeedMessage variant={variant}>
         <CloudOffIcon aria-hidden="true" className="size-6 text-on-surface-variant" />
         <p role="alert" className="m-0">
           {t(feedErrorKey(error))}
@@ -51,38 +52,63 @@ export function FeedContent({
       </FeedMessage>
     )
   }
-  if (feed.items.length === 0) return <FeedMessage>{t('feed.empty')}</FeedMessage>
-  return <FeedItemList items={feed.items} unreadSince={unreadSince} variant={variant} />
+  if (feed.items.length === 0) {
+    return <FeedMessage variant={variant}>{t('feed.empty')}</FeedMessage>
+  }
+  if (variant === 'page') return <FeedArticleList items={feed.items} unreadSince={unreadSince} />
+  return <FeedItemList items={feed.items} unreadSince={unreadSince} />
 }
 
-function FeedMessage({ children }: { children: ReactNode }): React.JSX.Element {
-  return (
+function FeedMessage({
+  variant,
+  children
+}: {
+  variant: FeedVariant
+  children: ReactNode
+}): React.JSX.Element {
+  const message = (
     <div className="flex flex-1 flex-col items-center justify-center gap-2 p-3 text-center text-sm text-on-surface-variant">
       {children}
     </div>
   )
+  return variant === 'page' ? <Card className="flex min-h-40 flex-col">{message}</Card> : message
 }
 
 interface FeedItemListProps {
   items: FeedItem[]
   /** See `FeedContentProps.unreadSince`. */
   unreadSince: string | null
-  variant: FeedVariant
+}
+
+/** The feed page's entries, one card each; a new one is marked with a badge. */
+function FeedArticleList({ items, unreadSince }: FeedItemListProps): React.JSX.Element {
+  const { i18n } = useTranslation()
+  const language = i18n.resolvedLanguage ?? i18n.language
+  const now = new Date()
+
+  return (
+    <ul className="m-0 flex list-none flex-col gap-stack-md p-0">
+      {items.map((item) => (
+        <li key={item.id}>
+          <FeedArticle
+            item={item}
+            date={item.publishedAt ? formatFeedDate(item.publishedAt, language, now) : null}
+            isNew={isNewFeedItem(item, unreadSince)}
+          />
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 /**
- * Entries as plain text; each with a link opens outside the app. A new entry gets a dot and a
- * bolder title, and screen readers hear "New" before it.
+ * A tile's entries as plain text; each with a link opens outside the app. A new entry gets a
+ * dot and a bolder title, and screen readers hear "New" before it.
  */
-export function FeedItemList({
-  items,
-  unreadSince,
-  variant
-}: FeedItemListProps): React.JSX.Element {
+export function FeedItemList({ items, unreadSince }: FeedItemListProps): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const language = i18n.resolvedLanguage ?? i18n.language
   const now = new Date()
-  const page = variant === 'page'
 
   return (
     <ul className="m-0 flex list-none flex-col p-0">
@@ -93,9 +119,8 @@ export function FeedItemList({
           <>
             <span
               className={cn(
-                'text-on-surface',
-                page ? 'font-semibold' : 'line-clamp-2 text-sm font-medium',
-                isNew && (page ? 'font-bold' : 'font-semibold')
+                'line-clamp-2 text-sm font-medium text-on-surface',
+                isNew && 'font-semibold'
               )}
             >
               {isNew ? (
@@ -119,12 +144,9 @@ export function FeedItemList({
                 {date.label}
               </time>
             ) : null}
-            {page && item.summary ? (
-              <span className="line-clamp-4 text-sm text-on-surface-variant">{item.summary}</span>
-            ) : null}
           </>
         )
-        const className = cn('flex flex-col gap-0.5 no-underline', page ? 'px-4 py-3' : 'px-3 py-2')
+        const className = 'flex flex-col gap-0.5 px-3 py-2 no-underline'
         return (
           <li key={item.id} className="border-b border-outline-variant last:border-b-0">
             {item.link ? (

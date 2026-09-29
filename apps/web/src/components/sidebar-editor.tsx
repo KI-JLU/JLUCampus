@@ -1,17 +1,10 @@
-import { useId, useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { DndContext } from '@dnd-kit/core'
-import { ArrowUpRightIcon, CheckIcon, PencilIcon } from 'lucide-react'
+import { ArrowUpRightIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import {
-  Button,
-  NavItem,
-  PopoverAnchor,
-  PopoverContent,
-  PopoverTrigger,
-  useSidebarCollapsed
-} from '@ki4jlu/design-system'
+import { NavItem, PopoverAnchor, useSidebarCollapsed } from '@ki4jlu/design-system'
 import type { Component } from '@justcampus/shared'
 import { externalUrlOf, feedUrlOf } from '@/adapters/registry'
 import { externalLinkProps } from '@/lib/external'
@@ -21,6 +14,7 @@ import { useFeedHasUnread } from '@/lib/use-feed'
 import { useMediaQuery } from '@/lib/use-media-query'
 import { useSidebarArrangement } from '@/lib/use-sidebar-arrangement'
 import { cn } from '@/lib/utils'
+import { AllAppsPanel } from './all-apps'
 import { ComponentIcon } from './component-icon'
 import { DropList, SidebarDragLayer, SidebarRows } from './sidebar-arrangement'
 
@@ -30,46 +24,30 @@ interface SidebarComponentsProps {
   /** The user's sidebar components, in their order. */
   components: Component[]
   pathname: string
-  /** Whether the sidebar is being edited; the `Popover` around the shell holds that state. */
+  /** Whether "All apps" is open and the sidebar edited; the `Popover` around the shell holds that. */
   editing: boolean
+  /** Closes "All apps", and so ends editing. */
+  onClose: () => void
 }
 
 /**
- * The component links of the sidebar, or while editing their editor: the links turn into sortable
- * rows in place and a panel beside the column lists the components that are not in the sidebar
- * yet; rows drag between the two. `EditSidebarButton` switches between the two.
+ * The component links of the sidebar, or while "All apps" is open their editor: the links turn
+ * into sortable rows in place and the panel beside the column lists every component; rows drag
+ * between the two. `AllAppsButton` opens and closes the panel.
  */
 export function SidebarComponents({
   components,
   pathname,
-  editing
+  editing,
+  onClose
 }: SidebarComponentsProps): React.JSX.Element {
-  if (editing) return <SidebarEditor />
+  if (editing) return <SidebarEditor pathname={pathname} onClose={onClose} />
   return (
     <>
       {components.map((component) => (
         <SidebarComponentLink key={component.id} component={component} pathname={pathname} />
       ))}
     </>
-  )
-}
-
-/** The pencil beside the user's name that starts and ends editing the sidebar. */
-export function EditSidebarButton({ editing }: { editing: boolean }): React.JSX.Element {
-  const { t } = useTranslation()
-  const label = editing ? t('sidebarEditor.done') : t('nav.editSidebar')
-  return (
-    <PopoverTrigger asChild>
-      <Button
-        variant={editing ? 'default' : 'ghost'}
-        size="icon"
-        className="shrink-0"
-        aria-label={label}
-        title={label}
-      >
-        {editing ? <CheckIcon {...icon} /> : <PencilIcon {...icon} />}
-      </Button>
-    </PopoverTrigger>
   )
 }
 
@@ -160,17 +138,24 @@ function ComponentPageLink({
 }
 
 /**
- * The user's own sidebar rows in place, plus the panel of available components, one drag
- * context for both. Changes are saved at once.
+ * The user's own sidebar rows in place, plus the "All apps" panel, one drag context for both.
+ * Changes are saved at once. The collapsed column has no room for the rows; it keeps its links
+ * and the panel's buttons still add and remove.
  */
-function SidebarEditor(): React.JSX.Element {
+function SidebarEditor({
+  pathname,
+  onClose
+}: {
+  pathname: string
+  onClose: () => void
+}): React.JSX.Element {
   const { t } = useTranslation()
+  const collapsed = useSidebarCollapsed()
   const catalogue = useQuery(componentsQuery)
   const sidebar = useQuery(sidebarQuery)
   const { mutate } = useSaveSidebar()
   const wide = useMediaQuery('(min-width: 64rem)')
-  const titleId = useId()
-  const hintId = useId()
+  const markerRef = useRef<HTMLSpanElement>(null)
   const arrangement = useSidebarArrangement({
     catalogue: catalogue.data,
     componentIds: sidebar.data,
@@ -180,24 +165,23 @@ function SidebarEditor(): React.JSX.Element {
         onSettled
       })
   })
-  const { lists, listRef, availableRef, activeId } = arrangement
+  const { lists, listRef, byId } = arrangement
 
-  // The panel sits beside the whole column on wide screens and below the rows on narrow ones,
-  // where the column fills the screen.
+  // On wide screens the panel is a second column of full height beside the sidebar; on narrow
+  // ones, where the column fills the screen, it sits below the rows.
   const anchor = useMemo(
     () => ({
       current: {
         getBoundingClientRect: (): DOMRect => {
-          const list = listRef.current
-          if (!list) return new DOMRect()
-          const rows = list.getBoundingClientRect()
-          const column = list.closest('aside')?.getBoundingClientRect()
-          if (!column) return rows
+          const column = markerRef.current?.closest('aside')?.getBoundingClientRect()
+          if (!column) return new DOMRect(0, 0, 0, window.innerHeight)
+          const rows = listRef.current?.getBoundingClientRect()
+          if (wide || !rows) return column
           return new DOMRect(column.left, rows.top, column.width, rows.height)
         }
       }
     }),
-    [listRef]
+    [listRef, wide]
   )
 
   const loading = catalogue.isPending || sidebar.isPending
@@ -206,60 +190,32 @@ function SidebarEditor(): React.JSX.Element {
   return (
     <DndContext {...arrangement.dndProps}>
       <PopoverAnchor virtualRef={anchor} />
-      <DropList
-        id="sidebar"
-        listRef={listRef}
-        label={t('sidebarEditor.sidebarLabel')}
-        items={lists.sidebar}
-        empty={loading ? t('common.loading') : t('sidebarEditor.sidebarEmpty')}
-      >
-        <SidebarRows arrangement={arrangement} list="sidebar" />
-      </DropList>
-      <PopoverContent
-        side={wide ? 'right' : 'bottom'}
-        align="start"
-        sideOffset={8}
-        collisionPadding={12}
-        aria-labelledby={titleId}
-        aria-describedby={hintId}
-        className="flex w-72 flex-col gap-stack-sm p-3"
-        // Working in the sidebar rows is part of editing, not a click away from it.
-        onInteractOutside={(event) => {
-          if (event.target instanceof Node && listRef.current?.contains(event.target)) {
-            event.preventDefault()
-          }
-        }}
-        // While a row is lifted by keyboard, Escape cancels that move and keeps the panel.
-        onEscapeKeyDown={(event) => {
-          if (activeId) event.preventDefault()
-        }}
-      >
-        <h2 id={titleId} className="m-0 text-sm font-semibold text-on-surface">
-          {t('sidebarEditor.title')}
-        </h2>
-        <p id={hintId} className="m-0 text-xs text-on-surface-variant">
-          {t('sidebarEditor.hint')}
-        </p>
-        {failed ? (
-          <p role="alert" className="m-0 text-sm text-error">
-            {t('sidebarEditor.loadFailed')}
-          </p>
-        ) : (
-          <DropList
-            id="available"
-            listRef={availableRef}
-            label={t('sidebarEditor.title')}
-            items={lists.available}
-            empty={loading ? t('common.loading') : t('sidebarEditor.availableEmpty')}
-            className="max-h-96 overflow-y-auto"
-          >
-            <SidebarRows arrangement={arrangement} list="available" />
-          </DropList>
-        )}
-        <p role="status" className="sr-only">
-          {arrangement.status}
-        </p>
-      </PopoverContent>
+      <span ref={markerRef} hidden />
+      {collapsed ? (
+        lists.sidebar.flatMap((id) => {
+          const component = byId.get(id)
+          if (!component) return []
+          return [<SidebarComponentLink key={id} component={component} pathname={pathname} />]
+        })
+      ) : (
+        <DropList
+          id="sidebar"
+          listRef={listRef}
+          label={t('sidebarEditor.sidebarLabel')}
+          items={lists.sidebar}
+          empty={loading ? t('common.loading') : t('sidebarEditor.sidebarEmpty')}
+        >
+          <SidebarRows arrangement={arrangement} list="sidebar" />
+        </DropList>
+      )}
+      <AllAppsPanel
+        arrangement={arrangement}
+        catalogue={catalogue.data}
+        loading={loading}
+        failed={failed}
+        wide={wide}
+        onClose={onClose}
+      />
       <SidebarDragLayer component={arrangement.activeComponent} />
     </DndContext>
   )

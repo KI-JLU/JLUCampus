@@ -10,6 +10,8 @@ export interface FeedDate {
   label: string
   /** Date and time in full, for a tooltip. */
   full: string
+  /** The day spelled out: "16 September 2026". */
+  long: string
 }
 
 /**
@@ -23,6 +25,7 @@ export function formatFeedDate(iso: string, language: string, now = new Date()):
     dateStyle: 'medium',
     timeStyle: 'short'
   }).format(date)
+  const long = new Intl.DateTimeFormat(language, { dateStyle: 'long' }).format(date)
   const ago = now.getTime() - date.getTime()
   if (ago >= 0 && ago < 7 * DAY) {
     const relative = new Intl.RelativeTimeFormat(language, { numeric: 'auto', style: 'short' })
@@ -32,7 +35,7 @@ export function formatFeedDate(iso: string, language: string, now = new Date()):
         : ago < DAY
           ? relative.format(-Math.floor(ago / HOUR), 'hour')
           : relative.format(-Math.floor(ago / DAY), 'day')
-    return { label, full }
+    return { label, full, long }
   }
   const sameYear = date.getFullYear() === now.getFullYear()
   const label = new Intl.DateTimeFormat(language, {
@@ -40,7 +43,7 @@ export function formatFeedDate(iso: string, language: string, now = new Date()):
     month: 'short',
     ...(sameYear ? {} : { year: 'numeric' })
   }).format(date)
-  return { label, full }
+  return { label, full, long }
 }
 
 export type FeedErrorKey =

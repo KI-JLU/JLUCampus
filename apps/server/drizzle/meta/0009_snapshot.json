@@ -1,6 +1,6 @@
 {
-  "id": "50fa8107-7b87-41f8-a843-caee7e0466f1",
-  "prevId": "0e07c2d4-5e8f-4526-ad15-eab12f07b223",
+  "id": "77b71488-4b56-498e-8bbb-d5c28ec4856f",
+  "prevId": "50fa8107-7b87-41f8-a843-caee7e0466f1",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -101,24 +101,24 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "account_user_id_user_id_fk": {
           "name": "account_user_id_user_id_fk",
           "tableFrom": "account",
+          "tableTo": "user",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -175,6 +175,20 @@
           "notNull": true,
           "default": true
         },
+        "singleton": {
+          "name": "singleton",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "secrets": {
+          "name": "secrets",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
         "sort_order": {
           "name": "sort_order",
           "type": "integer",
@@ -214,9 +228,25 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
+        },
+        "component_singleton_type_uidx": {
+          "name": "component_singleton_type_uidx",
+          "columns": [
+            {
+              "expression": "type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"component\".\"singleton\" = true",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -311,9 +341,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "dashboard_folder_item_component_id_idx": {
           "name": "dashboard_folder_item_component_id_idx",
@@ -326,37 +356,37 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "dashboard_folder_item_tile_id_dashboard_tile_id_fk": {
           "name": "dashboard_folder_item_tile_id_dashboard_tile_id_fk",
           "tableFrom": "dashboard_folder_item",
+          "tableTo": "dashboard_tile",
           "columnsFrom": [
             "tile_id"
           ],
-          "tableTo": "dashboard_tile",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "dashboard_folder_item_component_id_component_id_fk": {
           "name": "dashboard_folder_item_component_id_component_id_fk",
           "tableFrom": "dashboard_folder_item",
+          "tableTo": "component",
           "columnsFrom": [
             "component_id"
           ],
-          "tableTo": "component",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -455,9 +485,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "dashboard_tile_component_id_idx": {
           "name": "dashboard_tile_component_id_idx",
@@ -470,37 +500,37 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "dashboard_tile_user_id_user_id_fk": {
           "name": "dashboard_tile_user_id_user_id_fk",
           "tableFrom": "dashboard_tile",
+          "tableTo": "user",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "dashboard_tile_component_id_component_id_fk": {
           "name": "dashboard_tile_component_id_component_id_fk",
           "tableFrom": "dashboard_tile",
+          "tableTo": "component",
           "columnsFrom": [
             "component_id"
           ],
-          "tableTo": "component",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -537,15 +567,15 @@
         "feed_read_user_id_user_id_fk": {
           "name": "feed_read_user_id_user_id_fk",
           "tableFrom": "feed_read",
+          "tableTo": "user",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -631,9 +661,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -684,37 +714,37 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "folder_template_item_template_id_folder_template_id_fk": {
           "name": "folder_template_item_template_id_folder_template_id_fk",
           "tableFrom": "folder_template_item",
+          "tableTo": "folder_template",
           "columnsFrom": [
             "template_id"
           ],
-          "tableTo": "folder_template",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "folder_template_item_component_id_component_id_fk": {
           "name": "folder_template_item_component_id_component_id_fk",
           "tableFrom": "folder_template_item",
+          "tableTo": "component",
           "columnsFrom": [
             "component_id"
           ],
-          "tableTo": "component",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -806,9 +836,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "layout_preset_everyone_uidx": {
           "name": "layout_preset_everyone_uidx",
@@ -821,10 +851,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"layout_preset\".\"audience_kind\" = 'everyone'",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -901,9 +931,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "session_user_id_idx": {
           "name": "session_user_id_idx",
@@ -916,24 +946,24 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "session_user_id_user_id_fk": {
           "name": "session_user_id_user_id_fk",
           "tableFrom": "session",
+          "tableTo": "user",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -983,9 +1013,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "sidebar_entry_component_id_idx": {
           "name": "sidebar_entry_component_id_idx",
@@ -998,37 +1028,37 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "sidebar_entry_user_id_user_id_fk": {
           "name": "sidebar_entry_user_id_user_id_fk",
           "tableFrom": "sidebar_entry",
+          "tableTo": "user",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "sidebar_entry_component_id_component_id_fk": {
           "name": "sidebar_entry_component_id_component_id_fk",
           "tableFrom": "sidebar_entry",
+          "tableTo": "component",
           "columnsFrom": [
             "component_id"
           ],
-          "tableTo": "component",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -1134,10 +1164,10 @@
       "uniqueConstraints": {
         "user_email_unique": {
           "name": "user_email_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "email"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -1199,9 +1229,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -1214,10 +1244,10 @@
   },
   "enums": {},
   "schemas": {},
-  "views": {},
   "sequences": {},
   "roles": {},
   "policies": {},
+  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},
