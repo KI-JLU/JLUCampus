@@ -8,6 +8,12 @@ export const translatorAdapter: ComponentAdapter<'translator'> = {
   type: 'translator',
   Page: TranslatorPage,
   ConfigFields: TranslatorConfigFields,
-  defaultConfig: { defaultTargetLanguage: 'en' },
+  defaultConfig: {
+    defaultTargetLanguage: 'en',
+    deeplApiUrl: null,
+    llmBaseUrl: null,
+    llmModels: [],
+    defaultEngine: null
+  },
   widgets: { quick: { Tile: TranslatorTile } }
 }

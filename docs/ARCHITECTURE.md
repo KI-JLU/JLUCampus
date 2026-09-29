@@ -155,6 +155,29 @@ A module may add tables whose rows reference `component.id`; use that foreign
 key as the module instance and cascade deletes only if the module lifecycle
 allows it. The translator has no module-owned table.
 
+### Translator
+
+The translator (`apps/server/src/modules/translator`) follows HAWKI's
+translation service. It has two modes, translate and rephrase, and two kinds
+of engines:
+
+- **DeepL**, offered once the `deeplApiKey` secret is set. Translation uses
+  `/v2/translate` (formality as `prefer_more` / `prefer_less`, so languages
+  without the distinction are not an error), rephrasing uses DeepL Write
+  (`/v2/write/rephrase`), which takes a writing style or a tone, not both.
+  The API origin is `deeplApiUrl`, or picked from the key (`:fx` keys use
+  `api-free.deepl.com`).
+- **Models of an OpenAI-compatible endpoint** (`llmBaseUrl` up to `/v1`, the
+  admin-listed `llmModels`, optional `llmApiKey`), engine id `llm:<model id>`.
+  Requests go to `/chat/completions` with prompts ported from HAWKI and ask
+  for a JSON answer, which the server parses leniently.
+
+`GET /api/modules/translator/engines` lists the offered engines and the
+default (`defaultEngine`, else the first). Upstream calls refuse redirects,
+time out after 60 s and are cancelled when the client aborts, which live mode
+does whenever a newer request supersedes one. Nothing is stored: the texts
+only pass through the server.
+
 To add a module, add its type, config, secrets and widgets to shared, implement
 and register its server module, then add the web adapter. The typed server
 registry fails type checking when a shared singleton type has no server entry.
@@ -216,9 +239,14 @@ strings).
 - Module adapters (`translator`) have no `sourceUrl`; the admin list marks
   them "Module" and offers no delete, and the component form neither offers
   module types for new components nor lets a module change its type. The
-  translator page (`src/adapters/translator/`) posts to `API.translate` and
-  names its languages with `Intl.DisplayNames`; its `quick` tile always
-  detects the source language. The component form renders one write-only
+  translator page (`src/adapters/translator/`) switches between translating
+  (`API.translate`) and rephrasing (`API.rephrase`), with a settings panel for
+  engine, formality, writing style and tone, live mode (runs after a pause in
+  typing, not offered for DeepL) and "show changes" (a word diff against the
+  submitted text or the previous translation). These settings stay in
+  `localStorage`. Languages are named with `Intl.DisplayNames`; the `quick`
+  tile translates with the default engine and always detects the source
+  language. The component form renders one write-only
   `SecretField` per `COMPONENT_SECRETS[type]` entry (texts under
   `component.<type>.secrets.<key>`) and sends only changed secrets;
   `toComponentInput` never sends any.

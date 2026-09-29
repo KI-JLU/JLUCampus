@@ -4,6 +4,7 @@ import {
   componentInputSchema,
   isSingletonType,
   SECRET_VALUE_MAX,
+  TRANSLATOR_LLM_MODELS_MAX,
   type AdminComponent,
   type ComponentInput,
   type ComponentType
@@ -64,7 +65,8 @@ type Issue = { path: readonly PropertyKey[]; message: string }
 
 /**
  * Known fields get a translated message; anything else keeps the server's
- * wording. Embedded sites need https; feeds and shortcuts accept http too.
+ * wording. Embedded sites and the translator's APIs need https; feeds and
+ * shortcuts accept http too. Paths into lists match with `*` for the index.
  */
 function toFieldErrors(issues: readonly Issue[], type: ComponentType, t: TFunction): FieldErrors {
   const messages: Partial<Record<string, string>> = {
@@ -73,15 +75,23 @@ function toFieldErrors(issues: readonly Issue[], type: ComponentType, t: TFuncti
     icon: t('admin.form.errors.icon'),
     iconUrl: t('admin.form.errors.url'),
     'config.url': t(type === 'iframe' ? 'admin.form.errors.url' : 'admin.form.errors.externalUrl'),
-    'config.feedUrl': t('admin.form.errors.externalUrl')
+    'config.feedUrl': t('admin.form.errors.externalUrl'),
+    'config.deeplApiUrl': t('admin.form.errors.url'),
+    'config.llmBaseUrl': t('admin.form.errors.url'),
+    'config.llmModels': t('component.translator.configErrors.models', {
+      max: TRANSLATOR_LLM_MODELS_MAX
+    }),
+    'config.llmModels.*.id': t('component.translator.configErrors.modelId'),
+    'config.llmModels.*.label': t('component.translator.configErrors.modelLabel')
   }
   const errors: FieldErrors = {}
   for (const issue of issues) {
     const key = issue.path.map(String).join('.') || 'form'
+    const pattern = issue.path.map((part) => (typeof part === 'number' ? '*' : String(part)))
     const secret = key.startsWith('secrets.')
       ? t('admin.form.errors.secret', { max: SECRET_VALUE_MAX })
       : undefined
-    errors[key] ??= messages[key] ?? secret ?? issue.message
+    errors[key] ??= messages[key] ?? messages[pattern.join('.')] ?? secret ?? issue.message
   }
   return errors
 }

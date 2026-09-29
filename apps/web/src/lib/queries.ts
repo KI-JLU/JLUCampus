@@ -4,14 +4,18 @@ import {
   queryOptions,
   type Mutation,
   useMutation,
+  useQuery,
   useQueryClient,
   type DataTag,
   type UndefinedInitialDataOptions,
-  type UseMutationResult
+  type UseMutationResult,
+  type UseQueryResult
 } from '@tanstack/react-query'
 import {
   API,
+  rephraseResponseSchema,
   translateResponseSchema,
+  translatorEngineListSchema,
   type AdminComponent,
   type AdminComponentList,
   type Component,
@@ -29,9 +33,12 @@ import {
   type Me,
   type MePatch,
   type PresetAudienceSuggestions,
+  type RephraseRequest,
+  type RephraseResponse,
   type Sidebar,
   type TranslateRequest,
   type TranslateResponse,
+  type TranslatorEngineList,
   type UserFeed,
   type WidgetList
 } from '@justcampus/shared'
@@ -74,7 +81,8 @@ export const queryKeys = {
   adminPresets: ['admin', 'presets'] as const,
   adminPreset: (id: string) => ['admin', 'preset', id] as const,
   adminPresetAudiences: ['admin', 'preset-audiences'] as const,
-  feed: (url: string) => ['feed', url] as const
+  feed: (url: string) => ['feed', url] as const,
+  translatorEngines: ['translator', 'engines'] as const
 }
 
 export const meQuery = queryOptions({
@@ -129,6 +137,22 @@ export function feedQuery(url: string): FeedQueryOptions {
     refetchInterval: 10 * 60_000,
     retry: (count, error) => !(error instanceof ApiRequestError) && count < 2
   })
+}
+
+/**
+ * The engines the translator offers. Checked against the contract like the
+ * module's other answers; an answer from the server (a disabled module) is
+ * not retried.
+ */
+export const translatorEnginesQuery = queryOptions({
+  queryKey: queryKeys.translatorEngines,
+  queryFn: async ({ signal }) =>
+    translatorEngineListSchema.parse(await apiFetch<unknown>(API.translatorEngines, { signal })),
+  retry: (count, error) => !(error instanceof ApiRequestError) && count < 2
+})
+
+export function useTranslatorEngines(): UseQueryResult<TranslatorEngineList> {
+  return useQuery(translatorEnginesQuery)
 }
 
 /** Every component, disabled ones too, with which of its secrets are set. */
@@ -280,6 +304,7 @@ function invalidateCatalogue(client: QueryClient): Promise<void> {
     client.invalidateQueries({ queryKey: queryKeys.widgets }),
     client.invalidateQueries({ queryKey: queryKeys.sidebar }),
     client.invalidateQueries({ queryKey: queryKeys.dashboard }),
+    client.invalidateQueries({ queryKey: queryKeys.translatorEngines }),
     invalidateFolderTemplates(client)
   ]).then(() => undefined)
 }
@@ -330,15 +355,39 @@ export function useUpdateComponent(): UseMutationResult<
   })
 }
 
+/** A request to the translator module and the signal that aborts it once a newer one starts. */
+export interface TranslatorCall<T> {
+  request: T
+  signal?: AbortSignal
+}
+
 /**
  * Translates one text with the translator module. The answer is checked
  * against the contract, since the module's upstream service is replaceable.
  */
-export function useTranslate(): UseMutationResult<TranslateResponse, Error, TranslateRequest> {
+export function useTranslate(): UseMutationResult<
+  TranslateResponse,
+  Error,
+  TranslatorCall<TranslateRequest>
+> {
   return useMutation({
-    mutationFn: async (request: TranslateRequest) =>
+    mutationFn: async ({ request, signal }: TranslatorCall<TranslateRequest>) =>
       translateResponseSchema.parse(
-        await apiFetch<unknown>(API.translate, { method: 'POST', json: request })
+        await apiFetch<unknown>(API.translate, { method: 'POST', json: request, signal })
+      )
+  })
+}
+
+/** Rephrases one text with the translator module; checked like `useTranslate`. */
+export function useRephrase(): UseMutationResult<
+  RephraseResponse,
+  Error,
+  TranslatorCall<RephraseRequest>
+> {
+  return useMutation({
+    mutationFn: async ({ request, signal }: TranslatorCall<RephraseRequest>) =>
+      rephraseResponseSchema.parse(
+        await apiFetch<unknown>(API.rephrase, { method: 'POST', json: request, signal })
       )
   })
 }

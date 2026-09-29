@@ -166,9 +166,53 @@ export const TRANSLATOR_LANGUAGES = [
 export const translatorLanguageSchema = z.enum(TRANSLATOR_LANGUAGES)
 export type TranslatorLanguage = z.infer<typeof translatorLanguageSchema>
 
+/**
+ * An engine the translator offers: `deepl`, or `llm:` followed by the id of
+ * one of the admin's `llmModels`.
+ */
+export const translatorEngineIdSchema = z
+  .string()
+  .regex(/^(deepl|llm:.{1,200})$/, 'Expected "deepl" or "llm:<model id>"')
+export type TranslatorEngineId = z.infer<typeof translatorEngineIdSchema>
+
+/**
+ * One model of the translator's OpenAI-compatible endpoint (`llmBaseUrl`).
+ * `id` is what the endpoint expects in `model`; `label` is what users see.
+ */
+export const translatorLlmModelSchema = z.object({
+  id: z.string().trim().min(1).max(200),
+  label: z.string().trim().min(1).max(80)
+})
+export type TranslatorLlmModel = z.infer<typeof translatorLlmModelSchema>
+
+export const TRANSLATOR_LLM_MODELS_MAX = 20
+
+/**
+ * The translator works with two kinds of engines: DeepL (translate, and
+ * DeepL Write to rephrase) and the models of an OpenAI-compatible chat
+ * completions endpoint. DeepL is offered once its API key is set, each listed
+ * model once `llmBaseUrl` is set. Fields added after the first release have
+ * defaults, so older stored configs still parse.
+ */
 export const translatorComponentConfigSchema = z.object({
   /** Target language a user starts with. */
-  defaultTargetLanguage: translatorLanguageSchema
+  defaultTargetLanguage: translatorLanguageSchema,
+  /**
+   * DeepL API origin, e.g. `https://api.deepl.com`. `null` picks it from the
+   * key: free keys (ending in `:fx`) use `https://api-free.deepl.com`.
+   */
+  deeplApiUrl: httpsUrlSchema.nullable().default(null),
+  /** Base URL of the OpenAI-compatible API, up to and including `/v1`. */
+  llmBaseUrl: httpsUrlSchema.nullable().default(null),
+  llmModels: z
+    .array(translatorLlmModelSchema)
+    .max(TRANSLATOR_LLM_MODELS_MAX)
+    .refine((models) => new Set(models.map((model) => model.id)).size === models.length, {
+      message: 'Model ids must be unique'
+    })
+    .default([]),
+  /** Engine id (see `translatorEngineIdSchema`) users start with; `null` or unavailable: the first one. */
+  defaultEngine: translatorEngineIdSchema.nullable().default(null)
 })
 export type TranslatorComponentConfig = z.infer<typeof translatorComponentConfigSchema>
 
@@ -189,7 +233,7 @@ export const COMPONENT_SECRETS = {
   iframe: [],
   rss: [],
   link: [],
-  translator: ['apiKey']
+  translator: ['deeplApiKey', 'llmApiKey']
 } as const satisfies { [T in ComponentType]: readonly string[] }
 
 export type SecretKey<T extends ComponentType = ComponentType> = T extends ComponentType
@@ -204,10 +248,12 @@ export const SECRET_VALUE_MAX = 4096
  */
 const secretChangeSchema = z.string().trim().min(1).max(SECRET_VALUE_MAX).nullable().optional()
 
-const translatorSecretsInputSchema = z.strictObject({ apiKey: secretChangeSchema }).optional()
+const translatorSecretsInputSchema = z
+  .strictObject({ deeplApiKey: secretChangeSchema, llmApiKey: secretChangeSchema })
+  .optional()
 
 /** Which of a component's secrets are set, keyed by secret. */
-const translatorSecretsStatusSchema = z.object({ apiKey: z.boolean() })
+const translatorSecretsStatusSchema = z.object({ deeplApiKey: z.boolean(), llmApiKey: z.boolean() })
 const noSecretsStatusSchema = z.object({})
 
 /**
@@ -662,18 +708,63 @@ export const feedReadPutSchema = z.object({
 export type FeedReadPut = z.infer<typeof feedReadPutSchema>
 
 // ---------------------------------------------------------------------------
-// Translator module (`API.translate`)
+// Translator module (`API.translator*`)
 // ---------------------------------------------------------------------------
 
 export const TRANSLATE_TEXT_MAX = 5000
 
+export const TRANSLATOR_ENGINE_KINDS = ['deepl', 'llm'] as const
+export type TranslatorEngineKind = (typeof TRANSLATOR_ENGINE_KINDS)[number]
+
+export const translatorEngineSchema = z.object({
+  id: translatorEngineIdSchema,
+  kind: z.enum(TRANSLATOR_ENGINE_KINDS),
+  label: z.string()
+})
+export type TranslatorEngine = z.infer<typeof translatorEngineSchema>
+
+/**
+ * The engines users may pick, DeepL first, then the models in admin order.
+ * `defaultEngine` is the admin's choice if it is offered, else the first
+ * engine; `null` only when there is none (the module lacks its settings).
+ */
+export const translatorEngineListSchema = z.object({
+  engines: z.array(translatorEngineSchema),
+  defaultEngine: translatorEngineIdSchema.nullable()
+})
+export type TranslatorEngineList = z.infer<typeof translatorEngineListSchema>
+
+/**
+ * Formal or informal address in the translation ("Sie" or "du"). DeepL
+ * applies it where the target language has the distinction and ignores it
+ * elsewhere.
+ */
+export const TRANSLATOR_FORMALITIES = ['default', 'formal', 'informal'] as const
+export const translatorFormalitySchema = z.enum(TRANSLATOR_FORMALITIES)
+export type TranslatorFormality = z.infer<typeof translatorFormalitySchema>
+
+/** Writing styles for rephrasing; DeepL Write's `writing_style` values. */
+export const REPHRASE_STYLES = ['business', 'academic', 'casual', 'simple'] as const
+export const rephraseStyleSchema = z.enum(REPHRASE_STYLES)
+export type RephraseStyle = z.infer<typeof rephraseStyleSchema>
+
+/** Tones for rephrasing; DeepL Write's `tone` values. */
+export const REPHRASE_TONES = ['confident', 'diplomatic', 'enthusiastic', 'friendly'] as const
+export const rephraseToneSchema = z.enum(REPHRASE_TONES)
+export type RephraseTone = z.infer<typeof rephraseToneSchema>
+
+const translatorTextSchema = z.string().trim().min(1).max(TRANSLATE_TEXT_MAX)
+
 export const translateRequestSchema = z.object({
-  text: z.string().trim().min(1).max(TRANSLATE_TEXT_MAX),
+  text: translatorTextSchema,
   /** `null` lets the service detect the language. */
   source: translatorLanguageSchema.nullable(),
-  target: translatorLanguageSchema
+  target: translatorLanguageSchema,
+  /** Left out: the default engine. */
+  engine: translatorEngineIdSchema.optional(),
+  formality: translatorFormalitySchema.default('default')
 })
-export type TranslateRequest = z.infer<typeof translateRequestSchema>
+export type TranslateRequest = z.input<typeof translateRequestSchema>
 
 export const translateResponseSchema = z.object({
   translation: z.string(),
@@ -681,6 +772,26 @@ export const translateResponseSchema = z.object({
   detectedSource: translatorLanguageSchema.nullable()
 })
 export type TranslateResponse = z.infer<typeof translateResponseSchema>
+
+/**
+ * Rewrites a text in its own language: corrects it and, if asked, adapts it
+ * to a style or a tone. DeepL Write takes a style or a tone, not both, so a
+ * request with both for DeepL answers `400 validation`.
+ */
+export const rephraseRequestSchema = z.object({
+  text: translatorTextSchema,
+  engine: translatorEngineIdSchema.optional(),
+  style: rephraseStyleSchema.nullable().default(null),
+  tone: rephraseToneSchema.nullable().default(null)
+})
+export type RephraseRequest = z.input<typeof rephraseRequestSchema>
+
+export const rephraseResponseSchema = z.object({
+  text: z.string(),
+  /** The language of the text, if the service tells. */
+  detectedLanguage: translatorLanguageSchema.nullable()
+})
+export type RephraseResponse = z.infer<typeof rephraseResponseSchema>
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -753,8 +864,16 @@ export const API = {
    * module's component is disabled every endpoint answers `404 not_found`.
    */
   module: (type: SingletonComponentType) => `/api/modules/${type}`,
-  /** POST `translateRequestSchema` → `translateResponseSchema`. Failures answer `502 module_unavailable`. */
+  /** GET: `translatorEngineListSchema`. */
+  translatorEngines: '/api/modules/translator/engines',
+  /**
+   * POST `translateRequestSchema` → `translateResponseSchema`. An engine that
+   * is not offered answers `400 validation`; upstream failures and missing
+   * settings answer `502 module_unavailable`.
+   */
   translate: '/api/modules/translator/translate',
+  /** POST `rephraseRequestSchema` → `rephraseResponseSchema`. Errors as for `translate`. */
+  rephrase: '/api/modules/translator/rephrase',
   /** GET: `folderTemplateListSchema`, enabled templates with widgets of enabled components. Any signed-in user. */
   folderTemplates: '/api/folder-templates',
   /** Admin only. GET: all templates. POST: `folderTemplateInputSchema` → 201 with `folderTemplateSchema`. */

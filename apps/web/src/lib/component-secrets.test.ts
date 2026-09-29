@@ -23,8 +23,14 @@ const stored = {
 const translator: AdminComponent = {
   ...stored,
   type: 'translator',
-  config: { defaultTargetLanguage: 'en' },
-  secrets: { apiKey: true }
+  config: {
+    defaultTargetLanguage: 'en',
+    deeplApiUrl: null,
+    llmBaseUrl: null,
+    llmModels: [],
+    defaultEngine: null
+  },
+  secrets: { deeplApiKey: true, llmApiKey: false }
 }
 
 const iframe: AdminComponent = {
@@ -36,29 +42,35 @@ const iframe: AdminComponent = {
 
 describe('secretKeysOf', () => {
   it('lists the secrets of a type', () => {
-    expect(secretKeysOf('translator')).toEqual(['apiKey'])
+    expect(secretKeysOf('translator')).toEqual(['deeplApiKey', 'llmApiKey'])
     expect(secretKeysOf('iframe')).toEqual([])
   })
 })
 
 describe('secretsPatch', () => {
   it('leaves secrets out when nothing changed', () => {
-    expect(secretsPatch(['apiKey'], {})).toBeUndefined()
-    expect(secretsPatch(['apiKey'], { apiKey: { value: '', remove: false } })).toBeUndefined()
-    expect(secretsPatch(['apiKey'], { apiKey: { value: '   ', remove: false } })).toBeUndefined()
+    expect(secretsPatch(['deeplApiKey'], {})).toBeUndefined()
+    expect(
+      secretsPatch(['deeplApiKey'], { deeplApiKey: { value: '', remove: false } })
+    ).toBeUndefined()
+    expect(
+      secretsPatch(['deeplApiKey'], { deeplApiKey: { value: '   ', remove: false } })
+    ).toBeUndefined()
   })
 
   it('sets a typed value and removes a marked secret', () => {
-    expect(secretsPatch(['apiKey'], { apiKey: { value: 'key', remove: false } })).toEqual({
-      apiKey: 'key'
-    })
-    expect(secretsPatch(['apiKey'], { apiKey: { value: '', remove: true } })).toEqual({
-      apiKey: null
+    expect(secretsPatch(['deeplApiKey'], { deeplApiKey: { value: 'key', remove: false } })).toEqual(
+      {
+        deeplApiKey: 'key'
+      }
+    )
+    expect(secretsPatch(['deeplApiKey'], { deeplApiKey: { value: '', remove: true } })).toEqual({
+      deeplApiKey: null
     })
   })
 
   it('ignores drafts for secrets the type does not keep', () => {
-    expect(secretsPatch([], { apiKey: { value: 'key', remove: false } })).toBeUndefined()
+    expect(secretsPatch([], { deeplApiKey: { value: 'key', remove: false } })).toBeUndefined()
   })
 })
 
@@ -80,10 +92,15 @@ describe('secretStatus', () => {
 
 describe('isSecretSet', () => {
   it('reads the status from the admin component', () => {
-    expect(isSecretSet(translator, 'apiKey')).toBe(true)
-    expect(isSecretSet({ ...translator, secrets: { apiKey: false } }, 'apiKey')).toBe(false)
-    expect(isSecretSet(iframe, 'apiKey')).toBe(false)
-    expect(isSecretSet(null, 'apiKey')).toBe(false)
+    expect(isSecretSet(translator, 'deeplApiKey')).toBe(true)
+    expect(
+      isSecretSet(
+        { ...translator, secrets: { deeplApiKey: false, llmApiKey: false } },
+        'deeplApiKey'
+      )
+    ).toBe(false)
+    expect(isSecretSet(iframe, 'deeplApiKey')).toBe(false)
+    expect(isSecretSet(null, 'deeplApiKey')).toBe(false)
   })
 })
 
@@ -102,12 +119,17 @@ describe('applyComponentInput', () => {
       type: 'translator',
       config: translator.config
     }
-    expect(applyComponentInput(translator, { ...input, secrets: { apiKey: null } })).toMatchObject({
-      secrets: { apiKey: false }
+    expect(
+      applyComponentInput(translator, { ...input, secrets: { deeplApiKey: null } })
+    ).toMatchObject({
+      secrets: { deeplApiKey: false, llmApiKey: false }
     })
-    const unset = { ...translator, secrets: { apiKey: false } }
-    expect(applyComponentInput(unset, { ...input, secrets: { apiKey: 'key' } }).secrets).toEqual({
-      apiKey: true
+    const unset = { ...translator, secrets: { deeplApiKey: false, llmApiKey: false } }
+    expect(
+      applyComponentInput(unset, { ...input, secrets: { deeplApiKey: 'key' } }).secrets
+    ).toEqual({
+      deeplApiKey: true,
+      llmApiKey: false
     })
   })
 })
@@ -120,7 +142,7 @@ describe('toComponentInput', () => {
       iconUrl: null,
       enabled: false,
       type: 'translator',
-      config: { defaultTargetLanguage: 'en' }
+      config: translator.config
     })
   })
 })

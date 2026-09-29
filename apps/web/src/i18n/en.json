@@ -118,7 +118,7 @@
       "urlHint": "The website the shortcut opens outside JLU Campus. http or https."
     },
     "translator": {
-      "pageDescription": "Translate texts of up to {{max}} characters. The text is sent to a translation service.",
+      "pageDescription": "Translate or rephrase texts of up to {{max}} characters. The text is sent to the chosen engine.",
       "source": "Source language",
       "target": "Target language",
       "detect": "Detect language",
@@ -135,21 +135,96 @@
       "result": "Translation",
       "empty": "The translation appears here.",
       "copy": "Copy translation",
-      "copied": "Translation copied.",
-      "copyFailed": "The translation could not be copied.",
+      "copied": "Copied to the clipboard.",
+      "copyFailed": "The text could not be copied.",
       "errors": {
-        "unavailable": "The translation service is unavailable right now. Please try again later.",
+        "unavailable": "The service is unavailable right now. Please try again later.",
         "disabled": "The translator is no longer available.",
-        "invalid": "This text cannot be translated. Check its length and the languages.",
-        "failed": "The translation failed. Please try again."
+        "invalid": "The request was rejected. Check the length of the text and the settings.",
+        "failed": "The request failed. Please try again."
       },
       "defaultTargetLabel": "Default target language",
       "defaultTargetHint": "The language users translate into until they choose another.",
       "secrets": {
-        "apiKey": {
-          "label": "API key",
-          "hint": "The key for the translation service. It is stored encrypted and never shown again."
+        "deeplApiKey": {
+          "label": "DeepL API key",
+          "hint": "Enables DeepL for translating and rephrasing. It is stored encrypted and never shown again."
+        },
+        "llmApiKey": {
+          "label": "AI endpoint API key",
+          "hint": "Only needed if the endpoint asks for one. It is stored encrypted and never shown again."
         }
+      },
+      "mode": "Mode",
+      "modes": {
+        "translate": "Translate",
+        "rephrase": "Rephrase"
+      },
+      "notSetUpTitle": "The translator is not set up yet.",
+      "notSetUpDescription": "An administrator first has to add a DeepL key or an AI endpoint.",
+      "rephraseText": "Text to rephrase",
+      "rephrased": "Rephrased text",
+      "rephrase": "Rephrase",
+      "rephrasing": "Rephrasing …",
+      "rephraseEmpty": "The rephrased text appears here.",
+      "detectedLanguage": "Detected language: {{language}}",
+      "apply": "Apply",
+      "applyHint": "Replaces your text with the rephrased one.",
+      "copyRephrased": "Copy rephrased text",
+      "diff": {
+        "inserted": "inserted:",
+        "deleted": "deleted:"
+      },
+      "settings": "Settings",
+      "engine": "Engine",
+      "engineDefault": "Default",
+      "formality": "Formality",
+      "formalities": {
+        "default": "Default",
+        "formal": "Formal",
+        "informal": "Informal"
+      },
+      "style": "Writing style",
+      "styles": {
+        "default": "Default",
+        "business": "Business",
+        "academic": "Academic",
+        "casual": "Casual",
+        "simple": "Simple"
+      },
+      "tone": "Tone",
+      "tones": {
+        "default": "Default",
+        "confident": "Confident",
+        "diplomatic": "Diplomatic",
+        "enthusiastic": "Enthusiastic",
+        "friendly": "Friendly"
+      },
+      "deeplStyleOrTone": "DeepL Write takes a writing style or a tone, not both.",
+      "live": "Live editing",
+      "liveHint": "Sends the text whenever you pause typing.",
+      "liveDeepl": "Not available with DeepL.",
+      "showChanges": "Show changes",
+      "showChangesTranslateHint": "Highlights what changed since the previous translation.",
+      "showChangesRephraseHint": "Highlights what was changed in your text.",
+      "deeplApiUrlLabel": "DeepL API URL",
+      "deeplApiUrlHint": "Optional. Empty: chosen by the key; free keys end in “:fx” and use https://api-free.deepl.com.",
+      "llmBaseUrlLabel": "AI endpoint (OpenAI-compatible)",
+      "llmBaseUrlHint": "The base URL up to and including “/v1”, e.g. https://chat-ai.academiccloud.de/v1. Empty: no AI models.",
+      "llmModelsLabel": "AI models",
+      "llmModelsHint": "The endpoint expects the model ID, users see the display name. At most {{max}} models.",
+      "modelId": "Model ID",
+      "modelLabel": "Display name",
+      "modelRow": "Model {{number}}",
+      "removeModel": "Remove model “{{name}}”",
+      "addModel": "Add model",
+      "defaultEngineLabel": "Default engine",
+      "defaultEngineHint": "Users start with this one. “Automatic” picks DeepL, or the first model without a DeepL key.",
+      "defaultEngineAuto": "Automatic",
+      "configErrors": {
+        "models": "Each model ID may appear only once, at most {{max}} models.",
+        "modelId": "Enter a model ID of at most 200 characters.",
+        "modelLabel": "Enter a display name of at most 80 characters."
       }
     }
   },

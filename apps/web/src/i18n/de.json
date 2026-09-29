@@ -118,7 +118,7 @@
       "urlHint": "Die Website, die die Verknüpfung außerhalb von JLU Campus öffnet. http oder https."
     },
     "translator": {
-      "pageDescription": "Übersetzen Sie Texte mit bis zu {{max}} Zeichen. Der Text wird dazu an einen Übersetzungsdienst gesendet.",
+      "pageDescription": "Übersetzen oder überarbeiten Sie Texte mit bis zu {{max}} Zeichen. Der Text wird dazu an die gewählte Engine gesendet.",
       "source": "Ausgangssprache",
       "target": "Zielsprache",
       "detect": "Sprache erkennen",
@@ -135,21 +135,96 @@
       "result": "Übersetzung",
       "empty": "Hier erscheint die Übersetzung.",
       "copy": "Übersetzung kopieren",
-      "copied": "Übersetzung kopiert.",
-      "copyFailed": "Die Übersetzung konnte nicht kopiert werden.",
+      "copied": "In die Zwischenablage kopiert.",
+      "copyFailed": "Der Text konnte nicht kopiert werden.",
       "errors": {
-        "unavailable": "Der Übersetzungsdienst ist gerade nicht erreichbar. Bitte versuchen Sie es später erneut.",
+        "unavailable": "Der Dienst ist gerade nicht erreichbar. Bitte versuchen Sie es später erneut.",
         "disabled": "Der Übersetzer ist nicht mehr verfügbar.",
-        "invalid": "Dieser Text lässt sich nicht übersetzen. Prüfen Sie seine Länge und die Sprachen.",
-        "failed": "Die Übersetzung ist fehlgeschlagen. Bitte versuchen Sie es erneut."
+        "invalid": "Die Anfrage wurde abgelehnt. Prüfen Sie die Länge des Texts und die Einstellungen.",
+        "failed": "Die Anfrage ist fehlgeschlagen. Bitte versuchen Sie es erneut."
       },
       "defaultTargetLabel": "Standard-Zielsprache",
       "defaultTargetHint": "In diese Sprache übersetzen Nutzende, bis sie eine andere wählen.",
       "secrets": {
-        "apiKey": {
-          "label": "API-Schlüssel",
-          "hint": "Der Schlüssel für den Übersetzungsdienst. Er wird verschlüsselt gespeichert und nie wieder angezeigt."
+        "deeplApiKey": {
+          "label": "DeepL-API-Schlüssel",
+          "hint": "Schaltet DeepL zum Übersetzen und Überarbeiten frei. Er wird verschlüsselt gespeichert und nie wieder angezeigt."
+        },
+        "llmApiKey": {
+          "label": "API-Schlüssel des KI-Endpunkts",
+          "hint": "Nur nötig, wenn der Endpunkt einen verlangt. Er wird verschlüsselt gespeichert und nie wieder angezeigt."
         }
+      },
+      "mode": "Modus",
+      "modes": {
+        "translate": "Übersetzen",
+        "rephrase": "Überarbeiten"
+      },
+      "notSetUpTitle": "Der Übersetzer ist noch nicht eingerichtet.",
+      "notSetUpDescription": "Eine Administratorin oder ein Administrator muss erst einen DeepL-Schlüssel oder einen KI-Endpunkt hinterlegen.",
+      "rephraseText": "Text zum Überarbeiten",
+      "rephrased": "Überarbeiteter Text",
+      "rephrase": "Überarbeiten",
+      "rephrasing": "Wird überarbeitet …",
+      "rephraseEmpty": "Hier erscheint der überarbeitete Text.",
+      "detectedLanguage": "Erkannte Sprache: {{language}}",
+      "apply": "Übernehmen",
+      "applyHint": "Ersetzt Ihren Text durch den überarbeiteten.",
+      "copyRephrased": "Überarbeiteten Text kopieren",
+      "diff": {
+        "inserted": "eingefügt:",
+        "deleted": "gelöscht:"
+      },
+      "settings": "Einstellungen",
+      "engine": "Engine",
+      "engineDefault": "Standard",
+      "formality": "Anrede",
+      "formalities": {
+        "default": "Standard",
+        "formal": "Formell („Sie“)",
+        "informal": "Informell („du“)"
+      },
+      "style": "Schreibstil",
+      "styles": {
+        "default": "Standard",
+        "business": "Geschäftlich",
+        "academic": "Akademisch",
+        "casual": "Locker",
+        "simple": "Einfach"
+      },
+      "tone": "Tonfall",
+      "tones": {
+        "default": "Standard",
+        "confident": "Selbstbewusst",
+        "diplomatic": "Diplomatisch",
+        "enthusiastic": "Enthusiastisch",
+        "friendly": "Freundlich"
+      },
+      "deeplStyleOrTone": "DeepL Write nimmt einen Schreibstil oder einen Tonfall, nicht beides.",
+      "live": "Live-Bearbeitung",
+      "liveHint": "Sendet den Text, sobald Sie beim Tippen eine Pause machen.",
+      "liveDeepl": "Mit DeepL nicht verfügbar.",
+      "showChanges": "Änderungen anzeigen",
+      "showChangesTranslateHint": "Hebt hervor, was sich gegenüber der vorigen Übersetzung geändert hat.",
+      "showChangesRephraseHint": "Hebt hervor, was an Ihrem Text geändert wurde.",
+      "deeplApiUrlLabel": "DeepL-API-URL",
+      "deeplApiUrlHint": "Optional. Leer: passend zum Schlüssel; Free-Schlüssel enden auf „:fx“ und nutzen https://api-free.deepl.com.",
+      "llmBaseUrlLabel": "KI-Endpunkt (OpenAI-kompatibel)",
+      "llmBaseUrlHint": "Die Basis-URL bis einschließlich „/v1“, z. B. https://chat-ai.academiccloud.de/v1. Leer: keine KI-Modelle.",
+      "llmModelsLabel": "KI-Modelle",
+      "llmModelsHint": "Die Modell-ID erwartet der Endpunkt, den Anzeigenamen sehen Nutzende. Höchstens {{max}} Modelle.",
+      "modelId": "Modell-ID",
+      "modelLabel": "Anzeigename",
+      "modelRow": "Modell {{number}}",
+      "removeModel": "Modell „{{name}}“ entfernen",
+      "addModel": "Modell hinzufügen",
+      "defaultEngineLabel": "Standard-Engine",
+      "defaultEngineHint": "Damit beginnen Nutzende. „Automatisch“ nimmt DeepL, ohne DeepL-Schlüssel das erste Modell.",
+      "defaultEngineAuto": "Automatisch",
+      "configErrors": {
+        "models": "Jede Modell-ID darf nur einmal vorkommen, höchstens {{max}} Modelle.",
+        "modelId": "Geben Sie eine Modell-ID mit höchstens 200 Zeichen ein.",
+        "modelLabel": "Geben Sie einen Anzeigenamen mit höchstens 80 Zeichen ein."
       }
     }
   },
