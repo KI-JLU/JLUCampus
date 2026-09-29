@@ -1,0 +1,22 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    uses: ./.github/workflows/check.yml
+
+  build:
+    needs: check
+    uses: ./.github/workflows/build.yml
+    with:
+      artifact-suffix: ${{ github.event.release.tag_name }}
+      retention-days: 90
+
+  # Deployment follows here once it is decided; it can download the
+  # web-<tag> and server-<tag> artifacts from the build job.

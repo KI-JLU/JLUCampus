@@ -1,0 +1,20 @@
+# Lint, typecheck and tests for every package. Called by ci.yml and release.yml.
+name: Check
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Lint, typecheck and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+
+      - run: bun run lint
+      - run: bun run typecheck
+      - run: bun run test
