@@ -162,9 +162,11 @@ strings).
   (CSP-safe), ESLint plugin rules `no-hardcoded-colors` (error),
   `no-raw-ui-elements` (warn), `layout-only-classname` (warn). Frame:
   `AppShellLayout` with `Logo product="Campus"`, `NavItem`s for dashboard +
-  the user's sidebar components. The column's footer holds "All apps" (a
-  popover with every component) and the `SidebarUserMenu` (settings, admin,
-  sign out, language) with the sidebar's edit button beside it. The dashboard
+  the user's sidebar components. The column's footer holds "All apps" and the
+  `SidebarUserMenu` (settings, admin, sign out, language). "All apps" is also
+  the sidebar editor: its panel lists every component with a search, and while
+  it is open the sidebar's links turn into sortable rows; components drag
+  between the two or join and leave with the rows' buttons. The dashboard
   hides the shell's top bar; its edit actions sit above the grid.
 - Dashboard: `react-grid-layout` (v2), 12 columns (`DASHBOARD_COLS`), row
   height `DASHBOARD_ROW_HEIGHT`, edit mode toggles drag/resize, "add widget"
