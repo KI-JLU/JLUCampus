@@ -17,10 +17,12 @@
     "collapse": "Seitenleiste einklappen",
     "expand": "Seitenleiste ausklappen",
     "resize": "Breite der Seitenleiste ändern",
+    "collapseRight": "Rechte Seitenleiste einklappen",
+    "expandRight": "Rechte Seitenleiste ausklappen",
+    "resizeRight": "Breite der rechten Seitenleiste ändern",
     "tabsLabel": "Bereich wechseln",
     "tabNavigation": "Navigation",
-    "tabPage": "Seite",
-    "tabSettings": "Einstellungen"
+    "tabPage": "Seite"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -295,9 +297,8 @@
   },
   "settings": {
     "title": "Einstellungen",
-    "collapse": "Einstellungen einklappen",
-    "expand": "Einstellungen ausklappen",
-    "resize": "Breite der Einstellungen ändern",
+    "search": "Einstellungen suchen",
+    "noMatches": "Keine Treffer",
     "language": {
       "title": "Sprache",
       "label": "Sprache der Oberfläche",

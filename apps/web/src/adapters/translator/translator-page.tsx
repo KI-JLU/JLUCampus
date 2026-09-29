@@ -27,6 +27,7 @@ import {
 import { ComponentIcon } from '@/components/component-icon'
 import { Field } from '@/components/field'
 import { PageHeader } from '@/components/page-header'
+import { PageSidePanel } from '@/components/page-side-panel'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 import { useTranslatorEngines } from '@/lib/queries'
@@ -35,7 +36,7 @@ import { CopyButton } from './copy-button'
 import { LanguageSelect } from './language-select'
 import { isApplePlatform, isTranslateShortcut, languageOptions } from './languages'
 import { TranslationOutput } from './translation-output'
-import { TranslatorSettingsCard } from './translator-settings-card'
+import { TranslatorSettingsCard, TranslatorSettingsFields } from './translator-settings-card'
 import {
   rephraseOptions,
   resolveEngine,
@@ -65,7 +66,8 @@ interface RequestOptions {
  * The translator: translate a text, or rephrase it in its own language. The
  * text is shared between the two modes, each keeps its own result. Input and
  * result sit side by side once the card is wide enough; the settings go
- * beside the card from `lg` up, below it otherwise.
+ * into a column on the right of the shell from `lg` up, below the card
+ * otherwise.
  */
 export function TranslatorPage({ component }: ComponentViewProps<'translator'>): React.JSX.Element {
   const { t, i18n } = useTranslation()
@@ -160,6 +162,16 @@ export function TranslatorPage({ component }: ComponentViewProps<'translator'>):
     if (canSubmit) run()
   }
 
+  const settingsProps = {
+    id: `${id}-settings`,
+    settings,
+    engines: engines.data?.engines,
+    engine: options.engine,
+    style: options.style,
+    tone: options.tone,
+    onChange: changeSettings
+  }
+
   const translation = translator.result
   const rephrased = rephraser.result
   const resultText = translating ? translation?.response.translation : rephrased?.response.text
@@ -200,7 +212,7 @@ export function TranslatorPage({ component }: ComponentViewProps<'translator'>):
           <AlertDescription>{t('component.translator.notSetUpDescription')}</AlertDescription>
         </Alert>
       ) : null}
-      <div className="grid items-start gap-gutter lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid items-start gap-gutter">
         <Card className="@container">
           <form noValidate onSubmit={submit} className="grid gap-gutter p-4 @xl:grid-cols-2 md:p-6">
             <div className="flex min-w-0 flex-col gap-stack-sm">
@@ -352,15 +364,12 @@ export function TranslatorPage({ component }: ComponentViewProps<'translator'>):
             </div>
           </form>
         </Card>
-        <TranslatorSettingsCard
-          id={`${id}-settings`}
-          settings={settings}
-          engines={engines.data?.engines}
-          engine={options.engine}
-          style={options.style}
-          tone={options.tone}
-          onChange={changeSettings}
-        />
+        <PageSidePanel
+          label={t('component.translator.settings')}
+          fallback={<TranslatorSettingsCard {...settingsProps} />}
+        >
+          <TranslatorSettingsFields {...settingsProps} />
+        </PageSidePanel>
       </div>
     </Container>
   )

@@ -17,10 +17,12 @@
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar",
     "resize": "Resize sidebar",
+    "collapseRight": "Collapse right sidebar",
+    "expandRight": "Expand right sidebar",
+    "resizeRight": "Resize right sidebar",
     "tabsLabel": "Switch area",
     "tabNavigation": "Navigation",
-    "tabPage": "Page",
-    "tabSettings": "Settings"
+    "tabPage": "Page"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -295,9 +297,8 @@
   },
   "settings": {
     "title": "Settings",
-    "collapse": "Collapse settings",
-    "expand": "Expand settings",
-    "resize": "Resize settings",
+    "search": "Search settings",
+    "noMatches": "No matches",
     "language": {
       "title": "Language",
       "label": "Interface language",
