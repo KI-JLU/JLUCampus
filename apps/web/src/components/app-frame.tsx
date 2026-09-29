@@ -6,14 +6,17 @@ import {
   AppShellLayout,
   Logo,
   NavItem,
+  Popover,
   ThemeToggle,
   usePersistedWidth,
+  useSidebarCollapsed,
   type MobilePaneTab
 } from '@ki4jlu/design-system'
 import type { Component, Me } from '@justcampus/shared'
 import { PageHeaderSlotsContext } from '@/lib/page-header-slots'
+import { cn } from '@/lib/utils'
 import { AccountMenu } from './account-menu'
-import { SidebarComponents } from './sidebar-editor'
+import { AllApps, EditSidebarButton, SidebarComponents } from './sidebar-editor'
 
 const LEFT_OPEN_KEY = 'justcampus.shell.left-open'
 const LEFT_WIDTH_KEY = 'justcampus.shell.left-width'
@@ -30,12 +33,22 @@ interface AppFrameProps {
 
 /**
  * The chrome around every signed-in page: column with navigation and account, one <main>,
- * and one top bar that carries the page's title and actions (see `PageHeader`).
+ * and one top bar that carries the page's title and actions (see `PageHeader`). The dashboard
+ * has no top bar; its few actions sit on the page.
  */
 export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): React.JSX.Element {
   const { t } = useTranslation()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
-  const [leftOpen, setLeftOpen] = useLeftOpen()
+  const [editingSidebar, setEditingSidebar] = useState(false)
+  const [leftOpen, setLeftOpenState] = useLeftOpen()
+  // The rail has no room for the editor's rows, so collapsing the column ends editing.
+  const setLeftOpen = useCallback(
+    (open: boolean) => {
+      if (!open) setEditingSidebar(false)
+      setLeftOpenState(open)
+    },
+    [setLeftOpenState]
+  )
   const [leftWidth, setLeftWidth] = usePersistedWidth(LEFT_WIDTH_KEY, LEFT_WIDTH)
   const [activeTab, setActiveTab] = useTabPerPath(pathname)
   const [titleSlot, setTitleSlot] = useState<HTMLElement | null>(null)
@@ -59,48 +72,87 @@ export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): Re
           <span>{t('nav.dashboard')}</span>
         </Link>
       </NavItem>
-      <SidebarComponents components={sidebarComponents} pathname={pathname} />
+      <SidebarComponents
+        components={sidebarComponents}
+        pathname={pathname}
+        editing={editingSidebar}
+      />
     </>
   )
 
   return (
-    <AppShellLayout
-      logo={<Logo product="Campus" size="sm" />}
-      nav={nav}
-      navLabel={t('shell.navLabel')}
-      sidebarFooter={<AccountMenu me={me} />}
-      pageLabel={<span ref={setTitleSlot} className="flex min-w-0 items-center" />}
-      headerActions={
-        <>
-          <div ref={setActionsSlot} className="flex shrink-0 items-center gap-stack-sm" />
-          <ThemeToggle
-            themeLabel={t('theme.label')}
-            lightLabel={t('theme.light')}
-            systemLabel={t('theme.system')}
-            darkLabel={t('theme.dark')}
-          />
-        </>
-      }
-      leftOpen={leftOpen}
-      onLeftOpenChange={setLeftOpen}
-      collapseLabel={t('shell.collapse')}
-      expandLabel={t('shell.expand')}
-      leftWidth={leftWidth}
-      leftResize={{
-        minWidth: LEFT_WIDTH.minWidth,
-        maxWidth: LEFT_WIDTH.maxWidth,
-        onWidthChange: setLeftWidth,
-        label: t('shell.resize')
-      }}
-      mobileTabs={mobileTabs}
-      activeMobileTab={activeTab}
-      onMobileTabChange={(id) => setActiveTab(id === 'nav' ? 'nav' : 'page')}
-      mobileTabBarLabel={t('shell.tabsLabel')}
-    >
-      <div id="main-content" tabIndex={-1} className="flex min-h-0 flex-1 flex-col outline-none">
-        <PageHeaderSlotsContext.Provider value={slots}>{children}</PageHeaderSlotsContext.Provider>
+    // The sidebar editor's popover: its trigger sits in the column's footer, its panel beside
+    // the rows in the nav, so the root holds both. It renders no element of its own.
+    <Popover open={editingSidebar} onOpenChange={setEditingSidebar}>
+      <AppShellLayout
+        className={cn(
+          // The template always renders its bar (a `<header>`, the first child of the main column
+          // on wide screens, of the frame on narrow ones); the dashboard goes without it.
+          pathname === '/' && '[&>div>header]:hidden [&>header]:hidden'
+        )}
+        logo={<Logo product="Campus" size="sm" />}
+        nav={nav}
+        navLabel={t('shell.navLabel')}
+        sidebarFooter={
+          <SidebarFooter me={me} pathname={pathname} editingSidebar={editingSidebar} />
+        }
+        pageLabel={<span ref={setTitleSlot} className="flex min-w-0 items-center" />}
+        headerActions={
+          <>
+            <div ref={setActionsSlot} className="flex shrink-0 items-center gap-stack-sm" />
+            <ThemeToggle
+              themeLabel={t('theme.label')}
+              lightLabel={t('theme.light')}
+              systemLabel={t('theme.system')}
+              darkLabel={t('theme.dark')}
+            />
+          </>
+        }
+        leftOpen={leftOpen}
+        onLeftOpenChange={setLeftOpen}
+        collapseLabel={t('shell.collapse')}
+        expandLabel={t('shell.expand')}
+        leftWidth={leftWidth}
+        leftResize={{
+          minWidth: LEFT_WIDTH.minWidth,
+          maxWidth: LEFT_WIDTH.maxWidth,
+          onWidthChange: setLeftWidth,
+          label: t('shell.resize')
+        }}
+        mobileTabs={mobileTabs}
+        activeMobileTab={activeTab}
+        onMobileTabChange={(id) => setActiveTab(id === 'nav' ? 'nav' : 'page')}
+        mobileTabBarLabel={t('shell.tabsLabel')}
+      >
+        <div id="main-content" tabIndex={-1} className="flex min-h-0 flex-1 flex-col outline-none">
+          <PageHeaderSlotsContext.Provider value={slots}>
+            {children}
+          </PageHeaderSlotsContext.Provider>
+        </div>
+      </AppShellLayout>
+    </Popover>
+  )
+}
+
+interface SidebarFooterProps {
+  me: Me
+  pathname: string
+  editingSidebar: boolean
+}
+
+/** The foot of the column: "All apps", then the user's menu with the sidebar's edit button beside it. */
+function SidebarFooter({ me, pathname, editingSidebar }: SidebarFooterProps): React.JSX.Element {
+  const collapsed = useSidebarCollapsed()
+  return (
+    <div className={cn('flex flex-col gap-2', collapsed && 'items-center')}>
+      <AllApps pathname={pathname} />
+      <div className="flex items-center gap-1">
+        <div className="min-w-0 flex-1">
+          <AccountMenu me={me} />
+        </div>
+        {collapsed ? null : <EditSidebarButton editing={editingSidebar} />}
       </div>
-    </AppShellLayout>
+    </div>
   )
 }
 

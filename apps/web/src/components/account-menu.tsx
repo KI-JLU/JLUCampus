@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { CheckIcon, LogOutIcon, SettingsIcon, ShieldIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -11,6 +12,7 @@ import { LANGUAGES, type Me } from '@justcampus/shared'
 import { useLanguage } from '@/lib/language'
 import { signOut } from '@/lib/session'
 import { toast } from '@/lib/toast'
+import { UserSettingsDialog } from './user-settings-dialog'
 
 const ICON = { 'aria-hidden': true, width: '1em', height: '1em' } as const
 
@@ -19,6 +21,8 @@ export function AccountMenu({ me }: { me: Me }): React.JSX.Element {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { language, setLanguage } = useLanguage({ persist: true })
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
   const displayName = me.name || me.email
 
   const handleSignOut = async (): Promise<void> => {
@@ -35,43 +39,51 @@ export function AccountMenu({ me }: { me: Me }): React.JSX.Element {
     await navigate({ to: '/login', search: {} })
   }
 
+  // The menu item that opened the dialog is gone by the time it closes, so focus goes back to the
+  // menu's trigger, after the dialog has let go of it.
+  const handleSettingsOpenChange = (open: boolean): void => {
+    setSettingsOpen(open)
+    if (!open) requestAnimationFrame(() => menuRef.current?.querySelector('button')?.focus())
+  }
+
   return (
-    <SidebarUserMenu initials={initialsOf(displayName)} name={displayName} role={me.email}>
-      <DropdownMenuItem asChild>
-        <Link to="/settings">
+    <div ref={menuRef} className="contents">
+      <SidebarUserMenu initials={initialsOf(displayName)} name={displayName} role={me.email}>
+        <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
           <SettingsIcon {...ICON} />
           {t('account.settings')}
-        </Link>
-      </DropdownMenuItem>
-      {me.role === 'admin' ? (
-        <DropdownMenuItem asChild>
-          <Link to="/admin/components">
-            <ShieldIcon {...ICON} />
-            {t('account.admin')}
-          </Link>
         </DropdownMenuItem>
-      ) : null}
-      <DropdownMenuSeparator />
-      <DropdownMenuLabel>{t('language.label')}</DropdownMenuLabel>
-      {LANGUAGES.map((option) => (
-        <DropdownMenuItem
-          key={option}
-          role="menuitemradio"
-          aria-checked={language === option}
-          selected={language === option}
-          lang={option}
-          onSelect={() => setLanguage(option)}
-        >
-          {t(`language.${option}`)}
-          {language === option ? <CheckIcon {...ICON} className="ml-auto" /> : null}
+        {me.role === 'admin' ? (
+          <DropdownMenuItem asChild>
+            <Link to="/admin/components">
+              <ShieldIcon {...ICON} />
+              {t('account.admin')}
+            </Link>
+          </DropdownMenuItem>
+        ) : null}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>{t('language.label')}</DropdownMenuLabel>
+        {LANGUAGES.map((option) => (
+          <DropdownMenuItem
+            key={option}
+            role="menuitemradio"
+            aria-checked={language === option}
+            selected={language === option}
+            lang={option}
+            onSelect={() => setLanguage(option)}
+          >
+            {t(`language.${option}`)}
+            {language === option ? <CheckIcon {...ICON} className="ml-auto" /> : null}
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" onSelect={() => void handleSignOut()}>
+          <LogOutIcon {...ICON} />
+          {t('account.signOut')}
         </DropdownMenuItem>
-      ))}
-      <DropdownMenuSeparator />
-      <DropdownMenuItem variant="destructive" onSelect={() => void handleSignOut()}>
-        <LogOutIcon {...ICON} />
-        {t('account.signOut')}
-      </DropdownMenuItem>
-    </SidebarUserMenu>
+      </SidebarUserMenu>
+      <UserSettingsDialog open={settingsOpen} onOpenChange={handleSettingsOpenChange} />
+    </div>
   )
 }
 

@@ -23,6 +23,7 @@
   },
   "nav": {
     "dashboard": "Dashboard",
+    "allApps": "Alle Apps",
     "editSidebar": "Seitenleiste bearbeiten"
   },
   "account": {
@@ -175,7 +176,8 @@
   },
   "settings": {
     "title": "Einstellungen",
-    "description": "Passen Sie JLU Campus an. Die Einstellungen gelten auf allen Ihren Geräten; das Farbschema gilt pro Gerät.",
+    "search": "Einstellungen suchen",
+    "noMatches": "Keine Treffer",
     "language": {
       "title": "Sprache",
       "label": "Sprache der Oberfläche",
@@ -389,5 +391,9 @@
       "droppedAvailable": "{{name}} liegt bei den verfügbaren Komponenten.",
       "cancelled": "Verschieben abgebrochen, {{name}} bleibt an der bisherigen Position."
     }
+  },
+  "allApps": {
+    "empty": "Es sind noch keine Apps verfügbar.",
+    "loadFailed": "Die Apps konnten nicht geladen werden."
   }
 }

@@ -23,6 +23,7 @@
   },
   "nav": {
     "dashboard": "Dashboard",
+    "allApps": "All apps",
     "editSidebar": "Edit sidebar"
   },
   "account": {
@@ -175,7 +176,8 @@
   },
   "settings": {
     "title": "Settings",
-    "description": "Adjust JLU Campus to your needs. Settings apply on all your devices; the colour scheme is per device.",
+    "search": "Search settings",
+    "noMatches": "No matches",
     "language": {
       "title": "Language",
       "label": "Interface language",
@@ -389,5 +391,9 @@
       "droppedAvailable": "{{name}} is with the available components.",
       "cancelled": "Moving cancelled, {{name}} stays where it was."
     }
+  },
+  "allApps": {
+    "empty": "No apps are available yet.",
+    "loadFailed": "The apps could not be loaded."
   }
 }

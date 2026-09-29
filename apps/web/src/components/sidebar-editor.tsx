@@ -2,9 +2,10 @@ import { useId, useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { DndContext } from '@dnd-kit/core'
-import { ArrowUpRightIcon, CheckIcon, PencilIcon } from 'lucide-react'
+import { ArrowUpRightIcon, CheckIcon, GripIcon, PencilIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
+  Button,
   NavItem,
   Popover,
   PopoverAnchor,
@@ -27,50 +28,122 @@ interface SidebarComponentsProps {
   /** The user's sidebar components, in their order. */
   components: Component[]
   pathname: string
+  /** Whether the sidebar is being edited; the `Popover` around the shell holds that state. */
+  editing: boolean
 }
 
 /**
- * The component links of the sidebar and their editor. "Seitenleiste bearbeiten" turns the links
- * into sortable rows in place and opens a panel beside the column with the components that are
- * not in the sidebar yet; rows drag between the two.
+ * The component links of the sidebar, or while editing their editor: the links turn into sortable
+ * rows in place and a panel beside the column lists the components that are not in the sidebar
+ * yet; rows drag between the two. `EditSidebarButton` switches between the two.
  */
 export function SidebarComponents({
   components,
-  pathname
+  pathname,
+  editing
 }: SidebarComponentsProps): React.JSX.Element {
+  if (editing) return <SidebarEditor />
+  return (
+    <>
+      {components.map((component) => (
+        <SidebarComponentLink key={component.id} component={component} pathname={pathname} />
+      ))}
+    </>
+  )
+}
+
+/** The pencil beside the user's name that starts and ends editing the sidebar. */
+export function EditSidebarButton({ editing }: { editing: boolean }): React.JSX.Element {
   const { t } = useTranslation()
-  const [editing, setEditing] = useState(false)
   const label = editing ? t('sidebarEditor.done') : t('nav.editSidebar')
+  return (
+    <PopoverTrigger asChild>
+      <Button
+        variant={editing ? 'default' : 'ghost'}
+        size="icon"
+        className="shrink-0"
+        aria-label={label}
+        title={label}
+      >
+        {editing ? <CheckIcon {...icon} /> : <PencilIcon {...icon} />}
+      </Button>
+    </PopoverTrigger>
+  )
+}
+
+/** "All apps" at the foot of the column: every component, to open one that is not in the sidebar. */
+export function AllApps({ pathname }: { pathname: string }): React.JSX.Element {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const catalogue = useQuery(componentsQuery)
+  const wide = useMediaQuery('(min-width: 64rem)')
+  const titleId = useId()
+  const label = t('nav.allApps')
 
   return (
-    <Popover open={editing} onOpenChange={setEditing}>
-      {editing ? (
-        <SidebarEditor />
-      ) : (
-        components.map((component) => (
-          <SidebarComponentLink key={component.id} component={component} pathname={pathname} />
-        ))
-      )}
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <NavItem type="button" level="sub" label={label}>
-          {editing ? <CheckIcon {...icon} /> : <PencilIcon {...icon} />}
+        <NavItem type="button" label={label}>
+          <GripIcon {...icon} />
           <span>{label}</span>
         </NavItem>
       </PopoverTrigger>
+      <PopoverContent
+        side={wide ? 'right' : 'top'}
+        align="end"
+        sideOffset={8}
+        collisionPadding={12}
+        aria-labelledby={titleId}
+        className="flex w-72 flex-col gap-stack-sm p-3"
+      >
+        <h2 id={titleId} className="m-0 text-sm font-semibold text-on-surface">
+          {label}
+        </h2>
+        {catalogue.isPending ? (
+          <p className="m-0 text-sm text-on-surface-variant">{t('common.loading')}</p>
+        ) : catalogue.isError ? (
+          <p role="alert" className="m-0 text-sm text-error">
+            {t('allApps.loadFailed')}
+          </p>
+        ) : catalogue.data.length === 0 ? (
+          <p className="m-0 text-sm text-on-surface-variant">{t('allApps.empty')}</p>
+        ) : (
+          // Following a link closes the list; the page it opened is what the user wanted.
+          <ul
+            aria-labelledby={titleId}
+            className="m-0 flex max-h-96 list-none flex-col gap-1 overflow-y-auto p-0"
+            onClick={(event) => {
+              if (event.target instanceof Element && event.target.closest('a')) setOpen(false)
+            }}
+          >
+            {catalogue.data.map((component) => (
+              <li key={component.id}>
+                <SidebarComponentLink component={component} pathname={pathname} inColumn={false} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </PopoverContent>
     </Popover>
   )
 }
 
-/** A component's page inside the app, or for shortcut components their site outside it. */
+/**
+ * A component's page inside the app, or for shortcut components their site outside it. `inColumn`
+ * rows shrink to their icon with the collapsed column; a popover's rows keep their text.
+ */
 function SidebarComponentLink({
   component,
-  pathname
+  pathname,
+  inColumn = true
 }: {
   component: Component
   pathname: string
+  inColumn?: boolean
 }): React.JSX.Element {
   const { t } = useTranslation()
   const url = externalUrlOf(component)
+  const label = inColumn ? component.name : undefined
   const content = (
     <>
       <ComponentIcon icon={component.icon} iconUrl={component.iconUrl} siteUrl={url} />
@@ -79,7 +152,7 @@ function SidebarComponentLink({
   )
   if (url) {
     return (
-      <NavItem asChild label={component.name}>
+      <NavItem asChild label={label}>
         <a {...externalLinkProps(url)}>
           {content}
           <span className="sr-only">{t('shortcut.opensOutside')}</span>
@@ -89,7 +162,7 @@ function SidebarComponentLink({
     )
   }
   return (
-    <NavItem asChild label={component.name} active={pathname === `/c/${component.id}`}>
+    <NavItem asChild label={label} active={pathname === `/c/${component.id}`}>
       <Link to="/c/$componentId" params={{ componentId: component.id }}>
         {content}
       </Link>

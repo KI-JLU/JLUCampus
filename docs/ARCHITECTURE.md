@@ -149,8 +149,9 @@ strings).
 
 - Routes (TanStack Router, code-based like JLU Mail, **browser history**):
   `/login`, `/` (dashboard), `/c/$componentId` (component full page),
-  `/settings` (language, sidebar arrangement), `/admin/components`,
-  `/admin/folders`, `/admin/presets` and `/admin/presets/$presetId` (admin only).
+  `/admin/components`, `/admin/folders`, `/admin/presets` and
+  `/admin/presets/$presetId` (admin only). Settings (language, colour scheme)
+  are a `SettingsDialog` opened from the user menu, not a route.
   The preset editor reuses the user's dashboard grid and sidebar editor.
   The root route loads the session; unauthenticated users go to `/login`.
 - Design system: `@ki4jlu/design-system` exactly like JLU Mail — tokens.css,
@@ -158,8 +159,10 @@ strings).
   (CSP-safe), ESLint plugin rules `no-hardcoded-colors` (error),
   `no-raw-ui-elements` (warn), `layout-only-classname` (warn). Frame:
   `AppShellLayout` with `Logo product="Campus"`, `NavItem`s for dashboard +
-  the user's sidebar components, `SidebarUserMenu` footer (settings, admin,
-  sign out, language).
+  the user's sidebar components. The column's footer holds "All apps" (a
+  popover with every component) and the `SidebarUserMenu` (settings, admin,
+  sign out, language) with the sidebar's edit button beside it. The dashboard
+  hides the shell's top bar; its edit actions sit above the grid.
 - Dashboard: `react-grid-layout` (v2), 12 columns (`DASHBOARD_COLS`), row
   height `DASHBOARD_ROW_HEIGHT`, edit mode toggles drag/resize, "add widget"
   dialog lists the widgets of enabled components, tile header opens the
