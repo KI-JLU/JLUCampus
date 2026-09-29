@@ -11,6 +11,9 @@ import {
 } from '@tanstack/react-query'
 import {
   API,
+  translateResponseSchema,
+  type AdminComponent,
+  type AdminComponentList,
   type Component,
   type ComponentInput,
   type ComponentList,
@@ -27,10 +30,13 @@ import {
   type MePatch,
   type PresetAudienceSuggestions,
   type Sidebar,
+  type TranslateRequest,
+  type TranslateResponse,
   type UserFeed,
   type WidgetList
 } from '@justcampus/shared'
 import { ApiRequestError, apiFetch, isUnauthorized } from './api'
+import { applyComponentInput } from './component-secrets'
 import { isLater } from './feed'
 
 let onUnauthorized: (() => void) | undefined
@@ -125,9 +131,10 @@ export function feedQuery(url: string): FeedQueryOptions {
   })
 }
 
+/** Every component, disabled ones too, with which of its secrets are set. */
 export const adminComponentsQuery = queryOptions({
   queryKey: queryKeys.adminComponents,
-  queryFn: () => apiFetch<ComponentList>(API.adminComponents),
+  queryFn: () => apiFetch<AdminComponentList>(API.adminComponents),
   select: (data) => data.components
 })
 
@@ -285,34 +292,34 @@ function invalidateFolderTemplates(client: QueryClient): Promise<void> {
   ]).then(() => undefined)
 }
 
-export function useCreateComponent(): UseMutationResult<Component, Error, ComponentInput> {
+export function useCreateComponent(): UseMutationResult<AdminComponent, Error, ComponentInput> {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (input: ComponentInput) =>
-      apiFetch<Component>(API.adminComponents, { method: 'POST', json: input }),
+      apiFetch<AdminComponent>(API.adminComponents, { method: 'POST', json: input }),
     onSuccess: () => invalidateCatalogue(client)
   })
 }
 
 /** Full replace of one component; the admin list shows the change at once (the enabled switch). */
 export function useUpdateComponent(): UseMutationResult<
-  Component,
+  AdminComponent,
   Error,
   { id: string; input: ComponentInput },
-  OptimisticContext<ComponentList>
+  OptimisticContext<AdminComponentList>
 > {
   const client = useQueryClient()
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: ComponentInput }) =>
-      apiFetch<Component>(API.adminComponent(id), { method: 'PUT', json: input }),
+      apiFetch<AdminComponent>(API.adminComponent(id), { method: 'PUT', json: input }),
     onMutate: async ({ id, input }) => {
       await client.cancelQueries({ queryKey: queryKeys.adminComponents })
-      const previous = client.getQueryData<ComponentList>(queryKeys.adminComponents)
+      const previous = client.getQueryData<AdminComponentList>(queryKeys.adminComponents)
       if (previous) {
         const components = previous.components.map((component) =>
-          component.id === id ? { ...component, ...input } : component
+          component.id === id ? applyComponentInput(component, input) : component
         )
-        client.setQueryData<ComponentList>(queryKeys.adminComponents, { components })
+        client.setQueryData<AdminComponentList>(queryKeys.adminComponents, { components })
       }
       return { previous }
     },
@@ -320,6 +327,19 @@ export function useUpdateComponent(): UseMutationResult<
       if (context?.previous) client.setQueryData(queryKeys.adminComponents, context.previous)
     },
     onSettled: () => invalidateCatalogue(client)
+  })
+}
+
+/**
+ * Translates one text with the translator module. The answer is checked
+ * against the contract, since the module's upstream service is replaceable.
+ */
+export function useTranslate(): UseMutationResult<TranslateResponse, Error, TranslateRequest> {
+  return useMutation({
+    mutationFn: async (request: TranslateRequest) =>
+      translateResponseSchema.parse(
+        await apiFetch<unknown>(API.translate, { method: 'POST', json: request })
+      )
   })
 }
 
@@ -335,7 +355,7 @@ export function useReorderComponents(): UseMutationResult<
   void,
   Error,
   string[],
-  OptimisticContext<ComponentList>
+  OptimisticContext<AdminComponentList>
 > {
   const client = useQueryClient()
   return useMutation({
@@ -343,11 +363,11 @@ export function useReorderComponents(): UseMutationResult<
       apiFetch<void>(API.adminComponentOrder, { method: 'PUT', json: { ids } }),
     onMutate: async (ids) => {
       await client.cancelQueries({ queryKey: queryKeys.adminComponents })
-      const previous = client.getQueryData<ComponentList>(queryKeys.adminComponents)
+      const previous = client.getQueryData<AdminComponentList>(queryKeys.adminComponents)
       if (previous) {
         const byId = new Map(previous.components.map((component) => [component.id, component]))
         const components = ids.flatMap((id) => byId.get(id) ?? [])
-        client.setQueryData<ComponentList>(queryKeys.adminComponents, { components })
+        client.setQueryData<AdminComponentList>(queryKeys.adminComponents, { components })
       }
       return { previous }
     },
@@ -528,7 +548,10 @@ export function toFolderTemplateInput(template: FolderTemplate): FolderTemplateI
   return { name, icon, enabled, widgets }
 }
 
-/** The shared input shape of an existing component, for full-replace PUTs. */
+/**
+ * The shared input shape of an existing component, for full-replace PUTs.
+ * Secrets are left out, so they stay as they are.
+ */
 export function toComponentInput(component: Component): ComponentInput {
   const { name, icon, iconUrl, enabled } = component
   const base = { name, icon, iconUrl, enabled }
@@ -538,6 +561,8 @@ export function toComponentInput(component: Component): ComponentInput {
     case 'rss':
       return { ...base, type: component.type, config: component.config }
     case 'link':
+      return { ...base, type: component.type, config: component.config }
+    case 'translator':
       return { ...base, type: component.type, config: component.config }
   }
 }

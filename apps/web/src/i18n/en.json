@@ -116,12 +116,48 @@
       "pageDescription": "This shortcut opens {{host}} outside JLU Campus.",
       "urlLabel": "Address (URL)",
       "urlHint": "The website the shortcut opens outside JLU Campus. http or https."
+    },
+    "translator": {
+      "pageDescription": "Translate texts of up to {{max}} characters. The text is sent to a translation service.",
+      "source": "Source language",
+      "target": "Target language",
+      "detect": "Detect language",
+      "detected": "Detected: {{language}}",
+      "swap": "Swap languages",
+      "text": "Text to translate",
+      "placeholder": "Enter or paste text",
+      "tilePlaceholder": "Text to translate …",
+      "count": "{{length}} / {{max}} characters",
+      "shortcut": "Ctrl + Enter",
+      "shortcutMac": "⌘ + Enter",
+      "translate": "Translate",
+      "translating": "Translating …",
+      "result": "Translation",
+      "empty": "The translation appears here.",
+      "copy": "Copy translation",
+      "copied": "Translation copied.",
+      "copyFailed": "The translation could not be copied.",
+      "errors": {
+        "unavailable": "The translation service is unavailable right now. Please try again later.",
+        "disabled": "The translator is no longer available.",
+        "invalid": "This text cannot be translated. Check its length and the languages.",
+        "failed": "The translation failed. Please try again."
+      },
+      "defaultTargetLabel": "Default target language",
+      "defaultTargetHint": "The language users translate into until they choose another.",
+      "secrets": {
+        "apiKey": {
+          "label": "API key",
+          "hint": "The key for the translation service. It is stored encrypted and never shown again."
+        }
+      }
     }
   },
   "componentTypes": {
     "iframe": "Embedded website",
     "rss": "RSS feed",
-    "link": "Shortcut"
+    "link": "Shortcut",
+    "translator": "Translator"
   },
   "shortcut": {
     "new": "New shortcut",
@@ -213,7 +249,9 @@
       "icon": "Icon",
       "name": "Name",
       "type": "Type",
+      "module": "Module",
       "url": "URL",
+      "noUrl": "No address",
       "enabled": "Enabled",
       "actions": "Actions",
       "empty": "No components yet.",
@@ -230,12 +268,27 @@
       "editTitle": "Edit component",
       "description": "The name and icon appear in the sidebar and on the component's widgets.",
       "type": "Type",
+      "moduleTypeHint": "Modules are built into JLU Campus; their type cannot be changed.",
       "name": "Name",
       "icon": "Icon",
       "iconHint": "An icon from the Lucide library.",
       "iconUrl": "Image URL (optional)",
       "iconUrlHint": "A favicon or logo. Replaces the icon when set.",
       "enabled": "Enabled",
+      "secret": {
+        "status": {
+          "saved": "Saved",
+          "unset": "Not set",
+          "replace": "Will be replaced on save",
+          "set": "Will be saved",
+          "remove": "Will be removed on save"
+        },
+        "keepPlaceholder": "Leave empty to keep the saved value",
+        "remove": "Remove",
+        "removeFor": "Remove {{label}}",
+        "undoRemove": "Undo",
+        "undoRemoveFor": "Keep {{label}}"
+      },
       "saveFailed": "The component could not be saved.",
       "created": "Component created.",
       "updated": "Component saved.",
@@ -244,7 +297,8 @@
         "name": "Enter a name of at most 80 characters.",
         "icon": "Choose an icon from the list.",
         "url": "Enter a full https address (http only for localhost).",
-        "externalUrl": "Enter a full web address starting with http:// or https://."
+        "externalUrl": "Enter a full web address starting with http:// or https://.",
+        "secret": "Enter at most {{max}} characters."
       }
     },
     "delete": {

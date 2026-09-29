@@ -2,7 +2,8 @@
 
 A customizable campus dashboard for Justus-Liebig-Universität Gießen. Admins
 maintain a catalogue of components (IFrame, RSS and Link adapters: name, icon,
-URL). Each component is a page in the sidebar and adds widgets, which users
+URL) and configure built-in modules such as the translator. Each component is a
+page in the sidebar and adds widgets, which users
 place as resizable tiles on a free-grid dashboard. Available as a web app (installable PWA) and as
 a desktop app for Windows, macOS and Linux that bundles the same web build.
 
@@ -28,6 +29,10 @@ bun run db:migrate
 bun run db:seed             # two example components
 bun run dev                 # API on http://localhost:3000, web on http://localhost:5173
 ```
+
+`COMPONENT_SECRETS_KEY` encrypts module secrets such as API keys. Generate a
+production value with `openssl rand -base64 32`; changing it makes stored
+secrets unreadable.
 
 Sign in with one of the seeded Keycloak users:
 

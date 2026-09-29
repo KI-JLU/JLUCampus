@@ -116,12 +116,48 @@
       "pageDescription": "Diese Verknüpfung öffnet {{host}} außerhalb von JLU Campus.",
       "urlLabel": "Adresse (URL)",
       "urlHint": "Die Website, die die Verknüpfung außerhalb von JLU Campus öffnet. http oder https."
+    },
+    "translator": {
+      "pageDescription": "Übersetzen Sie Texte mit bis zu {{max}} Zeichen. Der Text wird dazu an einen Übersetzungsdienst gesendet.",
+      "source": "Ausgangssprache",
+      "target": "Zielsprache",
+      "detect": "Sprache erkennen",
+      "detected": "Erkannt: {{language}}",
+      "swap": "Sprachen tauschen",
+      "text": "Zu übersetzender Text",
+      "placeholder": "Text eingeben oder einfügen",
+      "tilePlaceholder": "Text zum Übersetzen …",
+      "count": "{{length}} / {{max}} Zeichen",
+      "shortcut": "Strg + Eingabe",
+      "shortcutMac": "⌘ + Eingabe",
+      "translate": "Übersetzen",
+      "translating": "Wird übersetzt …",
+      "result": "Übersetzung",
+      "empty": "Hier erscheint die Übersetzung.",
+      "copy": "Übersetzung kopieren",
+      "copied": "Übersetzung kopiert.",
+      "copyFailed": "Die Übersetzung konnte nicht kopiert werden.",
+      "errors": {
+        "unavailable": "Der Übersetzungsdienst ist gerade nicht erreichbar. Bitte versuchen Sie es später erneut.",
+        "disabled": "Der Übersetzer ist nicht mehr verfügbar.",
+        "invalid": "Dieser Text lässt sich nicht übersetzen. Prüfen Sie seine Länge und die Sprachen.",
+        "failed": "Die Übersetzung ist fehlgeschlagen. Bitte versuchen Sie es erneut."
+      },
+      "defaultTargetLabel": "Standard-Zielsprache",
+      "defaultTargetHint": "In diese Sprache übersetzen Nutzende, bis sie eine andere wählen.",
+      "secrets": {
+        "apiKey": {
+          "label": "API-Schlüssel",
+          "hint": "Der Schlüssel für den Übersetzungsdienst. Er wird verschlüsselt gespeichert und nie wieder angezeigt."
+        }
+      }
     }
   },
   "componentTypes": {
     "iframe": "Eingebettete Website",
     "rss": "RSS-Feed",
-    "link": "Verknüpfung"
+    "link": "Verknüpfung",
+    "translator": "Übersetzer"
   },
   "shortcut": {
     "new": "Neue Verknüpfung",
@@ -213,7 +249,9 @@
       "icon": "Symbol",
       "name": "Name",
       "type": "Typ",
+      "module": "Modul",
       "url": "URL",
+      "noUrl": "Keine Adresse",
       "enabled": "Aktiv",
       "actions": "Aktionen",
       "empty": "Noch keine Komponenten angelegt.",
@@ -230,12 +268,27 @@
       "editTitle": "Komponente bearbeiten",
       "description": "Name und Symbol erscheinen in der Seitenleiste und auf den Widgets der Komponente.",
       "type": "Typ",
+      "moduleTypeHint": "Module sind in JLU Campus eingebaut; ihr Typ lässt sich nicht ändern.",
       "name": "Name",
       "icon": "Symbol",
       "iconHint": "Ein Symbol aus der Lucide-Bibliothek.",
       "iconUrl": "Bild-URL (optional)",
       "iconUrlHint": "Ein Favicon oder Logo. Ersetzt das Symbol, wenn gesetzt.",
       "enabled": "Aktiv",
+      "secret": {
+        "status": {
+          "saved": "Gespeichert",
+          "unset": "Nicht gesetzt",
+          "replace": "Wird beim Speichern ersetzt",
+          "set": "Wird beim Speichern gesetzt",
+          "remove": "Wird beim Speichern entfernt"
+        },
+        "keepPlaceholder": "Leer lassen, um den gespeicherten Wert zu behalten",
+        "remove": "Entfernen",
+        "removeFor": "{{label}} entfernen",
+        "undoRemove": "Rückgängig",
+        "undoRemoveFor": "{{label}} behalten"
+      },
       "saveFailed": "Die Komponente konnte nicht gespeichert werden.",
       "created": "Komponente angelegt.",
       "updated": "Komponente gespeichert.",
@@ -244,7 +297,8 @@
         "name": "Geben Sie einen Namen mit höchstens 80 Zeichen ein.",
         "icon": "Wählen Sie ein Symbol aus der Liste.",
         "url": "Geben Sie eine vollständige https-Adresse ein (http nur für localhost).",
-        "externalUrl": "Geben Sie eine vollständige Webadresse ein, die mit http:// oder https:// beginnt."
+        "externalUrl": "Geben Sie eine vollständige Webadresse ein, die mit http:// oder https:// beginnt.",
+        "secret": "Geben Sie höchstens {{max}} Zeichen ein."
       }
     },
     "delete": {

@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow
 } from '@ki4jlu/design-system'
-import type { Component } from '@justcampus/shared'
+import type { AdminComponent } from '@justcampus/shared'
 import { AdminComponentRow } from '@/components/admin-component-row'
 import { AdminGuard } from '@/components/admin-guard'
 import { AdminNav } from '@/components/admin-nav'
@@ -31,7 +31,7 @@ import {
 } from '@/lib/queries'
 import { toast } from '@/lib/toast'
 
-type FormTarget = { component: Component | null; key: number } | null
+type FormTarget = { component: AdminComponent | null; key: number } | null
 
 export function AdminComponentsPage(): React.JSX.Element {
   return (
@@ -47,11 +47,12 @@ function ComponentCatalogue(): React.JSX.Element {
   const updateComponent = useUpdateComponent()
   const reorder = useReorderComponents()
   const [form, setForm] = useState<FormTarget>(null)
-  const [deleting, setDeleting] = useState<Component | null>(null)
+  const [deleting, setDeleting] = useState<AdminComponent | null>(null)
 
-  const openForm = (component: Component | null): void => setForm({ component, key: Date.now() })
+  const openForm = (component: AdminComponent | null): void =>
+    setForm({ component, key: Date.now() })
 
-  const toggle = (component: Component, enabled: boolean): void => {
+  const toggle = (component: AdminComponent, enabled: boolean): void => {
     updateComponent.mutate(
       { id: component.id, input: { ...toComponentInput(component), enabled } },
       { onError: () => toast({ variant: 'error', title: t('admin.table.toggleFailed') }) }

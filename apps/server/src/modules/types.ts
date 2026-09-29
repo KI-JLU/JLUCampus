@@ -1,0 +1,41 @@
+import type { Component, SecretKey, SingletonComponentType } from '@justcampus/shared'
+import type { Hono } from 'hono'
+import type { ZodType } from 'zod'
+
+import type { AuthSession } from '../auth.js'
+
+export type ModuleConfigMap = {
+  [T in SingletonComponentType]: Extract<Component, { type: T }>['config']
+}
+
+/** Decrypted secrets of each module; `null` when the admin has not set one. */
+export type ModuleSecretsMap = {
+  [T in SingletonComponentType]: { [K in SecretKey<T>]: string | null }
+}
+
+export interface ModuleRuntime<T extends SingletonComponentType> {
+  type: T
+  componentId: string
+  config: ModuleConfigMap[T]
+  secrets: ModuleSecretsMap[T]
+}
+
+export type AnyModuleRuntime = {
+  [T in SingletonComponentType]: ModuleRuntime<T>
+}[SingletonComponentType]
+
+export type AppEnvironment = {
+  Variables: {
+    session: AuthSession
+    module: AnyModuleRuntime
+  }
+}
+
+export interface ServerModule<T extends SingletonComponentType> {
+  type: T
+  defaultName: string
+  defaultIcon: string
+  defaultConfig: ModuleConfigMap[T]
+  configSchema: ZodType<ModuleConfigMap[T]>
+  app: Hono<AppEnvironment>
+}

@@ -78,8 +78,9 @@ Better-Auth tables (`user`, `session`, `account`, `verification`) as generated
 by the Better-Auth CLI, plus:
 
 ```
-component         id uuid pk, name text, type text ('iframe' | 'rss' | 'link'), icon text null,
-                  icon_url text null, config jsonb, enabled bool, sort_order int,
+component         id uuid pk, name text, type text ('iframe' | 'rss' | 'link' | 'translator'),
+                  icon text null, icon_url text null, config jsonb, enabled bool,
+                  singleton bool default false, secrets jsonb default {}, sort_order int,
                   created_at, updated_at
 sidebar_entry     user_id → user (cascade), component_id → component (cascade),
                   position int; pk (user_id, component_id)
@@ -109,6 +110,9 @@ component cascades.
 Feed read state is per user and feed URL; the server keeps the latest read timestamp.
 Folder templates list widgets and are copied into ordinary dashboard folders when added; there is no later sync.
 
+`component` has a partial unique index on `type` where `singleton = true`.
+Existing and ordinary components have `singleton = false`.
+
 ```
 layout_preset     id uuid pk, name text, audience_kind text ('role' | 'group' | 'everyone'),
                   audience_name text null, sort_order int, sidebar jsonb (component ids),
@@ -126,6 +130,34 @@ preset, and copies it once into the user's rows with fresh ids, dropping
 widgets of disabled or deleted components. Presets are snapshots stored as
 jsonb; later edits never reach existing users. Users who existed before
 presets were introduced count as initialised.
+
+## Modules (singleton components)
+
+Modules are built-in component types listed in `SINGLETON_COMPONENT_TYPES`.
+They remain ordinary `component` rows, so sidebars, widgets, folders and
+presets keep referring to a component id. At startup the server inserts each
+missing module at the end of the catalogue with its default name, icon and
+config. New module rows are disabled. Admins may configure and enable them,
+but cannot create, delete or change the type of one.
+
+Each server module supplies its defaults, config schema and a Hono sub-app in
+`apps/server/src/modules`. Its routes live below `/api/modules/<type>` and use
+the normal session middleware. The module middleware only loads enabled
+singleton rows. Missing or disabled modules answer `404 not_found`.
+
+`component.secrets` maps secret names to AES-256-GCM ciphertexts. The server
+uses `COMPONENT_SECRETS_KEY`, a base64-encoded 32-byte key. Each ciphertext has
+a random 12-byte IV and authenticates `<component id>:<secret key>` as AAD.
+Admin responses expose only a boolean per declared secret. A string replaces
+a secret, `null` removes it, and an absent key leaves it unchanged.
+
+A module may add tables whose rows reference `component.id`; use that foreign
+key as the module instance and cascade deletes only if the module lifecycle
+allows it. The translator has no module-owned table.
+
+To add a module, add its type, config, secrets and widgets to shared, implement
+and register its server module, then add the web adapter. The typed server
+registry fails type checking when a shared singleton type has no server entry.
 
 ## Feed proxy
 
@@ -174,12 +206,21 @@ strings).
   component's page and removes the tile.
   Layout is saved with `PUT /api/dashboard` (debounced while editing).
 - Adapter registry: `src/adapters/registry.ts` maps `ComponentType` →
-  `{ Page, ConfigFields, defaultConfig, sourceUrl, externalUrl?, feedUrl?, widgets }`,
+  `{ Page, ConfigFields, defaultConfig, sourceUrl?, externalUrl?, feedUrl?, widgets }`,
   where `widgets` holds a `Tile` for every key the type has in
   `COMPONENT_WIDGETS`. Adapters with `externalUrl` (`link`) open outside the
   app from tiles, folders and the sidebar instead of navigating to
   `/c/$componentId`. Adapters with `feedUrl` (`rss`) get a dot in the sidebar
   while their feed has unread entries.
+- Module adapters (`translator`) have no `sourceUrl`; the admin list marks
+  them "Module" and offers no delete, and the component form neither offers
+  module types for new components nor lets a module change its type. The
+  translator page (`src/adapters/translator/`) posts to `API.translate` and
+  names its languages with `Intl.DisplayNames`; its `quick` tile always
+  detects the source language. The component form renders one write-only
+  `SecretField` per `COMPONENT_SECRETS[type]` entry (texts under
+  `component.<type>.secrets.<key>`) and sends only changed secrets;
+  `toComponentInput` never sends any.
 - Shortcuts show the site's `/favicon.ico` unless the user picked a Lucide
   icon, falling back to a globe. Feeds are read through `GET /api/feed`.
   Opening an RSS page or pressing a feed tile's "mark as read" button marks

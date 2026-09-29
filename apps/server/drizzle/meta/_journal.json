@@ -64,6 +64,13 @@
       "when": 1790674864729,
       "tag": "0008_feed_read_repair",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790675632955,
+      "tag": "0009_singleton_components",
+      "breakpoints": true
     }
   ]
 }

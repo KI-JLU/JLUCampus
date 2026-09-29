@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  adminComponentSchema,
+  COMPONENT_SECRETS,
+  COMPONENT_TYPES,
+  componentSchema,
   dashboardPutSchema,
+  isSingletonType,
+  SINGLETON_COMPONENT_TYPES,
+  translateRequestSchema,
   externalUrlSchema,
   feedSchema,
   folderTemplateInputSchema,
@@ -193,5 +200,81 @@ describe('feedSchema', () => {
       items: [{ id: '1', title: 'A', link: 'javascript:x', publishedAt: null, summary: null }]
     }
     expect(feedSchema.safeParse(feed).success).toBe(false)
+  })
+})
+
+describe('modules', () => {
+  const translator = {
+    type: 'translator',
+    name: 'Übersetzer',
+    icon: 'languages',
+    iconUrl: null,
+    enabled: true,
+    config: { defaultTargetLanguage: 'en' }
+  }
+
+  it('lists only known component types as singletons', () => {
+    for (const type of SINGLETON_COMPONENT_TYPES) expect(COMPONENT_TYPES).toContain(type)
+    expect(isSingletonType('translator')).toBe(true)
+    expect(isSingletonType('iframe')).toBe(false)
+  })
+
+  it('accepts setting, removing and keeping a secret', () => {
+    for (const secrets of [{ apiKey: 'key' }, { apiKey: null }, {}, undefined]) {
+      expect(componentInputSchema.safeParse({ ...translator, secrets }).success).toBe(true)
+    }
+  })
+
+  it('rejects unknown and empty secrets', () => {
+    expect(componentInputSchema.safeParse({ ...translator, secrets: { token: 'x' } }).success).toBe(
+      false
+    )
+    expect(
+      componentInputSchema.safeParse({ ...translator, secrets: { apiKey: ' ' } }).success
+    ).toBe(false)
+  })
+
+  it('drops secrets sent for types without secrets', () => {
+    expect(COMPONENT_SECRETS.link).toEqual([])
+    const result = componentInputSchema.safeParse({
+      type: 'link',
+      name: 'X',
+      icon: null,
+      iconUrl: null,
+      enabled: true,
+      config: { url: 'https://example.org' },
+      secrets: { apiKey: 'key' }
+    })
+    expect(result.success && 'secrets' in result.data).toBe(false)
+  })
+
+  it('never lets a secret value into a component as users see it', () => {
+    const stored = {
+      ...translator,
+      id: '00000000-0000-4000-8000-000000000001',
+      sortOrder: 0,
+      createdAt: '2026-09-29T00:00:00.000Z',
+      updatedAt: '2026-09-29T00:00:00.000Z'
+    }
+    const parsed = componentSchema.parse({ ...stored, secrets: { apiKey: 'v1.secret' } })
+    expect('secrets' in parsed).toBe(false)
+    expect(adminComponentSchema.safeParse({ ...stored, secrets: { apiKey: true } }).success).toBe(
+      true
+    )
+    expect(
+      adminComponentSchema.safeParse({ ...stored, secrets: { apiKey: 'v1.secret' } }).success
+    ).toBe(false)
+  })
+
+  it('limits translation requests to known languages and a non-empty text', () => {
+    expect(
+      translateRequestSchema.safeParse({ text: 'Hallo', source: null, target: 'en' }).success
+    ).toBe(true)
+    expect(
+      translateRequestSchema.safeParse({ text: ' ', source: null, target: 'en' }).success
+    ).toBe(false)
+    expect(
+      translateRequestSchema.safeParse({ text: 'Hallo', source: 'de', target: 'xx' }).success
+    ).toBe(false)
   })
 })

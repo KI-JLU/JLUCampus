@@ -1,12 +1,16 @@
 import type { TFunction } from 'i18next'
 import {
+  COMPONENT_TYPES,
   componentInputSchema,
-  type Component,
+  isSingletonType,
+  SECRET_VALUE_MAX,
+  type AdminComponent,
   type ComponentInput,
   type ComponentType
 } from '@justcampus/shared'
 import { componentAdapters } from '@/adapters/registry'
 import { ApiRequestError } from './api'
+import { secretKeysOf, secretsPatch, type SecretDrafts } from './component-secrets'
 
 export interface ComponentFormState {
   type: ComponentType
@@ -15,12 +19,25 @@ export interface ComponentFormState {
   iconUrl: string
   enabled: boolean
   config: ComponentInput['config']
+  /** Changes to the type's secrets; untouched secrets have no draft. */
+  secrets: SecretDrafts
 }
 
 /** Field errors keyed by the dotted issue path, e.g. `name`, `config.url`. */
 export type FieldErrors = Partial<Record<string, string>>
 
-export function initialFormState(component: Component | null): ComponentFormState {
+/**
+ * The types the type field offers. Modules are created by the server, one
+ * per type, and a component's type cannot change into or out of a module
+ * type: a new or ordinary component chooses among the ordinary types, a
+ * module keeps its own.
+ */
+export function selectableTypes(component: AdminComponent | null): readonly ComponentType[] {
+  if (component && isSingletonType(component.type)) return [component.type]
+  return COMPONENT_TYPES.filter((type) => !isSingletonType(type))
+}
+
+export function initialFormState(component: AdminComponent | null): ComponentFormState {
   if (!component) {
     return {
       type: 'iframe',
@@ -28,7 +45,8 @@ export function initialFormState(component: Component | null): ComponentFormStat
       icon: null,
       iconUrl: '',
       enabled: true,
-      config: componentAdapters.iframe.defaultConfig
+      config: componentAdapters.iframe.defaultConfig,
+      secrets: {}
     }
   }
   return {
@@ -37,7 +55,8 @@ export function initialFormState(component: Component | null): ComponentFormStat
     icon: component.icon,
     iconUrl: component.iconUrl ?? '',
     enabled: component.enabled,
-    config: component.config
+    config: component.config,
+    secrets: {}
   }
 }
 
@@ -59,7 +78,10 @@ function toFieldErrors(issues: readonly Issue[], type: ComponentType, t: TFuncti
   const errors: FieldErrors = {}
   for (const issue of issues) {
     const key = issue.path.map(String).join('.') || 'form'
-    errors[key] ??= messages[key] ?? issue.message
+    const secret = key.startsWith('secrets.')
+      ? t('admin.form.errors.secret', { max: SECRET_VALUE_MAX })
+      : undefined
+    errors[key] ??= messages[key] ?? secret ?? issue.message
   }
   return errors
 }
@@ -69,13 +91,16 @@ export type ValidationResult =
 
 export function validateComponentForm(state: ComponentFormState, t: TFunction): ValidationResult {
   const iconUrl = state.iconUrl.trim()
+  const secrets = secretsPatch(secretKeysOf(state.type), state.secrets)
   const result = componentInputSchema.safeParse({
     type: state.type,
     name: state.name,
     icon: state.icon,
     iconUrl: iconUrl ? iconUrl : null,
     enabled: state.enabled,
-    config: state.config
+    config: state.config,
+    // Left out unless something changed, so saving keeps the stored secrets.
+    ...(secrets ? { secrets } : {})
   })
   if (result.success) return { ok: true, input: result.data }
   return { ok: false, errors: toFieldErrors(result.error.issues, state.type, t) }
