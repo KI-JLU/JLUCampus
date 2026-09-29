@@ -1,8 +1,8 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVerticalIcon, PlusIcon, XIcon } from 'lucide-react'
+import { GripVerticalIcon, MonitorIcon, PlusIcon, XIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Badge, Button, navItemVariants } from '@ki4jlu/design-system'
+import { Button, navItemVariants } from '@ki4jlu/design-system'
 import { isDesktopComponentType, type Component } from '@justcampus/shared'
 import { externalUrlOf } from '@/adapters/registry'
 import type { SidebarList } from '@/lib/use-sidebar-arrangement'
@@ -89,9 +89,11 @@ function RowLabel({ component }: { component: Component }): React.JSX.Element {
       />
       <span className="min-w-0 flex-1 truncate">{component.name}</span>
       {isDesktopComponentType(component.type) ? (
-        <Badge tone="secondary" appearance="filled" className="shrink-0">
-          {t('sidebarEditor.desktopBadge')}
-        </Badge>
+        // The rows are narrow: a badge would squeeze the name, so the mark is an icon.
+        <span className="shrink-0 text-on-surface-variant" title={t('sidebarEditor.desktopBadge')}>
+          <MonitorIcon aria-hidden="true" width="1em" height="1em" />
+          <span className="sr-only">{t('sidebarEditor.desktopBadge')}</span>
+        </span>
       ) : null}
     </>
   )

@@ -241,7 +241,7 @@
     "rss": "RSS-Feed",
     "link": "Verknüpfung",
     "translator": "Übersetzer",
-    "files": "Dateien & Laufwerke (Desktop)"
+    "files": "Dateien & Laufwerke"
   },
   "shortcut": {
     "new": "Neue Verknüpfung",
@@ -537,7 +537,7 @@
       "droppedAvailable": "{{name}} liegt bei den verfügbaren Komponenten.",
       "cancelled": "Verschieben abgebrochen, {{name}} bleibt an der bisherigen Position."
     },
-    "desktopBadge": "Desktop"
+    "desktopBadge": "Nur in der Desktop-App"
   },
   "moreApps": {
     "hint": "Ziehen Sie Apps in die Seitenleiste und ordnen Sie sie dort an, oder nutzen Sie +. Zurück hierher gezogen, verschwinden sie aus der Seitenleiste.",

@@ -241,7 +241,7 @@
     "rss": "RSS feed",
     "link": "Shortcut",
     "translator": "Translator",
-    "files": "Files & drives (desktop)"
+    "files": "Files & drives"
   },
   "shortcut": {
     "new": "New shortcut",
@@ -537,7 +537,7 @@
       "droppedAvailable": "{{name}} is with the available components.",
       "cancelled": "Moving cancelled, {{name}} stays where it was."
     },
-    "desktopBadge": "Desktop"
+    "desktopBadge": "Desktop app only"
   },
   "moreApps": {
     "hint": "Drag apps into the sidebar and arrange them there, or use +. Dragged back here, they leave the sidebar.",
