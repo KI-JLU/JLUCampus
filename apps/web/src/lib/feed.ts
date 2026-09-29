@@ -1,3 +1,4 @@
+import type { FeedItem, UserFeed } from '@justcampus/shared'
 import { ApiRequestError } from './api'
 
 const MINUTE = 60_000
@@ -52,4 +53,27 @@ export function feedErrorKey(error: unknown): FeedErrorKey {
     if (error.code === 'validation') return 'feed.errors.invalidUrl'
   }
   return 'feed.errors.failed'
+}
+
+/** Whether both times are readable and `iso` is the later one. */
+export function isLater(iso: string, than: string): boolean {
+  const time = new Date(iso).getTime()
+  const other = new Date(than).getTime()
+  return !Number.isNaN(time) && !Number.isNaN(other) && time > other
+}
+
+/**
+ * An entry is new when it was published after `unreadSince`, the user's previous read of its
+ * feed. Nothing is new before the first read (`null`), and entries without a date never are.
+ */
+export function isNewFeedItem(
+  item: Pick<FeedItem, 'publishedAt'>,
+  unreadSince: string | null
+): boolean {
+  return item.publishedAt !== null && unreadSince !== null && isLater(item.publishedAt, unreadSince)
+}
+
+/** Whether the copy on screen was fetched after the user last read the feed. */
+export function needsMarkRead(feed: Pick<UserFeed, 'fetchedAt' | 'readAt'>): boolean {
+  return feed.readAt === null || isLater(feed.fetchedAt, feed.readAt)
 }

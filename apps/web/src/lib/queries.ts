@@ -15,7 +15,7 @@ import {
   type ComponentList,
   type Dashboard,
   type DashboardTile,
-  type Feed,
+  type FeedReadPut,
   type FolderTemplate,
   type FolderTemplateInput,
   type FolderTemplateList,
@@ -26,9 +26,11 @@ import {
   type MePatch,
   type PresetAudienceSuggestions,
   type Sidebar,
+  type UserFeed,
   type WidgetList
 } from '@justcampus/shared'
 import { ApiRequestError, apiFetch, isUnauthorized } from './api'
+import { isLater } from './feed'
 
 let onUnauthorized: (() => void) | undefined
 
@@ -100,12 +102,13 @@ export const dashboardQuery = queryOptions({
 })
 
 type FeedQueryKey = ReturnType<typeof queryKeys.feed>
-type FeedQueryOptions = UndefinedInitialDataOptions<Feed, Error, Feed, FeedQueryKey> & {
-  queryKey: DataTag<FeedQueryKey, Feed, Error>
+type FeedQueryOptions = UndefinedInitialDataOptions<UserFeed, Error, UserFeed, FeedQueryKey> & {
+  queryKey: DataTag<FeedQueryKey, UserFeed, Error>
 }
 
 /**
- * A feed as the server fetched and normalised it. Feeds change slowly and the
+ * A feed as the server fetched and normalised it, with when the user last read
+ * it. Fetching does not mark it read; `useFeed` does. Feeds change slowly and the
  * server caches them, so tiles refresh every ten minutes. A feed the server
  * could not reach (`feed_unavailable`) or a rejected URL is not retried: the
  * server has already tried, and the answer will not change within seconds.
@@ -114,7 +117,7 @@ export function feedQuery(url: string): FeedQueryOptions {
   return queryOptions({
     queryKey: queryKeys.feed(url),
     queryFn: ({ signal }) =>
-      apiFetch<Feed>(`${API.feed}?${new URLSearchParams({ url })}`, { signal }),
+      apiFetch<UserFeed>(`${API.feed}?${new URLSearchParams({ url })}`, { signal }),
     staleTime: 5 * 60_000,
     refetchInterval: 10 * 60_000,
     retry: (count, error) => !(error instanceof ApiRequestError) && count < 2
@@ -183,6 +186,22 @@ export function useUpdateMe(): UseMutationResult<Me, Error, MePatch> {
   return useMutation({
     mutationFn: (patch: MePatch) => apiFetch<Me>(API.me, { method: 'PATCH', json: patch }),
     onSuccess: (me) => client.setQueryData(queryKeys.me, me)
+  })
+}
+
+/**
+ * Marks a feed read as of the copy the user saw. The cached copy then carries the new `readAt`,
+ * so a view opened later shows its entries as read; the server never moves `readAt` back, and
+ * neither does the cache.
+ */
+export function useMarkFeedRead(): UseMutationResult<void, Error, FeedReadPut> {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (read: FeedReadPut) => apiFetch<void>(API.feedRead, { method: 'PUT', json: read }),
+    onSuccess: (_data, { url, readAt }) =>
+      client.setQueryData<UserFeed>(queryKeys.feed(url), (feed) =>
+        feed && (feed.readAt === null || isLater(readAt, feed.readAt)) ? { ...feed, readAt } : feed
+      )
   })
 }
 

@@ -1,4 +1,3 @@
-import { useQuery } from '@tanstack/react-query'
 import { ExternalLinkIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button, Card, Container } from '@ki4jlu/design-system'
@@ -6,13 +5,13 @@ import { ComponentIcon } from '@/components/component-icon'
 import { FeedContent } from '@/components/feed-list'
 import { PageHeader } from '@/components/page-header'
 import { externalLinkProps } from '@/lib/external'
-import { feedQuery } from '@/lib/queries'
+import { useFeed } from '@/lib/use-feed'
 import type { ComponentViewProps } from '../types'
 
 /** The whole feed with each entry's summary, in a reading-width column. */
 export function RssPage({ component }: ComponentViewProps<'rss'>): React.JSX.Element {
   const { t } = useTranslation()
-  const { data: feed, error, isPending, refetch } = useQuery(feedQuery(component.config.feedUrl))
+  const { data: feed, error, isPending, refetch, unreadSince } = useFeed(component.config.feedUrl)
   const site = feed?.link ?? null
   const description = feed?.title && feed.title !== component.name ? feed.title : undefined
 
@@ -42,6 +41,7 @@ export function RssPage({ component }: ComponentViewProps<'rss'>): React.JSX.Ele
           feed={feed}
           error={error}
           pending={isPending}
+          unreadSince={unreadSince}
           onRetry={() => void refetch()}
           variant="page"
         />

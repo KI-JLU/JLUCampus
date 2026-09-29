@@ -149,6 +149,7 @@
     "fallbackName": "Feed von {{host}}",
     "openSite": "Website von {{name}} öffnen",
     "openSiteButton": "Website öffnen",
+    "newEntry": "Neu:",
     "errors": {
       "unavailable": "Der Feed konnte nicht geladen werden. Die Website ist vielleicht nicht erreichbar, oder unter dieser Adresse liegt kein Feed.",
       "invalidUrl": "Diese Feed-Adresse ist ungültig.",

@@ -6,6 +6,7 @@ import {
   componentOrderSchema,
   componentSchema,
   dashboardPutSchema,
+  feedReadPutSchema,
   feedQuerySchema,
   folderTemplateInputSchema,
   folderTemplateOrderSchema,
@@ -28,7 +29,7 @@ import {
   type Widget,
   type WidgetRef
 } from '@justcampus/shared'
-import { and, asc, desc, eq, inArray, or } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { cors } from 'hono/cors'
@@ -42,6 +43,7 @@ import {
   dashboardFolderItem,
   dashboardTile,
   component,
+  feedRead,
   folderTemplate,
   folderTemplateItem,
   layoutPreset,
@@ -49,7 +51,7 @@ import {
   user
 } from './db/schema.js'
 import { env } from './env.js'
-import { createFeedLoader, FeedUnavailableError } from './feed.js'
+import { createFeedLoader, feedKey, FeedUnavailableError } from './feed.js'
 import {
   assembleFolderTemplates,
   assembleTiles,
@@ -319,14 +321,41 @@ app.get(API.feed, async (context) => {
   }
   try {
     const feed = await loadFeed(result.data.url)
-    context.header('Cache-Control', 'private, max-age=300')
-    return context.json(feed)
+    const [read] = await db
+      .select({ readAt: feedRead.readAt })
+      .from(feedRead)
+      .where(
+        and(
+          eq(feedRead.userId, context.get('session').user.id),
+          eq(feedRead.feedUrl, feedKey(result.data.url))
+        )
+      )
+      .limit(1)
+    context.header('Cache-Control', 'private, no-cache')
+    return context.json({ ...feed, readAt: read?.readAt.toISOString() ?? null })
   } catch (error) {
     if (error instanceof FeedUnavailableError) {
       throw new ApiError(502, 'feed_unavailable', error.message)
     }
     throw error
   }
+})
+
+app.put(API.feedRead, async (context) => {
+  const input = await parseBody(context, feedReadPutSchema)
+  const readAt = new Date(Math.min(new Date(input.readAt).valueOf(), Date.now()))
+  await db
+    .insert(feedRead)
+    .values({
+      userId: context.get('session').user.id,
+      feedUrl: feedKey(input.url),
+      readAt
+    })
+    .onConflictDoUpdate({
+      target: [feedRead.userId, feedRead.feedUrl],
+      set: { readAt: sql`greatest(${feedRead.readAt}, excluded.read_at)` }
+    })
+  return context.body(null, 204)
 })
 
 app.get(API.adminComponents, async (context) => {

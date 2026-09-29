@@ -1,11 +1,10 @@
 import type { ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { ExternalLinkIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { externalLinkProps } from '@/lib/external'
 import { hostnameTitle } from '@/lib/links'
-import { feedQuery } from '@/lib/queries'
+import { useFeed } from '@/lib/use-feed'
 import { FeedContent } from './feed-list'
 
 interface FeedPanelProps {
@@ -32,7 +31,7 @@ export function FeedPanel({
   pageComponentId
 }: FeedPanelProps): React.JSX.Element {
   const { t } = useTranslation()
-  const { data: feed, error, isPending, refetch } = useQuery(feedQuery(feedUrl))
+  const { data: feed, error, isPending, refetch, unreadSince } = useFeed(feedUrl)
   const name = title ?? feed?.title ?? hostnameTitle(feedUrl)
   const site = feed?.link ?? null
 
@@ -77,6 +76,7 @@ export function FeedPanel({
           feed={feed}
           error={error}
           pending={isPending}
+          unreadSince={unreadSince}
           onRetry={() => void refetch()}
           variant="tile"
         />

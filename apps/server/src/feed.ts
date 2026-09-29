@@ -445,6 +445,11 @@ function checkedUrl(value: string, base?: URL): URL {
   return url
 }
 
+/** The stable key used for a feed URL, with its fragment removed. */
+export function feedKey(value: string): string {
+  return checkedUrl(value).toString()
+}
+
 async function beforeDeadline<T>(promise: Promise<T>, deadline: number): Promise<T> {
   const remaining = deadline - Date.now()
   if (remaining <= 0) throw new FeedUnavailableError('Feed request timed out')
@@ -520,7 +525,7 @@ export function createFeedLoader(options: FeedLoaderOptions): (url: string) => P
   }
 
   return async (urlValue) => {
-    const key = checkedUrl(urlValue).toString()
+    const key = feedKey(urlValue)
     const cached = cache.get(key)
     if (cached && cached.expiresAt > now()) {
       if (cached.feed) return cached.feed
