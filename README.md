@@ -56,7 +56,8 @@ The desktop app talks to the API at `DESKTOP_API_URL` (build time) or
 `bun run build` builds the shared package, the server (`apps/server/dist`) and
 the web app (`apps/web/dist`). Set `SERVE_WEB_DIR=../web/dist` (or an absolute
 path) and the server serves the web app itself, so one origin hosts both. Run
-migrations with `bun run db:migrate` before starting `node apps/server/dist/index.js`.
+migrations with `node apps/server/dist/migrate.js` before starting
+`node apps/server/dist/index.js`.
 
 ## CI
 
