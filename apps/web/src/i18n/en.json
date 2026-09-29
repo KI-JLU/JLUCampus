@@ -24,7 +24,8 @@
   "nav": {
     "dashboard": "Dashboard",
     "allApps": "All apps",
-    "editSidebar": "Edit sidebar"
+    "editSidebar": "Edit sidebar",
+    "newEntries": "(new entries)"
   },
   "account": {
     "settings": "Settings",
@@ -149,6 +150,10 @@
     "fallbackName": "Feed from {{host}}",
     "openSite": "Open the website of {{name}}",
     "openSiteButton": "Open website",
+    "newEntry": "New:",
+    "markRead": "Mark {{name}} as read",
+    "markReadButton": "Mark as read",
+    "markReadFailed": "The feed could not be marked as read. Please try again.",
     "errors": {
       "unavailable": "The feed could not be loaded. The website may be unreachable, or there is no feed at this address.",
       "invalidUrl": "This feed address is not valid.",

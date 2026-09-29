@@ -83,6 +83,8 @@ component         id uuid pk, name text, type text ('iframe' | 'rss' | 'link'), 
                   created_at, updated_at
 sidebar_entry     user_id → user (cascade), component_id → component (cascade),
                   position int; pk (user_id, component_id)
+feed_read         user_id → user (cascade), feed_url text, read_at timestamp;
+                  pk (user_id, feed_url)
 dashboard_tile    id uuid pk (client generated), user_id → user (cascade),
                   kind text ('widget' | 'folder' | 'link' | 'feed'),
                   component_id → component (cascade) null, widget_key text null,
@@ -104,6 +106,7 @@ server checks that the key belongs to the component's type
 `PUT /api/sidebar` and `PUT /api/dashboard` replace the user's rows in one
 transaction. Reads filter out disabled components and their widgets. Deleting a
 component cascades.
+Feed read state is per user and feed URL; the server keeps the latest read timestamp.
 Folder templates list widgets and are copied into ordinary dashboard folders when added; there is no later sync.
 
 ```
@@ -169,13 +172,17 @@ strings).
   component's page and removes the tile.
   Layout is saved with `PUT /api/dashboard` (debounced while editing).
 - Adapter registry: `src/adapters/registry.ts` maps `ComponentType` →
-  `{ Page, ConfigFields, defaultConfig, sourceUrl, externalUrl?, widgets }`,
+  `{ Page, ConfigFields, defaultConfig, sourceUrl, externalUrl?, feedUrl?, widgets }`,
   where `widgets` holds a `Tile` for every key the type has in
   `COMPONENT_WIDGETS`. Adapters with `externalUrl` (`link`) open outside the
   app from tiles, folders and the sidebar instead of navigating to
-  `/c/$componentId`.
+  `/c/$componentId`. Adapters with `feedUrl` (`rss`) get a dot in the sidebar
+  while their feed has unread entries.
 - Shortcuts show the site's `/favicon.ico` unless the user picked a Lucide
   icon, falling back to a globe. Feeds are read through `GET /api/feed`.
+  Opening an RSS page or pressing a feed tile's "mark as read" button marks
+  the feed read (`PUT /api/feed/read`); showing a tile does not, except that
+  a feed never read is marked on first display so later entries can be new.
 - i18n: `i18next` + `react-i18next`, resources `src/i18n/de.json` and
   `en.json`. Language = user's saved language, else browser detector, else
   `de`. Changing it PATCHes `/api/me` and updates `<html lang>`.

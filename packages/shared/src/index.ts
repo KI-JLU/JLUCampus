@@ -519,6 +519,27 @@ export const feedSchema = z.object({
 })
 export type Feed = z.infer<typeof feedSchema>
 
+/**
+ * `GET API.feed`: the feed plus when the current user last read it. Entries
+ * published after `readAt` are unread; `null` means the user never read this
+ * feed, so nothing counts as unread yet.
+ */
+export const userFeedSchema = feedSchema.extend({
+  readAt: z.string().datetime().nullable()
+})
+export type UserFeed = z.infer<typeof userFeedSchema>
+
+/**
+ * `PUT API.feedRead`: the user read the feed as of `readAt` (the `fetchedAt`
+ * of the copy they saw). The server keeps the later of the stored and the
+ * sent time, so it never moves back.
+ */
+export const feedReadPutSchema = z.object({
+  url: externalUrlSchema,
+  readAt: z.string().datetime()
+})
+export type FeedReadPut = z.infer<typeof feedReadPutSchema>
+
 // ---------------------------------------------------------------------------
 // Errors
 // ---------------------------------------------------------------------------
@@ -600,12 +621,14 @@ export const API = {
   /** GET / PUT `dashboardSchema` for the current user. */
   dashboard: '/api/dashboard',
   /**
-   * GET `?url=` (`feedQuerySchema`) → `feedSchema`. Any signed-in user. The
+   * GET `?url=` (`feedQuerySchema`) → `userFeedSchema`. Any signed-in user. The
    * server fetches the feed itself (browsers are blocked by CORS), refuses
    * private and loopback addresses, and caches results briefly. Failures
    * answer `502 feed_unavailable`.
    */
-  feed: '/api/feed'
+  feed: '/api/feed',
+  /** PUT `feedReadPutSchema` → 204: marks the feed read for the current user. */
+  feedRead: '/api/feed/read'
 } as const
 
 export const KEYCLOAK_PROVIDER_ID = 'keycloak'
