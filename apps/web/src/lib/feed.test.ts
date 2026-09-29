@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { ApiRequestError } from './api'
-import { feedErrorKey, formatFeedDate, isNewFeedItem, needsMarkRead } from './feed'
+import {
+  feedErrorKey,
+  formatFeedDate,
+  hasUnreadEntries,
+  isNewFeedItem,
+  needsMarkRead
+} from './feed'
 
 const NOW = new Date('2026-09-28T12:00:00Z')
 
@@ -50,6 +56,24 @@ describe('isNewFeedItem', () => {
   it('marks nothing before the first read, nor entries without a date', () => {
     expect(isNewFeedItem({ publishedAt: '2026-09-28T11:00:00Z' }, null)).toBe(false)
     expect(isNewFeedItem({ publishedAt: null }, READ)).toBe(false)
+  })
+})
+
+describe('hasUnreadEntries', () => {
+  const READ = '2026-09-28T10:00:00Z'
+  const items = [{ publishedAt: '2026-09-28T09:00:00Z' }, { publishedAt: null }]
+
+  it('is true once any entry was published after the last read', () => {
+    const newer = [...items, { publishedAt: '2026-09-28T10:30:00Z' }]
+    expect(hasUnreadEntries({ items: newer, readAt: READ })).toBe(true)
+  })
+
+  it('is false when every entry is older or undated, or the feed was never read', () => {
+    expect(hasUnreadEntries({ items, readAt: READ })).toBe(false)
+    expect(hasUnreadEntries({ items: [], readAt: READ })).toBe(false)
+    expect(
+      hasUnreadEntries({ items: [{ publishedAt: '2026-09-28T11:00:00Z' }], readAt: null })
+    ).toBe(false)
   })
 })
 

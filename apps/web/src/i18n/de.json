@@ -24,7 +24,8 @@
   "nav": {
     "dashboard": "Dashboard",
     "allApps": "Alle Apps",
-    "editSidebar": "Seitenleiste bearbeiten"
+    "editSidebar": "Seitenleiste bearbeiten",
+    "newEntries": "(neue Einträge)"
   },
   "account": {
     "settings": "Einstellungen",
@@ -150,6 +151,9 @@
     "openSite": "Website von {{name}} öffnen",
     "openSiteButton": "Website öffnen",
     "newEntry": "Neu:",
+    "markRead": "{{name}} als gelesen markieren",
+    "markReadButton": "Als gelesen markieren",
+    "markReadFailed": "Der Feed konnte nicht als gelesen markiert werden. Bitte versuchen Sie es erneut.",
     "errors": {
       "unavailable": "Der Feed konnte nicht geladen werden. Die Website ist vielleicht nicht erreichbar, oder unter dieser Adresse liegt kein Feed.",
       "invalidUrl": "Diese Feed-Adresse ist ungültig.",

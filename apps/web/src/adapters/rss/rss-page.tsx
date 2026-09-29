@@ -11,7 +11,15 @@ import type { ComponentViewProps } from '../types'
 /** The whole feed with each entry's summary, in a reading-width column. */
 export function RssPage({ component }: ComponentViewProps<'rss'>): React.JSX.Element {
   const { t } = useTranslation()
-  const { data: feed, error, isPending, refetch, unreadSince } = useFeed(component.config.feedUrl)
+  const {
+    data: feed,
+    error,
+    isPending,
+    refetch,
+    unreadSince
+  } = useFeed(component.config.feedUrl, {
+    markReadOnView: true
+  })
   const site = feed?.link ?? null
   const description = feed?.title && feed.title !== component.name ? feed.title : undefined
 

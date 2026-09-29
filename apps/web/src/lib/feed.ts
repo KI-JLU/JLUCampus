@@ -73,6 +73,13 @@ export function isNewFeedItem(
   return item.publishedAt !== null && unreadSince !== null && isLater(item.publishedAt, unreadSince)
 }
 
+/** Whether the feed has entries published after the user last read it (its live `readAt`). */
+export function hasUnreadEntries(
+  feed: Pick<UserFeed, 'readAt'> & { items: Pick<FeedItem, 'publishedAt'>[] }
+): boolean {
+  return feed.items.some((item) => isNewFeedItem(item, feed.readAt))
+}
+
 /** Whether the copy on screen was fetched after the user last read the feed. */
 export function needsMarkRead(feed: Pick<UserFeed, 'fetchedAt' | 'readAt'>): boolean {
   return feed.readAt === null || isLater(feed.fetchedAt, feed.readAt)

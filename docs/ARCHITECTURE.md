@@ -172,13 +172,17 @@ strings).
   component's page and removes the tile.
   Layout is saved with `PUT /api/dashboard` (debounced while editing).
 - Adapter registry: `src/adapters/registry.ts` maps `ComponentType` →
-  `{ Page, ConfigFields, defaultConfig, sourceUrl, externalUrl?, widgets }`,
+  `{ Page, ConfigFields, defaultConfig, sourceUrl, externalUrl?, feedUrl?, widgets }`,
   where `widgets` holds a `Tile` for every key the type has in
   `COMPONENT_WIDGETS`. Adapters with `externalUrl` (`link`) open outside the
   app from tiles, folders and the sidebar instead of navigating to
-  `/c/$componentId`.
+  `/c/$componentId`. Adapters with `feedUrl` (`rss`) get a dot in the sidebar
+  while their feed has unread entries.
 - Shortcuts show the site's `/favicon.ico` unless the user picked a Lucide
   icon, falling back to a globe. Feeds are read through `GET /api/feed`.
+  Opening an RSS page or pressing a feed tile's "mark as read" button marks
+  the feed read (`PUT /api/feed/read`); showing a tile does not, except that
+  a feed never read is marked on first display so later entries can be new.
 - i18n: `i18next` + `react-i18next`, resources `src/i18n/de.json` and
   `en.json`. Language = user's saved language, else browser detector, else
   `de`. Changing it PATCHes `/api/me` and updates `<html lang>`.

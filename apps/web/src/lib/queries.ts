@@ -2,6 +2,7 @@ import {
   QueryCache,
   QueryClient,
   queryOptions,
+  type Mutation,
   useMutation,
   useQueryClient,
   type DataTag,
@@ -108,7 +109,7 @@ type FeedQueryOptions = UndefinedInitialDataOptions<UserFeed, Error, UserFeed, F
 
 /**
  * A feed as the server fetched and normalised it, with when the user last read
- * it. Fetching does not mark it read; `useFeed` does. Feeds change slowly and the
+ * it. Fetching does not mark it read (see `useFeed`). Feeds change slowly and the
  * server caches them, so tiles refresh every ten minutes. A feed the server
  * could not reach (`feed_unavailable`) or a rejected URL is not retried: the
  * server has already tried, and the answer will not change within seconds.
@@ -189,20 +190,32 @@ export function useUpdateMe(): UseMutationResult<Me, Error, MePatch> {
   })
 }
 
+const feedReadMutationKey = ['feed-read'] as const
+
 /**
  * Marks a feed read as of the copy the user saw. The cached copy then carries the new `readAt`,
- * so a view opened later shows its entries as read; the server never moves `readAt` back, and
+ * so every view of the feed shows its entries as read; the server never moves `readAt` back, and
  * neither does the cache.
  */
 export function useMarkFeedRead(): UseMutationResult<void, Error, FeedReadPut> {
   const client = useQueryClient()
   return useMutation({
+    mutationKey: feedReadMutationKey,
     mutationFn: (read: FeedReadPut) => apiFetch<void>(API.feedRead, { method: 'PUT', json: read }),
     onSuccess: (_data, { url, readAt }) =>
       client.setQueryData<UserFeed>(queryKeys.feed(url), (feed) =>
         feed && (feed.readAt === null || isLater(readAt, feed.readAt)) ? { ...feed, readAt } : feed
       )
   })
+}
+
+/** Whether a request marking exactly this read is already on its way, e.g. from another view. */
+export function isMarkingFeedRead(client: QueryClient, { url, readAt }: FeedReadPut): boolean {
+  const matches = (mutation: Mutation<unknown, unknown, unknown>): boolean => {
+    const read = mutation.state.variables as FeedReadPut | undefined
+    return read?.url === url && read.readAt === readAt
+  }
+  return client.isMutating({ mutationKey: feedReadMutationKey, predicate: matches }) > 0
 }
 
 interface OptimisticContext<T> {

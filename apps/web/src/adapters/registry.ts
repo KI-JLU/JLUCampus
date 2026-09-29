@@ -23,6 +23,7 @@ interface AnyComponentAdapter {
   ConfigFields: ReactComponentType<ComponentConfigFieldsProps<ComponentType>>
   sourceUrl: (component: Component) => string
   externalUrl?: (component: Component) => string
+  feedUrl?: (component: Component) => string
   widgets: Readonly<Partial<Record<string, { Tile: AnyComponentView }>>>
 }
 
@@ -40,6 +41,11 @@ export function adapterOf(componentOrType: Component | ComponentType): AnyCompon
 /** Where a shortcut component leads, or `null` for components that open as a page in the app. */
 export function externalUrlOf(component: Component): string | null {
   return adapterOf(component).externalUrl?.(component) ?? null
+}
+
+/** The feed a component shows, whose unread entries its sidebar entry flags, or `null`. */
+export function feedUrlOf(component: Component): string | null {
+  return adapterOf(component).feedUrl?.(component) ?? null
 }
 
 /** The renderer of one of a component's widgets, or `undefined` if its type has no such widget. */
