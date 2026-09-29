@@ -18,7 +18,12 @@ import {
   SelectValue,
   Switch
 } from '@ki4jlu/design-system'
-import { componentTypeSchema, isSingletonType, type AdminComponent } from '@justcampus/shared'
+import {
+  componentTypeSchema,
+  isBuiltInType,
+  isDesktopComponentType,
+  type AdminComponent
+} from '@justcampus/shared'
 import { adapterOf, componentAdapters } from '@/adapters/registry'
 import {
   configErrors,
@@ -59,7 +64,8 @@ export function ComponentFormDialog({
   const update = useUpdateComponent()
   const pending = create.isPending || update.isPending
   const adapter = adapterOf(state.type)
-  const isModule = component !== null && isSingletonType(component.type)
+  // Built-in components (modules, desktop components) keep their type.
+  const isBuiltIn = component !== null && isBuiltInType(component.type)
   const types = selectableTypes(component)
 
   const set = <K extends keyof ComponentFormState>(key: K, value: ComponentFormState[K]): void =>
@@ -110,13 +116,19 @@ export function ComponentFormDialog({
           <Field
             id={`${formId}-type`}
             label={t('admin.form.type')}
-            hint={isModule ? t('admin.form.moduleTypeHint') : undefined}
+            hint={
+              !isBuiltIn
+                ? undefined
+                : isDesktopComponentType(state.type)
+                  ? t('admin.form.desktopTypeHint')
+                  : t('admin.form.moduleTypeHint')
+            }
             error={errors.type}
           >
             {(control) => (
               <Select
                 value={state.type}
-                disabled={isModule}
+                disabled={isBuiltIn}
                 onValueChange={(value) => {
                   const type = componentTypeSchema.parse(value)
                   setState((current) => ({

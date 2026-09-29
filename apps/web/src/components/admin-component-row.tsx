@@ -1,7 +1,7 @@
 import { ArrowDownIcon, ArrowUpIcon, PencilIcon, Trash2Icon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Badge, Button, Switch, TableCell, TableRow } from '@ki4jlu/design-system'
-import { isSingletonType, type AdminComponent } from '@justcampus/shared'
+import { isBuiltInType, isDesktopComponentType, type AdminComponent } from '@justcampus/shared'
 import { externalUrlOf, sourceUrlOf } from '@/adapters/registry'
 import { ComponentIcon } from './component-icon'
 
@@ -28,7 +28,9 @@ export function AdminComponentRow({
 }: AdminComponentRowProps): React.JSX.Element {
   const { t } = useTranslation()
   const { name } = component
-  const isModule = isSingletonType(component.type)
+  // Built in (modules, desktop components): created by the server, so they cannot be deleted.
+  const isBuiltIn = isBuiltInType(component.type)
+  const isDesktop = isDesktopComponentType(component.type)
   const url = sourceUrlOf(component)
   return (
     <TableRow>
@@ -45,9 +47,9 @@ export function AdminComponentRow({
       <TableCell className="whitespace-nowrap">
         <span className="flex items-center gap-2">
           {t(`componentTypes.${component.type}`)}
-          {isModule ? (
+          {isBuiltIn ? (
             <Badge tone="secondary" appearance="filled">
-              {t('admin.table.module')}
+              {t(isDesktop ? 'admin.table.desktop' : 'admin.table.module')}
             </Badge>
           ) : null}
         </span>
@@ -98,16 +100,16 @@ export function AdminComponentRow({
             <PencilIcon {...ICON} />
           </Button>
           {/*
-           * Modules cannot be deleted. Their button stays as an invisible placeholder (hidden from
+           * Built-in components cannot be deleted. Their button stays as an invisible placeholder (hidden from
            * pointer, keyboard and screenreaders alike), so every row's buttons line up.
            */}
           <Button
             variant="ghost-destructive"
             size="icon"
             aria-label={t('admin.table.delete', { name })}
-            disabled={isModule}
-            onClick={isModule ? undefined : onDelete}
-            className={isModule ? 'invisible' : undefined}
+            disabled={isBuiltIn}
+            onClick={isBuiltIn ? undefined : onDelete}
+            className={isBuiltIn ? 'invisible' : undefined}
           >
             <Trash2Icon {...ICON} />
           </Button>

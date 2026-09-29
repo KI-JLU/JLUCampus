@@ -1,7 +1,7 @@
 import { useContext, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '@/lib/utils'
-import { PageHeaderSlotsContext } from '@/lib/page-header-slots'
+import { PageHeaderExtraActionsContext, PageHeaderSlotsContext } from '@/lib/page-header-slots'
 
 interface PageHeaderProps {
   title: ReactNode
@@ -16,15 +16,25 @@ interface PageHeaderProps {
  * A page's one header. From `lg` up the title and actions go into the shell's
  * top bar, so there is a single bar above the content; the `<h1>` stays in the
  * page for assistive technology. Below `lg` the bar shows the brand, so the
- * page renders the header itself.
+ * page renders the header itself. Actions the route adds (see
+ * `PageHeaderExtraActionsContext`) follow the page's own.
  */
 export function PageHeader({
   title,
   description,
-  actions,
+  actions: pageActions,
   className
 }: PageHeaderProps): React.JSX.Element {
   const slots = useContext(PageHeaderSlotsContext)
+  const extraActions = useContext(PageHeaderExtraActionsContext)
+  const actions = extraActions ? (
+    <>
+      {pageActions}
+      {extraActions}
+    </>
+  ) : (
+    pageActions
+  )
   const descriptionLine = description ? (
     <p className="m-0 text-body-base text-on-surface-variant">{description}</p>
   ) : null

@@ -229,13 +229,19 @@
         "modelId": "Geben Sie eine Modell-ID mit höchstens 200 Zeichen ein.",
         "modelLabel": "Geben Sie einen Anzeigenamen mit höchstens 80 Zeichen ein."
       }
+    },
+    "files": {
+      "configNote": "Nichts einzustellen: Die Orte richtet jede Person in der Desktop-App auf ihrem Gerät ein.",
+      "desktopOnlyTitle": "Nur in der Desktop-App verfügbar",
+      "desktopOnlyDescription": "Dateien und Netzlaufwerke Ihres Computers öffnen Sie in der Desktop-App von JLU Campus."
     }
   },
   "componentTypes": {
     "iframe": "Eingebettete Website",
     "rss": "RSS-Feed",
     "link": "Verknüpfung",
-    "translator": "Übersetzer"
+    "translator": "Übersetzer",
+    "files": "Dateien & Laufwerke (Desktop)"
   },
   "shortcut": {
     "new": "Neue Verknüpfung",
@@ -339,7 +345,8 @@
       "edit": "{{name}} bearbeiten",
       "delete": "{{name}} löschen",
       "toggleFailed": "Die Komponente konnte nicht geändert werden.",
-      "reorderFailed": "Die Reihenfolge konnte nicht gespeichert werden."
+      "reorderFailed": "Die Reihenfolge konnte nicht gespeichert werden.",
+      "desktop": "Desktop"
     },
     "form": {
       "createTitle": "Neue Komponente",
@@ -377,7 +384,8 @@
         "url": "Geben Sie eine vollständige https-Adresse ein (http nur für localhost).",
         "externalUrl": "Geben Sie eine vollständige Webadresse ein, die mit http:// oder https:// beginnt.",
         "secret": "Geben Sie höchstens {{max}} Zeichen ein."
-      }
+      },
+      "desktopTypeHint": "Desktop-Komponenten sind in JLU Campus eingebaut und nur in der Desktop-App sichtbar; ihr Typ lässt sich nicht ändern."
     },
     "delete": {
       "title": "Komponente löschen?",
@@ -528,7 +536,8 @@
       "droppedSidebar": "{{name}} in der Seitenleiste abgelegt, Position {{position}} von {{total}}.",
       "droppedAvailable": "{{name}} liegt bei den verfügbaren Komponenten.",
       "cancelled": "Verschieben abgebrochen, {{name}} bleibt an der bisherigen Position."
-    }
+    },
+    "desktopBadge": "Desktop"
   },
   "moreApps": {
     "hint": "Ziehen Sie Apps in die Seitenleiste und ordnen Sie sie dort an, oder nutzen Sie +. Zurück hierher gezogen, verschwinden sie aus der Seitenleiste.",
@@ -539,5 +548,88 @@
     "noMatches": "Keine App passt zu „{{query}}“.",
     "matches_one": "{{count}} App gefunden.",
     "matches_other": "{{count}} Apps gefunden."
+  },
+  "desktop": {
+    "settings": {
+      "title": "Desktop-App"
+    },
+    "settingsLoadFailed": "Die Einstellungen konnten nicht geladen werden.",
+    "settingsSaveFailed": "Die Einstellung konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
+    "notifications": {
+      "name": "Benachrichtigungen & Infobereich",
+      "enabled": "Benachrichtigungen bei neuen Feed-Einträgen",
+      "enabledDescription": "Meldet neue Einträge der Feeds in Ihrer Seitenleiste, auch wenn das Fenster im Hintergrund ist.",
+      "closeToTray": "Beim Schließen im Infobereich weiterlaufen",
+      "closeToTrayDescription": "Das Fenster schließt sich, JLU Campus bleibt im Infobereich und meldet weiter neue Einträge.",
+      "test": "Benachrichtigungen prüfen",
+      "testDescription": "Zeigt eine Benachrichtigung, wie JLU Campus sie auf diesem Gerät sendet.",
+      "testOff": "Schalten Sie zuerst die Benachrichtigungen ein.",
+      "sendTest": "Testbenachrichtigung senden",
+      "testBody": "So sehen Benachrichtigungen von JLU Campus aus.",
+      "testFailed": "Die Testbenachrichtigung konnte nicht gesendet werden.",
+      "newEntries_one": "{{count}} neuer Eintrag",
+      "newEntries_other": "{{count}} neue Einträge"
+    },
+    "files": {
+      "description": "Ihre Ordner und Netzlaufwerke auf einen Blick. Geöffnet wird im Dateimanager Ihres Computers.",
+      "addFolder": "Ordner hinzufügen",
+      "connectNetwork": "Netzlaufwerk verbinden",
+      "places": "Orte",
+      "placesFailed": "Die Orte konnten nicht geladen werden.",
+      "recent": "Zuletzt heruntergeladen",
+      "recentFailed": "Die Downloads konnten nicht geladen werden.",
+      "recentEmpty": "Im Downloads-Ordner liegen noch keine Dateien.",
+      "standard": {
+        "downloads": "Downloads",
+        "documents": "Dokumente",
+        "desktop": "Schreibtisch"
+      },
+      "reachable": "Erreichbar",
+      "unreachable": "Nicht erreichbar",
+      "missing": "Nicht gefunden",
+      "vpnHint": "VPN verbunden? Außerhalb des Uni-Netzes sind Netzlaufwerke nur über das VPN der JLU erreichbar.",
+      "open": "Öffnen",
+      "openPlace": "{{name}} öffnen",
+      "openFile": "{{name}} öffnen",
+      "notOpenable": "Programm, wird hier nicht geöffnet",
+      "remove": "{{name}} entfernen",
+      "showInExplorer": "Im Explorer zeigen",
+      "showInFinder": "Im Finder zeigen",
+      "showInFolder": "Im Ordner zeigen",
+      "openFailed": "Das konnte nicht geöffnet werden. Vielleicht wurde es verschoben oder gelöscht.",
+      "addFailed": "Der Ordner konnte nicht hinzugefügt werden.",
+      "removeFailed": "Der Ort konnte nicht entfernt werden.",
+      "dropTitle": "Ordner hier ablegen, um ihn hinzuzufügen",
+      "dropHint": "Dateien lassen sich nicht hinzufügen, nur Ordner.",
+      "dropNotFolder": "„{{name}}“ ist kein Ordner und wurde nicht hinzugefügt.",
+      "network": {
+        "title": "Netzlaufwerk verbinden",
+        "description": "Fügen Sie eine Freigabe im Netzwerk hinzu, etwa ein Laufwerk Ihres Instituts. Die Anmeldung übernimmt Ihr Betriebssystem.",
+        "address": "Adresse",
+        "addressHint": "Wie im Dateimanager: \\\\server\\freigabe unter Windows, smb://server/freigabe unter macOS und Linux.",
+        "addressRequired": "Geben Sie die Adresse der Freigabe ein.",
+        "addressInvalid": "Diese Adresse lässt sich nicht verbinden. Prüfen Sie die Schreibweise.",
+        "placeholder": "smb://server/freigabe",
+        "placeholderWindows": "\\\\server\\freigabe",
+        "name": "Name (optional)",
+        "nameHint": "Leer lassen, um den Namen der Freigabe zu verwenden.",
+        "connect": "Verbinden",
+        "connecting": "Wird verbunden …"
+      }
+    },
+    "system": {
+      "name": "Autostart & Links",
+      "autostart": "Mit dem Computer starten",
+      "autostartDescription": "JLU Campus startet, wenn Sie sich am Computer anmelden.",
+      "autostartUnsupported": "Nur in der installierten App verfügbar.",
+      "links": "Links {{scheme}}://… öffnen diese App",
+      "linksDescription": "Kopierte Desktop-Links öffnen die Seite direkt in JLU Campus.",
+      "linksOffDescription": "Eine andere App ist für diese Links zuständig. Installieren Sie JLU Campus erneut, um das zu ändern.",
+      "yes": "Ja",
+      "no": "Nein",
+      "copyLink": "Desktop-Link kopieren",
+      "linkCopied": "Link kopiert",
+      "copyLinkFailed": "Der Link konnte nicht kopiert werden."
+    }
   }
 }

@@ -48,6 +48,12 @@ describe('selectableTypes', () => {
   it('keeps a module on its own type', () => {
     expect(selectableTypes(translator)).toEqual(['translator'])
   })
+
+  it('keeps a desktop component on its own type', () => {
+    expect(selectableTypes({ ...translator, type: 'files', config: {}, secrets: {} })).toEqual([
+      'files'
+    ])
+  })
 })
 
 describe('validateComponentForm', () => {

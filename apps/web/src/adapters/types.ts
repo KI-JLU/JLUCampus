@@ -1,5 +1,5 @@
 import type { ComponentType as ReactComponentType } from 'react'
-import type { Component, ComponentType, WidgetKey } from '@justcampus/shared'
+import type { Component, ComponentType, DesktopModuleId, WidgetKey } from '@justcampus/shared'
 
 export type ComponentOf<T extends ComponentType> = Extract<Component, { type: T }>
 export type ComponentConfigOf<T extends ComponentType> = ComponentOf<T>['config']
@@ -49,6 +49,12 @@ export interface ComponentAdapter<T extends ComponentType> {
    * entries newer than the user's last read.
    */
   feedUrl?: (component: ComponentOf<T>) => string
+  /**
+   * Set for desktop components (see `DESKTOP_COMPONENT_TYPES`): the desktop module the page needs.
+   * Where the desktop app does not offer it (the browser, the PWA), users never see the component;
+   * admins still do, to place it in presets.
+   */
+  desktopModule?: DesktopModuleId
   /** A renderer for every widget the type offers (see `COMPONENT_WIDGETS`). */
   widgets: { [K in WidgetKey<T>]: WidgetView<T> }
 }

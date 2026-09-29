@@ -6,9 +6,10 @@ import { ArrowUpRightIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { NavItem, PopoverAnchor, useSidebarCollapsed } from '@ki4jlu/design-system'
 import type { Component } from '@justcampus/shared'
-import { externalUrlOf, feedUrlOf } from '@/adapters/registry'
+import { externalUrlOf, feedUrlOf, isAvailableHere } from '@/adapters/registry'
 import { externalLinkProps } from '@/lib/external'
 import { componentsQuery, sidebarQuery, useSaveSidebar } from '@/lib/queries'
+import { keepHiddenIds } from '@/lib/sidebar-hidden'
 import { toast } from '@/lib/toast'
 import { useFeedHasUnread } from '@/lib/use-feed'
 import { useMediaQuery } from '@/lib/use-media-query'
@@ -137,7 +138,8 @@ function ComponentPageLink({
 /**
  * The user's own sidebar rows in place, plus the "More apps" panel, one drag context for both.
  * Changes are saved at once. The collapsed column has no room for the rows; it keeps its links
- * and the panel's buttons still add.
+ * and the panel's buttons still add. Components this device cannot show (desktop components in
+ * the browser) are left out of both lists but kept in the saved sidebar.
  */
 function SidebarEditor({ pathname }: { pathname: string }): React.JSX.Element {
   const { t } = useTranslation()
@@ -147,11 +149,18 @@ function SidebarEditor({ pathname }: { pathname: string }): React.JSX.Element {
   const { mutate } = useSaveSidebar()
   const wide = useMediaQuery('(min-width: 64rem)')
   const markerRef = useRef<HTMLSpanElement>(null)
+  const { available, hiddenIds } = useMemo(() => {
+    const all = catalogue.data ?? []
+    return {
+      available: catalogue.data?.filter(isAvailableHere),
+      hiddenIds: new Set(all.filter((c) => !isAvailableHere(c)).map((c) => c.id))
+    }
+  }, [catalogue.data])
   const arrangement = useSidebarArrangement({
-    catalogue: catalogue.data,
+    catalogue: available,
     componentIds: sidebar.data,
     onSave: (componentIds, onSettled) =>
-      mutate(componentIds, {
+      mutate(keepHiddenIds(componentIds, sidebar.data ?? [], hiddenIds), {
         onError: () => toast({ variant: 'error', title: t('sidebarEditor.saveFailed') }),
         onSettled
       })
@@ -201,7 +210,7 @@ function SidebarEditor({ pathname }: { pathname: string }): React.JSX.Element {
       )}
       <MoreAppsPanel
         arrangement={arrangement}
-        catalogue={catalogue.data}
+        catalogue={available}
         loading={loading}
         failed={failed}
         wide={wide}

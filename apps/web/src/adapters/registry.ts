@@ -1,5 +1,7 @@
 import type { ComponentType as ReactComponentType } from 'react'
-import type { Component, ComponentType } from '@justcampus/shared'
+import type { Component, ComponentType, DesktopModuleId } from '@justcampus/shared'
+import { desktopModule } from '@/desktop/bridge'
+import { filesAdapter } from './files'
 import { iframeAdapter } from './iframe'
 import { linkAdapter } from './link'
 import { rssAdapter } from './rss'
@@ -10,7 +12,8 @@ export const componentAdapters: { [T in ComponentType]: ComponentAdapter<T> } = 
   iframe: iframeAdapter,
   rss: rssAdapter,
   link: linkAdapter,
-  translator: translatorAdapter
+  translator: translatorAdapter,
+  files: filesAdapter
 }
 
 export function getAdapter<T extends ComponentType>(type: T): ComponentAdapter<T> {
@@ -26,6 +29,7 @@ interface AnyComponentAdapter {
   sourceUrl?: (component: Component) => string
   externalUrl?: (component: Component) => string
   feedUrl?: (component: Component) => string
+  desktopModule?: DesktopModuleId
   widgets: Readonly<Partial<Record<string, { Tile: AnyComponentView }>>>
 }
 
@@ -38,6 +42,16 @@ interface AnyComponentAdapter {
 export function adapterOf(componentOrType: Component | ComponentType): AnyComponentAdapter {
   const type = typeof componentOrType === 'string' ? componentOrType : componentOrType.type
   return componentAdapters[type] as unknown as AnyComponentAdapter
+}
+
+/**
+ * Whether the user can use the component on this device: always, except desktop components
+ * outside the desktop app (or a build without their module). Everything a user sees lists only
+ * these; admin views list all.
+ */
+export function isAvailableHere(componentOrType: Component | ComponentType): boolean {
+  const module = adapterOf(componentOrType).desktopModule
+  return module === undefined || desktopModule(module) !== undefined
 }
 
 /** Where a shortcut component leads, or `null` for components that open as a page in the app. */

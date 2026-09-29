@@ -1,4 +1,4 @@
-import { createContext } from 'react'
+import { createContext, type ReactNode } from 'react'
 
 /**
  * Where `PageHeader` puts a page's title and actions: two elements in the
@@ -14,3 +14,9 @@ export const PageHeaderSlotsContext = createContext<PageHeaderSlots>({
   title: null,
   actions: null
 })
+
+/**
+ * Actions the route adds after a page's own in its `PageHeader`, e.g. "copy desktop link" on
+ * component pages in the desktop app.
+ */
+export const PageHeaderExtraActionsContext = createContext<ReactNode>(null)

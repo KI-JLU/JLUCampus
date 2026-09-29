@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { LanguagesIcon, SunMoonIcon } from 'lucide-react'
+import { LanguagesIcon, MonitorIcon, SunMoonIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   Select,
@@ -9,9 +9,12 @@ import {
   SelectValue,
   SettingsDialog,
   SettingsRow,
-  ThemeToggle
+  ThemeToggle,
+  type SettingsSection
 } from '@ki4jlu/design-system'
 import { LANGUAGES, languageSchema } from '@justcampus/shared'
+import { DesktopSettings } from '@/desktop/desktop-settings'
+import { desktopModuleSettings } from '@/desktop/registry'
 import { useLanguage } from '@/lib/language'
 
 const ICON = { 'aria-hidden': true, width: '1em', height: '1em' } as const
@@ -21,7 +24,10 @@ interface UserSettingsDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-/** The user's settings window: interface language (saved to the profile) and colour scheme. */
+/**
+ * The user's settings window: interface language (saved to the profile) and colour scheme, and in
+ * the desktop app the settings of its modules.
+ */
 export function UserSettingsDialog({
   open,
   onOpenChange
@@ -30,6 +36,19 @@ export function UserSettingsDialog({
   const { language, setLanguage } = useLanguage({ persist: true })
   const languageLabelId = useId()
   const themeLabelId = useId()
+  const desktopModules = desktopModuleSettings()
+  const desktopSection: SettingsSection[] =
+    desktopModules.length === 0
+      ? []
+      : [
+          {
+            value: 'desktop',
+            label: t('desktop.settings.title'),
+            icon: <MonitorIcon {...ICON} />,
+            keywords: desktopModules.map(({ view }) => t(`desktop.${view.id}.name`)),
+            content: <DesktopSettings modules={desktopModules} />
+          }
+        ]
 
   return (
     <SettingsDialog
@@ -93,7 +112,8 @@ export function UserSettingsDialog({
               }
             />
           )
-        }
+        },
+        ...desktopSection
       ]}
     />
   )
