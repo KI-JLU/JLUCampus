@@ -57,6 +57,13 @@
       "when": 1790670917328,
       "tag": "0007_feed_read",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790674864729,
+      "tag": "0008_feed_read_repair",
+      "breakpoints": true
     }
   ]
 }
