@@ -67,7 +67,11 @@ Copy `.env.example` to `.env` at the repo root. The server loads the root
   API, so session cookies are `SameSite=None; Secure` by default (Chromium and
   Firefox accept Secure cookies from `http://localhost`). `CORS_ORIGINS` and
   Better-Auth `trustedOrigins` list every frontend origin including `app://-`.
-  CORS allows credentials.
+  CORS allows credentials. Because the cookie goes along on cross-site
+  requests and CORS does not stop simple ones (form posts, multipart,
+  `text/plain`), every `/api/*` request other than GET/HEAD/OPTIONS that
+  carries an `Origin` outside `CORS_ORIGINS` and the API's own origin answers
+  `403 forbidden` (`src/origin.ts`).
 - API authorization: every `/api/*` route except `/api/health` and `/api/auth/*`
   requires a session → `401 { error: { code: 'unauthorized' } }`. `/api/admin/*`
   requires `role === 'admin'` → `403 forbidden`.

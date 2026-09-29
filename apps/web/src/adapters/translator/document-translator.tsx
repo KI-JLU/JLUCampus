@@ -23,6 +23,7 @@ import {
 } from '@justcampus/shared'
 import { ApiRequestError, apiBase } from '@/lib/api'
 import {
+  type DocumentUploadRequest,
   useDeleteTranslatorDocument,
   useTranslatorDocuments,
   useUploadTranslatorDocument
@@ -45,6 +46,12 @@ interface Upload {
   state: 'waiting' | 'uploading' | 'error'
   /** Why the upload failed. */
   error: string | null
+}
+
+interface QueuedFile {
+  file: File
+  key: string
+  request: Omit<DocumentUploadRequest, 'file'>
 }
 
 /** How long to wait before looking again whether a running job has finished. */
@@ -77,6 +84,9 @@ export function DocumentTranslator({
   const [source, setSource] = useState<TranslatorLanguage | null>(null)
   const [target, setTarget] = useState<TranslatorLanguage>(defaultTarget)
   const [uploads, setUploads] = useState<Upload[]>([])
+  /** Files waiting for their upload, in the order they were added. */
+  const queue = useRef<QueuedFile[]>([])
+  const draining = useRef(false)
   const jobs = useTranslatorDocuments(true)
   const upload = useUploadTranslatorDocument()
   const remove = useDeleteTranslatorDocument()
@@ -108,11 +118,8 @@ export function DocumentTranslator({
     })
     // The languages as they are now, even if they change while earlier files upload.
     const request = { source, target, formality }
-    const queued = accepted.map((file) => ({ file, key: crypto.randomUUID() }))
-    const update = (key: string, patch: Partial<Upload>): void =>
-      setUploads((current) =>
-        current.map((item) => (item.key === key ? { ...item, ...patch } : item))
-      )
+    const queued = accepted.map((file) => ({ file, key: crypto.randomUUID(), request }))
+    queue.current.push(...queued)
     setUploads((current) => [
       ...current,
       ...queued.map(({ file, key }) => ({
@@ -123,21 +130,40 @@ export function DocumentTranslator({
         error: null
       }))
     ])
-    for (const { file, key } of queued) {
-      try {
-        await waitForSlot()
-        update(key, { state: 'uploading' })
-        await upload.mutateAsync({ file, ...request })
-        setUploads((current) => current.filter((item) => item.key !== key))
-      } catch (error) {
-        update(key, {
-          state: 'error',
-          error: t(uploadErrorKey(error), {
-            active: TRANSLATOR_DOCUMENT_ACTIVE_MAX,
-            daily: TRANSLATOR_DOCUMENT_DAILY_MAX
+    void drain()
+  }
+
+  /**
+   * Uploads the queued files one after another. One run at a time, fed by every selection, so
+   * two quick selections cannot both take the same free slot.
+   */
+  const drain = async (): Promise<void> => {
+    if (draining.current) return
+    draining.current = true
+    const update = (key: string, patch: Partial<Upload>): void =>
+      setUploads((current) =>
+        current.map((item) => (item.key === key ? { ...item, ...patch } : item))
+      )
+    try {
+      for (let next = queue.current.shift(); next; next = queue.current.shift()) {
+        const { file, key, request } = next
+        try {
+          await waitForSlot()
+          update(key, { state: 'uploading' })
+          await upload.mutateAsync({ file, ...request })
+          setUploads((current) => current.filter((item) => item.key !== key))
+        } catch (error) {
+          update(key, {
+            state: 'error',
+            error: t(uploadErrorKey(error), {
+              active: TRANSLATOR_DOCUMENT_ACTIVE_MAX,
+              daily: TRANSLATOR_DOCUMENT_DAILY_MAX
+            })
           })
-        })
+        }
       }
+    } finally {
+      draining.current = false
     }
   }
 

@@ -101,32 +101,8 @@ translatorApp.get('/documents', async (context) => {
 
 translatorApp.post('/documents', async (context) => {
   const { componentId, config, secrets } = documentsRuntime(context)
-  let body: FormData
-  try {
-    body = await context.req.raw.formData()
-  } catch {
-    return validation('file', 'Expected multipart form data')
-  }
-  const uploaded = body.get('file')
-  if (!(uploaded instanceof File) || uploaded.size === 0)
-    return validation('file', 'Select a non-empty file')
-  const filename = basename(uploaded.name.replaceAll('\\', '/')).trim()
-  if (!filename || filename.length > TRANSLATOR_DOCUMENT_FILENAME_MAX)
-    return validation('file', 'Invalid filename')
-  if (!translatorDocumentExtension(filename)) return validation('file', 'Unsupported file type')
-  if (uploaded.size > TRANSLATOR_DOCUMENT_MAX_BYTES) return validation('file', 'File is too large')
-  const fields = Object.fromEntries(
-    ['source', 'target', 'formality'].map((key) => [key, body.get(key) ?? undefined])
-  )
-  const parsed = translatorDocumentUploadSchema.safeParse(fields)
-  if (!parsed.success)
-    throw new ApiError(
-      400,
-      'validation',
-      'Request validation failed',
-      validationIssues(parsed.error)
-    )
   const userId = context.get('session').user.id
+  // Reserved before the body is read, so parallel uploads cannot pile up 20 MB bodies unchecked.
   const inFlight = uploadsInFlight.get(userId) ?? 0
   uploadsInFlight.set(userId, inFlight + 1)
   try {
@@ -137,6 +113,32 @@ translatorApp.post('/documents', async (context) => {
     ) {
       throw new ApiError(429, 'rate_limited', 'Document upload limit reached')
     }
+    let body: FormData
+    try {
+      body = await context.req.raw.formData()
+    } catch {
+      return validation('file', 'Expected multipart form data')
+    }
+    const uploaded = body.get('file')
+    if (!(uploaded instanceof File) || uploaded.size === 0)
+      return validation('file', 'Select a non-empty file')
+    const filename = basename(uploaded.name.replaceAll('\\', '/')).trim()
+    if (!filename || filename.length > TRANSLATOR_DOCUMENT_FILENAME_MAX)
+      return validation('file', 'Invalid filename')
+    if (!translatorDocumentExtension(filename)) return validation('file', 'Unsupported file type')
+    if (uploaded.size > TRANSLATOR_DOCUMENT_MAX_BYTES)
+      return validation('file', 'File is too large')
+    const fields = Object.fromEntries(
+      ['source', 'target', 'formality'].map((key) => [key, body.get(key) ?? undefined])
+    )
+    const parsed = translatorDocumentUploadSchema.safeParse(fields)
+    if (!parsed.success)
+      throw new ApiError(
+        400,
+        'validation',
+        'Request validation failed',
+        validationIssues(parsed.error)
+      )
     const file = new File([uploaded], filename, { type: uploaded.type })
     let remote: Awaited<ReturnType<typeof uploadDocument>>
     try {

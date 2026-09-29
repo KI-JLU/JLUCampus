@@ -18,7 +18,8 @@ vi.mock('../../db/index.js', () => ({
       from: () => ({
         where: (condition: SQL) => {
           quotaWhere.push(condition)
-          return Promise.resolve([{ value: quotaWhere.length === 1 ? 2 : 49 }])
+          // Each quota check asks for the active count, then the daily one.
+          return Promise.resolve([{ value: quotaWhere.length % 2 === 1 ? 2 : 49 }])
         }
       })
     })
@@ -28,6 +29,7 @@ vi.mock('../../db/index.js', () => ({
 function app(enabled: boolean): Hono<AppEnvironment> {
   const testApp = new Hono<AppEnvironment>()
   testApp.use('*', async (context, next) => {
+    context.set('session', { user: { id: 'owner' } } as AppEnvironment['Variables']['session'])
     context.set('module', {
       type: 'translator',
       componentId: '00000000-0000-0000-0000-000000000001',
