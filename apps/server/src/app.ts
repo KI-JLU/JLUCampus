@@ -398,31 +398,44 @@ app.get('/api/admin/components/:id', async (context) => {
 app.put('/api/admin/components/:id', async (context) => {
   const id = parseComponentId(context.req.param('id'))
   const input = await parseBody(context, componentInputSchema)
-  const [record] = await db.select().from(component).where(eq(component.id, id)).limit(1)
-  if (!record) throw new ApiError(404, 'not_found', 'Component not found')
-  if (componentTypeChangeConflicts(record, input.type)) {
-    throw new ApiError(409, 'conflict', 'A component cannot change into or out of a module type')
-  }
-
   const secretPatch = 'secrets' in input ? input.secrets : undefined
-  const secrets = applySecretsPatch(record.secrets, secretPatch, (secretKey, value) =>
-    encryptSecret(value, env.COMPONENT_SECRETS_KEY, id, secretKey)
-  )
-  const [updated] = await db
-    .update(component)
-    .set({
-      name: input.name,
-      type: input.type,
-      icon: input.icon,
-      iconUrl: input.iconUrl,
-      config: input.config,
-      enabled: input.enabled,
-      secrets,
-      updatedAt: new Date()
-    })
-    .where(eq(component.id, id))
-    .returning()
-  if (!updated) throw new ApiError(404, 'not_found', 'Component not found')
+  const changesSecrets = Object.values(secretPatch ?? {}).some((value) => value !== undefined)
+
+  // The row lock keeps concurrent saves from writing back a stale copy of the secrets.
+  const updated = await db.transaction(async (transaction) => {
+    const [record] = await transaction
+      .select()
+      .from(component)
+      .where(eq(component.id, id))
+      .limit(1)
+      .for('update')
+    if (!record) throw new ApiError(404, 'not_found', 'Component not found')
+    if (componentTypeChangeConflicts(record, input.type)) {
+      throw new ApiError(409, 'conflict', 'A component cannot change into or out of a module type')
+    }
+
+    const [row] = await transaction
+      .update(component)
+      .set({
+        name: input.name,
+        type: input.type,
+        icon: input.icon,
+        iconUrl: input.iconUrl,
+        config: input.config,
+        enabled: input.enabled,
+        ...(changesSecrets
+          ? {
+              secrets: applySecretsPatch(record.secrets, secretPatch, (secretKey, value) =>
+                encryptSecret(value, env.COMPONENT_SECRETS_KEY, id, secretKey)
+              )
+            }
+          : {}),
+        updatedAt: new Date()
+      })
+      .where(eq(component.id, id))
+      .returning()
+    return row!
+  })
   return context.json(toAdminComponent(updated))
 })
 
