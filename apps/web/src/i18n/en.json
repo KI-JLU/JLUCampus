@@ -394,6 +394,10 @@
   },
   "allApps": {
     "empty": "No apps are available yet.",
-    "loadFailed": "The apps could not be loaded."
+    "loadFailed": "The apps could not be loaded.",
+    "search": "Search apps",
+    "noMatches": "No app matches “{{query}}”.",
+    "matches_one": "{{count}} app found.",
+    "matches_other": "{{count}} apps found."
   }
 }

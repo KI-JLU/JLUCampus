@@ -1,13 +1,12 @@
-import { useId, useMemo, useState } from 'react'
+import { useId, useMemo } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { DndContext } from '@dnd-kit/core'
-import { ArrowUpRightIcon, CheckIcon, GripIcon, PencilIcon } from 'lucide-react'
+import { ArrowUpRightIcon, CheckIcon, PencilIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   Button,
   NavItem,
-  Popover,
   PopoverAnchor,
   PopoverContent,
   PopoverTrigger
@@ -71,79 +70,20 @@ export function EditSidebarButton({ editing }: { editing: boolean }): React.JSX.
   )
 }
 
-/** "All apps" at the foot of the column: every component, to open one that is not in the sidebar. */
-export function AllApps({ pathname }: { pathname: string }): React.JSX.Element {
-  const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
-  const catalogue = useQuery(componentsQuery)
-  const wide = useMediaQuery('(min-width: 64rem)')
-  const titleId = useId()
-  const label = t('nav.allApps')
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <NavItem type="button" label={label}>
-          <GripIcon {...icon} />
-          <span>{label}</span>
-        </NavItem>
-      </PopoverTrigger>
-      <PopoverContent
-        side={wide ? 'right' : 'top'}
-        align="end"
-        sideOffset={8}
-        collisionPadding={12}
-        aria-labelledby={titleId}
-        className="flex w-72 flex-col gap-stack-sm p-3"
-      >
-        <h2 id={titleId} className="m-0 text-sm font-semibold text-on-surface">
-          {label}
-        </h2>
-        {catalogue.isPending ? (
-          <p className="m-0 text-sm text-on-surface-variant">{t('common.loading')}</p>
-        ) : catalogue.isError ? (
-          <p role="alert" className="m-0 text-sm text-error">
-            {t('allApps.loadFailed')}
-          </p>
-        ) : catalogue.data.length === 0 ? (
-          <p className="m-0 text-sm text-on-surface-variant">{t('allApps.empty')}</p>
-        ) : (
-          // Following a link closes the list; the page it opened is what the user wanted.
-          <ul
-            aria-labelledby={titleId}
-            className="m-0 flex max-h-96 list-none flex-col gap-1 overflow-y-auto p-0"
-            onClick={(event) => {
-              if (event.target instanceof Element && event.target.closest('a')) setOpen(false)
-            }}
-          >
-            {catalogue.data.map((component) => (
-              <li key={component.id}>
-                <SidebarComponentLink component={component} pathname={pathname} inColumn={false} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </PopoverContent>
-    </Popover>
-  )
-}
-
 /**
- * A component's page inside the app, or for shortcut components their site outside it. `inColumn`
- * rows shrink to their icon with the collapsed column; a popover's rows keep their text.
+ * A component's page inside the app, or for shortcut components their site outside it. The row
+ * shrinks to its icon with the collapsed column.
  */
 function SidebarComponentLink({
   component,
-  pathname,
-  inColumn = true
+  pathname
 }: {
   component: Component
   pathname: string
-  inColumn?: boolean
 }): React.JSX.Element {
   const { t } = useTranslation()
   const url = externalUrlOf(component)
-  const label = inColumn ? component.name : undefined
+  const label = component.name
   const content = (
     <>
       <ComponentIcon icon={component.icon} iconUrl={component.iconUrl} siteUrl={url} />

@@ -16,7 +16,8 @@ import type { Component, Me } from '@justcampus/shared'
 import { PageHeaderSlotsContext } from '@/lib/page-header-slots'
 import { cn } from '@/lib/utils'
 import { AccountMenu } from './account-menu'
-import { AllApps, EditSidebarButton, SidebarComponents } from './sidebar-editor'
+import { AllApps } from './all-apps'
+import { EditSidebarButton, SidebarComponents } from './sidebar-editor'
 
 const LEFT_OPEN_KEY = 'justcampus.shell.left-open'
 const LEFT_WIDTH_KEY = 'justcampus.shell.left-width'
@@ -93,9 +94,7 @@ export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): Re
         logo={<Logo product="Campus" size="sm" />}
         nav={nav}
         navLabel={t('shell.navLabel')}
-        sidebarFooter={
-          <SidebarFooter me={me} pathname={pathname} editingSidebar={editingSidebar} />
-        }
+        sidebarFooter={<SidebarFooter me={me} editingSidebar={editingSidebar} />}
         pageLabel={<span ref={setTitleSlot} className="flex min-w-0 items-center" />}
         headerActions={
           <>
@@ -136,16 +135,15 @@ export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): Re
 
 interface SidebarFooterProps {
   me: Me
-  pathname: string
   editingSidebar: boolean
 }
 
 /** The foot of the column: "All apps", then the user's menu with the sidebar's edit button beside it. */
-function SidebarFooter({ me, pathname, editingSidebar }: SidebarFooterProps): React.JSX.Element {
+function SidebarFooter({ me, editingSidebar }: SidebarFooterProps): React.JSX.Element {
   const collapsed = useSidebarCollapsed()
   return (
     <div className={cn('flex flex-col gap-2', collapsed && 'items-center')}>
-      <AllApps pathname={pathname} />
+      <AllApps />
       <div className="flex items-center gap-1">
         <div className="min-w-0 flex-1">
           <AccountMenu me={me} />
