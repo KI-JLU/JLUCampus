@@ -120,6 +120,13 @@ export function useSidebarArrangement({
     setDraft(next)
   }
 
+  // The rows' buttons as rendered, so a search that hides rows does not shift the neighbours.
+  const actionsIn = (ref: typeof listRef): HTMLElement[] => [
+    ...(ref.current?.querySelectorAll<HTMLElement>('[data-row-action]') ?? [])
+  ]
+  const renderedIndex = (ref: typeof listRef, id: string): number =>
+    actionsIn(ref).findIndex((action) => action.dataset.rowAction === id)
+
   // After a button moved the focused row out of its list, focus its neighbour's button instead of
   // losing focus to <body>.
   useLayoutEffect(() => {
@@ -128,9 +135,6 @@ export function useSidebarArrangement({
     pendingFocus.current = null
     const [own, other] =
       target.list === 'sidebar' ? [listRef, availableRef] : [availableRef, listRef]
-    const actionsIn = (ref: typeof listRef): HTMLElement[] => [
-      ...(ref.current?.querySelectorAll<HTMLElement>('[data-row-action]') ?? [])
-    ]
     const actions = actionsIn(own)
     const next =
       actions[Math.min(Math.max(target.index, 0), actions.length - 1)] ?? actionsIn(other)[0]
@@ -140,12 +144,12 @@ export function useSidebarArrangement({
   const nameOf = (id: UniqueIdentifier): string => byId.get(String(id))?.name ?? ''
 
   const add = (id: string): void => {
-    pendingFocus.current = { list: 'available', index: lists.available.indexOf(id) }
+    pendingFocus.current = { list: 'available', index: renderedIndex(availableRef, id) }
     setStatus(t('sidebarEditor.added', { name: nameOf(id) }))
     onSave([...lists.sidebar, id])
   }
   const remove = (id: string): void => {
-    pendingFocus.current = { list: 'sidebar', index: lists.sidebar.indexOf(id) }
+    pendingFocus.current = { list: 'sidebar', index: renderedIndex(listRef, id) }
     setStatus(t('sidebarEditor.removed', { name: nameOf(id) }))
     onSave(lists.sidebar.filter((other) => other !== id))
   }
