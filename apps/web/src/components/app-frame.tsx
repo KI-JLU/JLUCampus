@@ -14,6 +14,7 @@ import {
 } from '@ki4jlu/design-system'
 import type { Component, Me } from '@justcampus/shared'
 import { PageHeaderSlotsContext } from '@/lib/page-header-slots'
+import { PageSidePanelContext } from '@/lib/page-side-panel'
 import { cn } from '@/lib/utils'
 import { AccountMenu } from './account-menu'
 import { MoreAppsButton } from './more-apps'
@@ -22,6 +23,9 @@ import { SidebarComponents } from './sidebar-editor'
 const LEFT_OPEN_KEY = 'justcampus.shell.left-open'
 const LEFT_WIDTH_KEY = 'justcampus.shell.left-width'
 const LEFT_WIDTH = { defaultWidth: 256, minWidth: 200, maxWidth: 420 }
+const RIGHT_OPEN_KEY = 'justcampus.shell.right-open'
+const RIGHT_WIDTH_KEY = 'justcampus.shell.right-width'
+const RIGHT_WIDTH = { defaultWidth: 320, minWidth: 260, maxWidth: 480 }
 
 type ShellTab = 'nav' | 'page'
 
@@ -34,15 +38,16 @@ interface AppFrameProps {
 
 /**
  * The chrome around every signed-in page: column with navigation and account, one <main>,
- * and one top bar that carries the page's title and actions (see `PageHeader`). The dashboard
- * has no top bar; its few actions sit on the page.
+ * and one top bar that carries the page's title and actions (see `PageHeader`). A page can add
+ * a column on the right (see `PageSidePanel`). The dashboard has no top bar; its few actions
+ * sit on the page.
  */
 export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): React.JSX.Element {
   const { t } = useTranslation()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
   // "More apps" is open, and with it the sidebar's rows are being edited.
   const [moreAppsOpen, setMoreAppsOpen] = useState(false)
-  const [leftOpen, setLeftOpenState] = useLeftOpen()
+  const [leftOpen, setLeftOpenState] = useStoredOpen(LEFT_OPEN_KEY, true)
   // The panel was placed against the open column, so collapsing the column closes it.
   const setLeftOpen = useCallback(
     (open: boolean) => {
@@ -52,6 +57,8 @@ export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): Re
     [setLeftOpenState]
   )
   const [leftWidth, setLeftWidth] = usePersistedWidth(LEFT_WIDTH_KEY, LEFT_WIDTH)
+  const [rightOpen, setRightOpen] = useStoredOpen(RIGHT_OPEN_KEY, true)
+  const [rightWidth, setRightWidth] = usePersistedWidth(RIGHT_WIDTH_KEY, RIGHT_WIDTH)
   const [activeTab, setActiveTab] = useTabPerPath(pathname)
   const [titleSlot, setTitleSlot] = useState<HTMLElement | null>(null)
   const [actionsSlot, setActionsSlot] = useState<HTMLElement | null>(null)
@@ -59,6 +66,9 @@ export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): Re
     () => ({ title: titleSlot, actions: actionsSlot }),
     [titleSlot, actionsSlot]
   )
+  const [sideLabel, setSideLabel] = useState<string | null>(null)
+  const [sideSlot, setSideSlot] = useState<HTMLElement | null>(null)
+  const sidePanel = useMemo(() => ({ element: sideSlot, setLabel: setSideLabel }), [sideSlot])
 
   const icon = { 'aria-hidden': true, width: '1em', height: '1em' } as const
   const mobileTabs: MobilePaneTab[] = [
@@ -96,6 +106,26 @@ export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): Re
         nav={nav}
         navLabel={t('shell.navLabel')}
         sidebarFooter={<SidebarFooter me={me} />}
+        rightPanel={
+          sideLabel === null
+            ? undefined
+            : {
+                label: sideLabel,
+                header: <h2 className="truncate text-base font-semibold">{sideLabel}</h2>,
+                content: <div ref={setSideSlot} className="p-4" />,
+                isOpen: rightOpen,
+                onOpenChange: setRightOpen,
+                width: rightWidth,
+                resize: {
+                  minWidth: RIGHT_WIDTH.minWidth,
+                  maxWidth: RIGHT_WIDTH.maxWidth,
+                  onWidthChange: setRightWidth,
+                  label: t('shell.resizeRight')
+                },
+                collapseLabel: t('shell.collapseRight'),
+                expandLabel: t('shell.expandRight')
+              }
+        }
         pageLabel={<span ref={setTitleSlot} className="flex min-w-0 items-center" />}
         headerActions={
           <>
@@ -126,7 +156,9 @@ export function AppFrame({ me, sidebarComponents, children }: AppFrameProps): Re
       >
         <div id="main-content" tabIndex={-1} className="flex min-h-0 flex-1 flex-col outline-none">
           <PageHeaderSlotsContext.Provider value={slots}>
-            {children}
+            <PageSidePanelContext.Provider value={sidePanel}>
+              {children}
+            </PageSidePanelContext.Provider>
           </PageHeaderSlotsContext.Provider>
         </div>
       </AppShellLayout>
@@ -145,23 +177,27 @@ function SidebarFooter({ me }: { me: Me }): React.JSX.Element {
   )
 }
 
-/** Whether the column is open, remembered per device. */
-function useLeftOpen(): [boolean, (open: boolean) => void] {
+/** Whether a column is open, remembered per device. */
+function useStoredOpen(key: string, fallback: boolean): [boolean, (open: boolean) => void] {
   const [open, setOpenState] = useState<boolean>(() => {
     try {
-      return window.localStorage.getItem(LEFT_OPEN_KEY) !== 'false'
+      const stored = window.localStorage.getItem(key)
+      return stored === null ? fallback : stored === 'true'
     } catch {
-      return true
+      return fallback
     }
   })
-  const setOpen = useCallback((next: boolean) => {
-    setOpenState(next)
-    try {
-      window.localStorage.setItem(LEFT_OPEN_KEY, String(next))
-    } catch {
-      /* A lost preference costs nothing but the preference. */
-    }
-  }, [])
+  const setOpen = useCallback(
+    (next: boolean) => {
+      setOpenState(next)
+      try {
+        window.localStorage.setItem(key, String(next))
+      } catch {
+        /* A lost preference costs nothing but the preference. */
+      }
+    },
+    [key]
+  )
   return [open, setOpen]
 }
 

@@ -240,11 +240,14 @@ strings).
   them "Module" and offers no delete, and the component form neither offers
   module types for new components nor lets a module change its type. The
   translator page (`src/adapters/translator/`) switches between translating
-  (`API.translate`) and rephrasing (`API.rephrase`), with a settings panel for
+  (`API.translate`) and rephrasing (`API.rephrase`), with settings for
   engine, formality, writing style and tone, live mode (runs after a pause in
   typing, not offered for DeepL) and "show changes" (a word diff against the
   submitted text or the previous translation). These settings stay in
-  `localStorage`. Languages are named with `Intl.DisplayNames`; the `quick`
+  `localStorage`. From `lg` up they sit in a collapsible, resizable column on
+  the right of the shell (`PageSidePanel`: the page portals into a slot the
+  frame shows only while a page fills it), below `lg` in a card under the
+  translator. Languages are named with `Intl.DisplayNames`; the `quick`
   tile translates with the default engine and always detects the source
   language. The component form renders one write-only
   `SecretField` per `COMPONENT_SECRETS[type]` entry (texts under

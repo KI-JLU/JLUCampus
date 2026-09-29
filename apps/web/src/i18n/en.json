@@ -17,6 +17,9 @@
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar",
     "resize": "Resize sidebar",
+    "collapseRight": "Collapse right sidebar",
+    "expandRight": "Expand right sidebar",
+    "resizeRight": "Resize right sidebar",
     "tabsLabel": "Switch area",
     "tabNavigation": "Navigation",
     "tabPage": "Page"

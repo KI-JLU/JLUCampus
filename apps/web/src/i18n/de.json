@@ -17,6 +17,9 @@
     "collapse": "Seitenleiste einklappen",
     "expand": "Seitenleiste ausklappen",
     "resize": "Breite der Seitenleiste ändern",
+    "collapseRight": "Rechte Seitenleiste einklappen",
+    "expandRight": "Rechte Seitenleiste ausklappen",
+    "resizeRight": "Breite der rechten Seitenleiste ändern",
     "tabsLabel": "Bereich wechseln",
     "tabNavigation": "Navigation",
     "tabPage": "Seite"
