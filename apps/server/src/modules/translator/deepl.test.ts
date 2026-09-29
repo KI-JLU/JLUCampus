@@ -64,7 +64,8 @@ describe('DeepL', () => {
           deeplApiUrl: null,
           llmBaseUrl: null,
           llmModels: [],
-          defaultEngine: null
+          defaultEngine: null,
+          documentsEnabled: false
         },
         secrets: { deeplApiKey: 'key', llmApiKey: null }
       })

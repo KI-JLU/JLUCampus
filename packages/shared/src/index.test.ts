@@ -11,6 +11,8 @@ import {
   translatorComponentConfigSchema,
   translatorEngineIdSchema,
   rephraseRequestSchema,
+  translatorDocumentExtension,
+  translatorDocumentUploadSchema,
   externalUrlSchema,
   feedSchema,
   folderTemplateInputSchema,
@@ -290,8 +292,29 @@ describe('modules', () => {
       deeplApiUrl: null,
       llmBaseUrl: null,
       llmModels: [],
-      defaultEngine: null
+      defaultEngine: null,
+      documentsEnabled: false
     })
+  })
+
+  it('reads the document upload fields', () => {
+    expect(translatorDocumentUploadSchema.parse({ target: 'en' })).toEqual({
+      source: null,
+      target: 'en',
+      formality: 'default'
+    })
+    expect(translatorDocumentUploadSchema.parse({ source: '', target: 'de' }).source).toBeNull()
+    expect(translatorDocumentUploadSchema.parse({ source: 'fr', target: 'de' }).source).toBe('fr')
+    expect(translatorDocumentUploadSchema.safeParse({ source: 'xx', target: 'de' }).success).toBe(
+      false
+    )
+  })
+
+  it('takes only the document types DeepL translates', () => {
+    expect(translatorDocumentExtension('Bericht.DOCX')).toBe('docx')
+    expect(translatorDocumentExtension('folien.v2.pptx')).toBe('pptx')
+    expect(translatorDocumentExtension('bild.png')).toBeNull()
+    expect(translatorDocumentExtension('pdf')).toBeNull()
   })
 
   it('rejects duplicate model ids', () => {

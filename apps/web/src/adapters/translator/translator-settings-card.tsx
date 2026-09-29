@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import {
   BookmarkIcon,
   EyeIcon,
+  FileTextIcon,
   LanguagesIcon,
   MessageCircleIcon,
   PenLineIcon,
@@ -49,6 +50,7 @@ const ROW_SELECT = 'w-auto min-w-36 py-2'
 
 const MODE_ICONS: Record<TranslatorMode, ReactNode> = {
   translate: <LanguagesIcon {...ICON} />,
+  documents: <FileTextIcon {...ICON} />,
   rephrase: <PenLineIcon {...ICON} />
 }
 
@@ -62,6 +64,8 @@ interface TranslatorSettingsFieldsProps {
   /** Style and tone as they are sent (see `rephraseOptions`). */
   style: RephraseStyle | null
   tone: RephraseTone | null
+  /** Whether document translation is offered; `undefined` until the engines are known. */
+  documents: boolean | undefined
   onChange: (patch: Partial<TranslatorSettings>) => void
 }
 
@@ -75,7 +79,7 @@ export function TranslatorSidebar(props: TranslatorSettingsFieldsProps): React.J
   return (
     <div className="grid gap-stack-lg">
       <ul aria-label={t('component.translator.mode')} className="m-0 grid list-none gap-1 p-0">
-        {TRANSLATOR_MODES.map((mode) => {
+        {TRANSLATOR_MODES.filter((mode) => mode !== 'documents' || props.documents).map((mode) => {
           const active = settings.mode === mode
           const label = t(`component.translator.modes.${mode}`)
           return (
@@ -114,57 +118,82 @@ export function TranslatorSettingsFields({
   onChange
 }: TranslatorSettingsFieldsProps): React.JSX.Element {
   const { t } = useTranslation()
-  const deepl = engine?.kind === 'deepl'
+  const documentMode = settings.mode === 'documents'
+  // Documents only go to DeepL, whatever engine the text modes use.
+  const deepl = documentMode || engine?.kind === 'deepl'
   const noteId = `${id}-deepl-note`
-  const translating = settings.mode === 'translate'
+  const translating = settings.mode !== 'rephrase'
+  const deeplEngine = engines?.find((option) => option.kind === 'deepl')
 
   return (
     <div className="grid gap-stack-lg">
       <Section id={`${id}-engine-title`} title={t('component.translator.engine')}>
-        <Select
-          value={engine?.id ?? ''}
-          onValueChange={(next) => onChange({ engine: next })}
-          disabled={!engines?.length}
-        >
-          <SelectTrigger id={`${id}-engine`} aria-labelledby={`${id}-engine-title`}>
-            <SelectValue placeholder={t('component.translator.engineDefault')} />
-          </SelectTrigger>
-          <SelectContent>
-            {engines?.map((option) => (
-              <SelectItem key={option.id} value={option.id}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {documentMode ? (
+          <>
+            <Select value="deepl" disabled>
+              <SelectTrigger
+                id={`${id}-engine`}
+                aria-labelledby={`${id}-engine-title`}
+                aria-describedby={`${id}-engine-hint`}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="deepl">{deeplEngine?.label ?? 'DeepL'}</SelectItem>
+              </SelectContent>
+            </Select>
+            <p id={`${id}-engine-hint`} className="m-0 text-xs text-on-surface-variant">
+              {t('component.translator.documents.engineHint')}
+            </p>
+          </>
+        ) : (
+          <Select
+            value={engine?.id ?? ''}
+            onValueChange={(next) => onChange({ engine: next })}
+            disabled={!engines?.length}
+          >
+            <SelectTrigger id={`${id}-engine`} aria-labelledby={`${id}-engine-title`}>
+              <SelectValue placeholder={t('component.translator.engineDefault')} />
+            </SelectTrigger>
+            <SelectContent>
+              {engines?.map((option) => (
+                <SelectItem key={option.id} value={option.id}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </Section>
-      <Section id={`${id}-tools-title`} title={t('component.translator.tools')}>
-        <SettingRow
-          id={`${id}-live`}
-          icon={<RefreshCwIcon {...ICON} />}
-          label={t('component.translator.live')}
-          hint={deepl ? t('component.translator.liveDeepl') : undefined}
-        >
-          <Switch
+      {documentMode ? null : (
+        <Section id={`${id}-tools-title`} title={t('component.translator.tools')}>
+          <SettingRow
             id={`${id}-live`}
-            checked={settings.live && !deepl}
-            disabled={deepl}
-            aria-describedby={deepl ? `${id}-live-hint` : undefined}
-            onCheckedChange={(live) => onChange({ live })}
-          />
-        </SettingRow>
-        <SettingRow
-          id={`${id}-changes`}
-          icon={<EyeIcon {...ICON} />}
-          label={t('component.translator.showChanges')}
-        >
-          <Switch
+            icon={<RefreshCwIcon {...ICON} />}
+            label={t('component.translator.live')}
+            hint={deepl ? t('component.translator.liveDeepl') : undefined}
+          >
+            <Switch
+              id={`${id}-live`}
+              checked={settings.live && !deepl}
+              disabled={deepl}
+              aria-describedby={deepl ? `${id}-live-hint` : undefined}
+              onCheckedChange={(live) => onChange({ live })}
+            />
+          </SettingRow>
+          <SettingRow
             id={`${id}-changes`}
-            checked={settings.showChanges}
-            onCheckedChange={(showChanges) => onChange({ showChanges })}
-          />
-        </SettingRow>
-      </Section>
+            icon={<EyeIcon {...ICON} />}
+            label={t('component.translator.showChanges')}
+          >
+            <Switch
+              id={`${id}-changes`}
+              checked={settings.showChanges}
+              onCheckedChange={(showChanges) => onChange({ showChanges })}
+            />
+          </SettingRow>
+        </Section>
+      )}
       <Section id={`${id}-options-title`} title={t('component.translator.options')}>
         {translating ? (
           <SettingRow

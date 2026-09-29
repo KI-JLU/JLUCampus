@@ -122,6 +122,7 @@
     },
     "translator": {
       "pageDescription": "Übersetzen oder überarbeiten Sie Texte mit bis zu {{max}} Zeichen. Der Text wird dazu an die gewählte Engine gesendet.",
+      "pageDescriptionDocuments": "Übersetzen Sie Dokumente bis {{max}} mit DeepL. Die Datei wird dazu an DeepL gesendet; die Übersetzung bleibt {{hours}} Stunden für Sie abrufbar.",
       "source": "Ausgangssprache",
       "target": "Zielsprache",
       "detect": "Automatisch",
@@ -163,7 +164,13 @@
       "mode": "Modus",
       "modes": {
         "translate": "Text übersetzen",
+        "documents": "Dokumente übersetzen",
         "rephrase": "Text überarbeiten"
+      },
+      "modesShort": {
+        "translate": "Text",
+        "documents": "Dokumente",
+        "rephrase": "Überarbeiten"
       },
       "notSetUpTitle": "Der Übersetzer ist noch nicht eingerichtet.",
       "notSetUpDescription": "Eine Administratorin oder ein Administrator muss erst einen DeepL-Schlüssel oder einen KI-Endpunkt hinterlegen.",
@@ -226,10 +233,38 @@
       "defaultEngineLabel": "Standard-Engine",
       "defaultEngineHint": "Damit beginnen Nutzende. „Automatisch“ nimmt DeepL, ohne DeepL-Schlüssel das erste Modell.",
       "defaultEngineAuto": "Automatisch",
+      "documentsEnabledLabel": "Dokumentübersetzung erlauben",
+      "documentsEnabledHint": "Nutzende können PDF-, Word-, PowerPoint-, Excel-, Text- und HTML-Dateien mit DeepL übersetzen (nur mit DeepL-Schlüssel). Die übersetzten Dateien bleiben {{hours}} Stunden auf dem Server, die Originale werden nicht gespeichert.",
       "configErrors": {
         "models": "Jede Modell-ID darf nur einmal vorkommen, höchstens {{max}} Modelle.",
         "modelId": "Geben Sie eine Modell-ID mit höchstens 200 Zeichen ein.",
         "modelLabel": "Geben Sie einen Anzeigenamen mit höchstens 80 Zeichen ein."
+      },
+      "documents": {
+        "drop": "Dokumente hierher ziehen oder auswählen",
+        "types": "PDF, Word (.docx), PowerPoint (.pptx), Excel (.xlsx), Text und HTML, bis {{max}} pro Datei",
+        "unsupported": "„{{name}}“ kann nicht übersetzt werden. Erlaubt sind PDF, Word, PowerPoint, Excel, Text und HTML.",
+        "tooLarge": "„{{name}}“ ist größer als {{max}}.",
+        "uploadInvalid": "Die Datei wurde abgelehnt. Prüfen Sie Dateityp und Größe.",
+        "uploading": "Wird hochgeladen …",
+        "queued": "Wartet auf DeepL …",
+        "translating": "Wird übersetzt …",
+        "translatingFor": "Wird übersetzt, noch etwa {{seconds}} s …",
+        "done": "Übersetzt, verfügbar bis {{until}}",
+        "sameLanguage": "Ausgangs- und Zielsprache sind gleich.",
+        "failed": "Die Übersetzung ist fehlgeschlagen.",
+        "download": "Herunterladen",
+        "delete": "„{{name}}“ löschen",
+        "dismiss": "Hinweis zu „{{name}}“ schließen",
+        "deleteFailed": "„{{name}}“ konnte nicht gelöscht werden.",
+        "listTitle": "Übersetzte Dokumente",
+        "listHint": "Übersetzte Dateien bleiben {{hours}} Stunden verfügbar, auch wenn Sie die Seite schließen.",
+        "empty": "Noch keine Dokumente.",
+        "loading": "Dokumente werden geladen …",
+        "loadFailed": "Die Dokumente konnten nicht geladen werden.",
+        "announceDone": "„{{name}}“ ist übersetzt.",
+        "announceFailed": "„{{name}}“ konnte nicht übersetzt werden.",
+        "engineHint": "Dokumente übersetzt DeepL."
       }
     }
   },

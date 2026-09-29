@@ -2,6 +2,7 @@ import type { ComponentConfig, Dashboard, Sidebar } from '@justcampus/shared'
 import { sql } from 'drizzle-orm'
 import {
   boolean,
+  customType,
   index,
   integer,
   jsonb,
@@ -111,6 +112,41 @@ export const component = pgTable(
       .on(table.type)
       .where(sql`${table.singleton} = true`)
   ]
+)
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => 'bytea'
+})
+
+export const translatorDocument = pgTable(
+  'translator_document',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    componentId: uuid('component_id')
+      .notNull()
+      .references(() => component.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    filename: text('filename').notNull(),
+    size: integer('size').notNull(),
+    source: text('source'),
+    target: text('target').notNull(),
+    formality: text('formality').notNull(),
+    status: text('status').notNull().default('queued'),
+    secondsRemaining: integer('seconds_remaining'),
+    error: text('error'),
+    deeplDocumentId: text('deepl_document_id').notNull(),
+    deeplDocumentKey: text('deepl_document_key').notNull(),
+    result: bytea('result'),
+    resultContentType: text('result_content_type'),
+    pollClaimedAt: timestamp('poll_claimed_at'),
+    polledAt: timestamp('polled_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+    expiresAt: timestamp('expires_at').notNull()
+  },
+  (table) => [index('translator_document_user_created_idx').on(table.userId, table.createdAt)]
 )
 
 export const folderTemplate = pgTable(

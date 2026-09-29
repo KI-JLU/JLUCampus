@@ -122,6 +122,7 @@
     },
     "translator": {
       "pageDescription": "Translate or rephrase texts of up to {{max}} characters. The text is sent to the chosen engine.",
+      "pageDescriptionDocuments": "Translate documents up to {{max}} with DeepL. The file is sent to DeepL; the translation stays available to you for {{hours}} hours.",
       "source": "Source language",
       "target": "Target language",
       "detect": "Auto-detect",
@@ -163,7 +164,13 @@
       "mode": "Mode",
       "modes": {
         "translate": "Translate text",
+        "documents": "Translate documents",
         "rephrase": "Rephrase text"
+      },
+      "modesShort": {
+        "translate": "Text",
+        "documents": "Documents",
+        "rephrase": "Rephrase"
       },
       "notSetUpTitle": "The translator is not set up yet.",
       "notSetUpDescription": "An administrator first has to add a DeepL key or an AI endpoint.",
@@ -226,10 +233,38 @@
       "defaultEngineLabel": "Default engine",
       "defaultEngineHint": "Users start with this one. “Automatic” picks DeepL, or the first model without a DeepL key.",
       "defaultEngineAuto": "Automatic",
+      "documentsEnabledLabel": "Allow document translation",
+      "documentsEnabledHint": "Users can translate PDF, Word, PowerPoint, Excel, text and HTML files with DeepL (needs the DeepL key). Translated files stay on the server for {{hours}} hours; originals are not stored.",
       "configErrors": {
         "models": "Each model ID may appear only once, at most {{max}} models.",
         "modelId": "Enter a model ID of at most 200 characters.",
         "modelLabel": "Enter a display name of at most 80 characters."
+      },
+      "documents": {
+        "drop": "Drag documents here or choose them",
+        "types": "PDF, Word (.docx), PowerPoint (.pptx), Excel (.xlsx), text and HTML, up to {{max}} per file",
+        "unsupported": "“{{name}}” cannot be translated. Allowed are PDF, Word, PowerPoint, Excel, text and HTML.",
+        "tooLarge": "“{{name}}” is larger than {{max}}.",
+        "uploadInvalid": "The file was rejected. Check its type and size.",
+        "uploading": "Uploading …",
+        "queued": "Waiting for DeepL …",
+        "translating": "Translating …",
+        "translatingFor": "Translating, about {{seconds}} s left …",
+        "done": "Translated, available until {{until}}",
+        "sameLanguage": "Source and target language are the same.",
+        "failed": "The translation failed.",
+        "download": "Download",
+        "delete": "Delete “{{name}}”",
+        "dismiss": "Dismiss the note on “{{name}}”",
+        "deleteFailed": "“{{name}}” could not be deleted.",
+        "listTitle": "Translated documents",
+        "listHint": "Translated files stay available for {{hours}} hours, even if you close the page.",
+        "empty": "No documents yet.",
+        "loading": "Loading documents …",
+        "loadFailed": "The documents could not be loaded.",
+        "announceDone": "“{{name}}” is translated.",
+        "announceFailed": "“{{name}}” could not be translated.",
+        "engineHint": "Documents are translated by DeepL."
       }
     }
   },

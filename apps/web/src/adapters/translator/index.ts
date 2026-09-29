@@ -13,7 +13,8 @@ export const translatorAdapter: ComponentAdapter<'translator'> = {
     deeplApiUrl: null,
     llmBaseUrl: null,
     llmModels: [],
-    defaultEngine: null
+    defaultEngine: null,
+    documentsEnabled: false
   },
   widgets: { quick: { Tile: TranslatorTile } }
 }

@@ -27,7 +27,8 @@ const translator: AdminComponent = {
     deeplApiUrl: null,
     llmBaseUrl: null,
     llmModels: [],
-    defaultEngine: null
+    defaultEngine: null,
+    documentsEnabled: false
   },
   secrets: { deeplApiKey: false, llmApiKey: false }
 }
@@ -89,7 +90,8 @@ describe('validateComponentForm', () => {
             { id: 'llama', label: 'Llama' },
             { id: ' ', label: 'Mistral' }
           ],
-          defaultEngine: null
+          defaultEngine: null,
+          documentsEnabled: false
         }
       },
       t

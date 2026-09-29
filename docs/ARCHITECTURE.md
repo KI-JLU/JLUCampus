@@ -82,6 +82,13 @@ component         id uuid pk, name text, type text ('iframe' | 'rss' | 'link' | 
                   icon text null, icon_url text null, config jsonb, enabled bool,
                   singleton bool default false, secrets jsonb default {}, sort_order int,
                   created_at, updated_at
+translator_document id uuid pk, component_id → component (cascade), user_id → user (cascade),
+                  filename text, size int, source text null, target text, formality text,
+                  status text, seconds_remaining int null, error text null,
+                  deepl_document_id text, deepl_document_key text (encrypted),
+                  result bytea null, result_content_type text null,
+                  poll_claimed_at timestamp null, polled_at timestamp null,
+                  created_at, updated_at, expires_at; index (user_id, created_at)
 sidebar_entry     user_id → user (cascade), component_id → component (cascade),
                   position int; pk (user_id, component_id)
 feed_read         user_id → user (cascade), feed_url text, read_at timestamp;
@@ -153,7 +160,7 @@ a secret, `null` removes it, and an absent key leaves it unchanged.
 
 A module may add tables whose rows reference `component.id`; use that foreign
 key as the module instance and cascade deletes only if the module lifecycle
-allows it. The translator has no module-owned table.
+allows it. Translator documents reference their module's component row.
 
 ### Translator
 
@@ -173,10 +180,19 @@ of engines:
   for a JSON answer, which the server parses leniently.
 
 `GET /api/modules/translator/engines` lists the offered engines and the
-default (`defaultEngine`, else the first). Upstream calls refuse redirects,
-time out after 60 s and are cancelled when the client aborts, which live mode
-does whenever a newer request supersedes one. Nothing is stored: the texts
-only pass through the server.
+default (`defaultEngine`, else the first), plus whether documents are offered.
+Text calls refuse redirects, time out after 60 s and are cancelled when the
+client aborts. Texts only pass through the server.
+
+Document translation needs `documentsEnabled` and a DeepL key. The signed-in
+user can upload a supported file at `/documents`, list unexpired jobs, read or
+delete one at `/documents/:id`, and download its result at
+`/documents/:id/download` once done. The original goes straight to DeepL;
+`translator_document` stores metadata, an AES-256-GCM encrypted DeepL document
+key bound to the row id, and the translated bytes. Rows expire after 24 hours.
+A worker checks active jobs every five seconds and deletes expired rows. GET of
+one active job also checks DeepL, at most once every two seconds. A database
+claim makes the worker and GET share the one-time result download safely.
 
 To add a module, add its type, config, secrets and widgets to shared, implement
 and register its server module, then add the web adapter. The typed server
@@ -240,7 +256,10 @@ strings).
   them "Module" and offers no delete, and the component form neither offers
   module types for new components nor lets a module change its type. The
   translator page (`src/adapters/translator/`) switches between translating
-  (`API.translate`) and rephrasing (`API.rephrase`), with settings for
+  (`API.translate`), translating documents (`API.translatorDocuments`, only
+  while the engine list says `documents`; a dropzone and the user's jobs,
+  refetched every 3 s while one runs, downloads are plain links to
+  `API.translatorDocumentDownload`) and rephrasing (`API.rephrase`), with settings for
   engine, formality, writing style and tone, live mode (runs after a pause in
   typing, not offered for DeepL) and "show changes" (a word diff against the
   submitted text or the previous translation). These settings stay in
