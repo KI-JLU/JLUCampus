@@ -1,4 +1,4 @@
-import { useId, type FormEvent, type KeyboardEvent } from 'react'
+import { useId, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { Button, Label, Textarea } from '@ki4jlu/design-system'
@@ -19,17 +19,22 @@ import { useTranslator } from './use-translator'
 export function TranslatorTile({ component }: ComponentViewProps<'translator'>): React.JSX.Element {
   const { t } = useTranslation()
   const id = useId()
-  const translator = useTranslator(component.config.defaultTargetLanguage)
+  const [text, setText] = useState('')
+  const translator = useTranslator({
+    text,
+    setText,
+    defaultTarget: component.config.defaultTargetLanguage
+  })
   const { result, pending, error } = translator
 
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault()
-    translator.translate()
+    if (translator.canTranslate) translator.translate()
   }
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
     if (!isTranslateShortcut(event)) return
     event.preventDefault()
-    translator.translate()
+    if (translator.canTranslate) translator.translate()
   }
 
   return (
@@ -49,7 +54,7 @@ export function TranslatorTile({ component }: ComponentViewProps<'translator'>):
           </Link>
         </h2>
         <CopyButton
-          text={pending || error ? undefined : result?.translation}
+          text={pending || error ? undefined : result?.response.translation}
           className="-mr-2 group-data-editing/tile:invisible"
         />
       </div>
@@ -59,12 +64,12 @@ export function TranslatorTile({ component }: ComponentViewProps<'translator'>):
         </Label>
         <Textarea
           id={`${id}-text`}
-          value={translator.text}
+          value={text}
           maxLength={TRANSLATE_TEXT_MAX}
           placeholder={t('component.translator.tilePlaceholder')}
           dir="auto"
           aria-keyshortcuts="Control+Enter Meta+Enter"
-          onChange={(event) => translator.setText(event.target.value)}
+          onChange={(event) => setText(event.target.value)}
           onKeyDown={handleKeyDown}
           className="min-h-12 flex-1 resize-none"
         />
@@ -89,8 +94,11 @@ export function TranslatorTile({ component }: ComponentViewProps<'translator'>):
           </Button>
         </div>
         <TranslationOutput
-          translator={translator}
-          language={translator.target}
+          label={t('component.translator.result')}
+          pending={pending}
+          error={error}
+          text={result?.response.translation}
+          language={result?.language}
           htmlFor={`${id}-text`}
           className="min-h-12 flex-1 px-3 py-2 text-sm"
         />

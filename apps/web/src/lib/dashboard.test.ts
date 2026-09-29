@@ -53,7 +53,17 @@ function component(id: string, type: Component['type']): Component {
     case 'rss':
       return { ...base, type, config: { feedUrl: 'https://example.org/feed' } }
     case 'translator':
-      return { ...base, type, config: { defaultTargetLanguage: 'en' } }
+      return {
+        ...base,
+        type,
+        config: {
+          defaultTargetLanguage: 'en',
+          deeplApiUrl: null,
+          llmBaseUrl: null,
+          llmModels: [],
+          defaultEngine: null
+        }
+      }
     case 'iframe':
     case 'link':
       return { ...base, type, config: { url: 'https://example.org' } }

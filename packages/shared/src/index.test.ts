@@ -8,6 +8,9 @@ import {
   isSingletonType,
   SINGLETON_COMPONENT_TYPES,
   translateRequestSchema,
+  translatorComponentConfigSchema,
+  translatorEngineIdSchema,
+  rephraseRequestSchema,
   externalUrlSchema,
   feedSchema,
   folderTemplateInputSchema,
@@ -220,7 +223,7 @@ describe('modules', () => {
   })
 
   it('accepts setting, removing and keeping a secret', () => {
-    for (const secrets of [{ apiKey: 'key' }, { apiKey: null }, {}, undefined]) {
+    for (const secrets of [{ deeplApiKey: 'key' }, { deeplApiKey: null }, {}, undefined]) {
       expect(componentInputSchema.safeParse({ ...translator, secrets }).success).toBe(true)
     }
   })
@@ -230,7 +233,7 @@ describe('modules', () => {
       false
     )
     expect(
-      componentInputSchema.safeParse({ ...translator, secrets: { apiKey: ' ' } }).success
+      componentInputSchema.safeParse({ ...translator, secrets: { deeplApiKey: ' ' } }).success
     ).toBe(false)
   })
 
@@ -243,7 +246,7 @@ describe('modules', () => {
       iconUrl: null,
       enabled: true,
       config: { url: 'https://example.org' },
-      secrets: { apiKey: 'key' }
+      secrets: { deeplApiKey: 'key' }
     })
     expect(result.success && 'secrets' in result.data).toBe(false)
   })
@@ -256,13 +259,16 @@ describe('modules', () => {
       createdAt: '2026-09-29T00:00:00.000Z',
       updatedAt: '2026-09-29T00:00:00.000Z'
     }
-    const parsed = componentSchema.parse({ ...stored, secrets: { apiKey: 'v1.secret' } })
+    const parsed = componentSchema.parse({ ...stored, secrets: { deeplApiKey: 'v1.secret' } })
     expect('secrets' in parsed).toBe(false)
-    expect(adminComponentSchema.safeParse({ ...stored, secrets: { apiKey: true } }).success).toBe(
-      true
-    )
     expect(
-      adminComponentSchema.safeParse({ ...stored, secrets: { apiKey: 'v1.secret' } }).success
+      adminComponentSchema.safeParse({
+        ...stored,
+        secrets: { deeplApiKey: true, llmApiKey: false }
+      }).success
+    ).toBe(true)
+    expect(
+      adminComponentSchema.safeParse({ ...stored, secrets: { deeplApiKey: 'v1.secret' } }).success
     ).toBe(false)
   })
 
@@ -276,5 +282,44 @@ describe('modules', () => {
     expect(
       translateRequestSchema.safeParse({ text: 'Hallo', source: 'de', target: 'xx' }).success
     ).toBe(false)
+  })
+
+  it('fills the engine settings of a config stored before they existed', () => {
+    expect(translatorComponentConfigSchema.parse({ defaultTargetLanguage: 'en' })).toEqual({
+      defaultTargetLanguage: 'en',
+      deeplApiUrl: null,
+      llmBaseUrl: null,
+      llmModels: [],
+      defaultEngine: null
+    })
+  })
+
+  it('rejects duplicate model ids', () => {
+    const model = { id: 'llama', label: 'Llama' }
+    expect(
+      translatorComponentConfigSchema.safeParse({
+        defaultTargetLanguage: 'en',
+        llmModels: [model, { ...model, label: 'Other' }]
+      }).success
+    ).toBe(false)
+  })
+
+  it('names engines as deepl or llm:<model id>', () => {
+    expect(translatorEngineIdSchema.safeParse('deepl').success).toBe(true)
+    expect(translatorEngineIdSchema.safeParse('llm:meta-llama-3.1-8b-instruct').success).toBe(true)
+    expect(translatorEngineIdSchema.safeParse('llm:').success).toBe(false)
+    expect(translatorEngineIdSchema.safeParse('google').success).toBe(false)
+  })
+
+  it('defaults formality, style and tone', () => {
+    expect(
+      translateRequestSchema.parse({ text: 'Hallo', source: null, target: 'en' }).formality
+    ).toBe('default')
+    expect(rephraseRequestSchema.parse({ text: 'Hallo' })).toEqual({
+      text: 'Hallo',
+      style: null,
+      tone: null
+    })
+    expect(rephraseRequestSchema.safeParse({ text: 'Hallo', style: 'poetic' }).success).toBe(false)
   })
 })

@@ -22,8 +22,14 @@ const translator: AdminComponent = {
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
   type: 'translator',
-  config: { defaultTargetLanguage: 'en' },
-  secrets: { apiKey: false }
+  config: {
+    defaultTargetLanguage: 'en',
+    deeplApiUrl: null,
+    llmBaseUrl: null,
+    llmModels: [],
+    defaultEngine: null
+  },
+  secrets: { deeplApiKey: false, llmApiKey: false }
 }
 
 describe('selectableTypes', () => {
@@ -51,21 +57,50 @@ describe('validateComponentForm', () => {
     expect(unchanged.ok && 'secrets' in unchanged.input).toBe(false)
 
     const changed = validateComponentForm(
-      { ...state, secrets: { apiKey: { value: ' key ', remove: false } } },
+      { ...state, secrets: { deeplApiKey: { value: ' key ', remove: false } } },
       t
     )
-    expect(changed).toMatchObject({ ok: true, input: { secrets: { apiKey: 'key' } } })
+    expect(changed).toMatchObject({ ok: true, input: { secrets: { deeplApiKey: 'key' } } })
   })
 
   it('reports an overlong secret on its field', () => {
     const result = validateComponentForm(
       {
         ...initialFormState(translator),
-        secrets: { apiKey: { value: 'x'.repeat(5000), remove: false } }
+        secrets: { deeplApiKey: { value: 'x'.repeat(5000), remove: false } }
       },
       t
     )
-    expect(result).toEqual({ ok: false, errors: { 'secrets.apiKey': 'admin.form.errors.secret' } })
+    expect(result).toEqual({
+      ok: false,
+      errors: { 'secrets.deeplApiKey': 'admin.form.errors.secret' }
+    })
+  })
+
+  it('names the translator fields in its messages, rows of the model list included', () => {
+    const result = validateComponentForm(
+      {
+        ...initialFormState(translator),
+        config: {
+          defaultTargetLanguage: 'en',
+          deeplApiUrl: 'http://api.deepl.com',
+          llmBaseUrl: null,
+          llmModels: [
+            { id: 'llama', label: 'Llama' },
+            { id: ' ', label: 'Mistral' }
+          ],
+          defaultEngine: null
+        }
+      },
+      t
+    )
+    expect(result).toEqual({
+      ok: false,
+      errors: {
+        'config.deeplApiUrl': 'admin.form.errors.url',
+        'config.llmModels.1.id': 'component.translator.configErrors.modelId'
+      }
+    })
   })
 })
 
@@ -75,11 +110,11 @@ describe('serverFieldErrors', () => {
       error: {
         code: 'validation',
         message: 'Invalid',
-        issues: [{ path: ['secrets', 'apiKey'], message: 'Too long' }]
+        issues: [{ path: ['secrets', 'deeplApiKey'], message: 'Too long' }]
       }
     })
     expect(serverFieldErrors(error, 'translator', t)).toEqual({
-      'secrets.apiKey': 'admin.form.errors.secret'
+      'secrets.deeplApiKey': 'admin.form.errors.secret'
     })
   })
 })

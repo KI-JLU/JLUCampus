@@ -30,6 +30,9 @@ bun run db:seed             # two example components
 bun run dev                 # API on http://localhost:3000, web on http://localhost:5173
 ```
 
+The translator module needs a DeepL API key and/or an OpenAI-compatible
+endpoint with at least one model; admins set both under Admin → Components.
+
 `COMPONENT_SECRETS_KEY` encrypts module secrets such as API keys. Generate a
 production value with `openssl rand -base64 32`; changing it makes stored
 secrets unreadable.
