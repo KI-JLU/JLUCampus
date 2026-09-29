@@ -41,6 +41,11 @@ export interface ComponentAdapter<T extends ComponentType> {
    * folder entries and tiles open this URL externally instead of `/c/$componentId`.
    */
   externalUrl?: (component: ComponentOf<T>) => string
+  /**
+   * Set for components that show a feed: their sidebar entry carries a marker while the feed has
+   * entries newer than the user's last read.
+   */
+  feedUrl?: (component: ComponentOf<T>) => string
   /** A renderer for every widget the type offers (see `COMPONENT_WIDGETS`). */
   widgets: { [K in WidgetKey<T>]: WidgetView<T> }
 }

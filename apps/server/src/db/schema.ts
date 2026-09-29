@@ -178,6 +178,18 @@ export const sidebarEntry = pgTable(
   ]
 )
 
+export const feedRead = pgTable(
+  'feed_read',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    feedUrl: text('feed_url').notNull(),
+    readAt: timestamp('read_at').notNull()
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.feedUrl] })]
+)
+
 export const dashboardTile = pgTable(
   'dashboard_tile',
   {

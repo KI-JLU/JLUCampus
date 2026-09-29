@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   createFeedLoader,
   decodeBody,
+  feedKey,
   FeedUnavailableError,
   isPublicAddress,
   normalizeFeed,
@@ -11,6 +12,18 @@ import {
 
 const baseUrl = 'https://feeds.example.test/news/feed.xml'
 const fetchedAt = new Date('2026-09-28T10:00:00.000Z')
+
+describe('feedKey', () => {
+  it('strips the fragment and matches the loader key', async () => {
+    const url = `${baseUrl}#latest`
+    const fetcher = vi.fn(async () => ({ title: null, link: null, items: [], fetchedAt: '' }))
+    const load = createFeedLoader({ allowPrivateHosts: false, fetcher })
+
+    expect(feedKey(url)).toBe(baseUrl)
+    await load(url)
+    expect(fetcher).toHaveBeenCalledWith(baseUrl, false)
+  })
+})
 
 describe('isPublicAddress', () => {
   it.each([

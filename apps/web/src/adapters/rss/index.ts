@@ -9,5 +9,6 @@ export const rssAdapter: ComponentAdapter<'rss'> = {
   ConfigFields: RssConfigFields,
   defaultConfig: { feedUrl: '' },
   sourceUrl: (component) => component.config.feedUrl,
+  feedUrl: (component) => component.config.feedUrl,
   widgets: { feed: { Tile: RssTile } }
 }

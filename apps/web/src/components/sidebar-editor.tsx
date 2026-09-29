@@ -10,15 +10,18 @@ import {
   Popover,
   PopoverAnchor,
   PopoverContent,
-  PopoverTrigger
+  PopoverTrigger,
+  useSidebarCollapsed
 } from '@ki4jlu/design-system'
 import type { Component } from '@justcampus/shared'
-import { externalUrlOf } from '@/adapters/registry'
+import { externalUrlOf, feedUrlOf } from '@/adapters/registry'
 import { externalLinkProps } from '@/lib/external'
 import { componentsQuery, sidebarQuery, useSaveSidebar } from '@/lib/queries'
 import { toast } from '@/lib/toast'
+import { useFeedHasUnread } from '@/lib/use-feed'
 import { useMediaQuery } from '@/lib/use-media-query'
 import { useSidebarArrangement } from '@/lib/use-sidebar-arrangement'
+import { cn } from '@/lib/utils'
 import { ComponentIcon } from './component-icon'
 import { DropList, SidebarDragLayer, SidebarRows } from './sidebar-arrangement'
 
@@ -128,43 +131,97 @@ export function AllApps({ pathname }: { pathname: string }): React.JSX.Element {
   )
 }
 
+interface SidebarComponentLinkProps {
+  component: Component
+  pathname: string
+  /** Rows in the column shrink to their icon with the collapsed column; a popover's keep their text. */
+  inColumn?: boolean
+}
+
 /**
- * A component's page inside the app, or for shortcut components their site outside it. `inColumn`
- * rows shrink to their icon with the collapsed column; a popover's rows keep their text.
+ * A component's page inside the app, or for shortcut components their site outside it. Rows in the
+ * column of components that show a feed flag its unread entries.
  */
 function SidebarComponentLink({
   component,
   pathname,
   inColumn = true
-}: {
-  component: Component
-  pathname: string
-  inColumn?: boolean
-}): React.JSX.Element {
+}: SidebarComponentLinkProps): React.JSX.Element {
   const { t } = useTranslation()
   const url = externalUrlOf(component)
-  const label = inColumn ? component.name : undefined
-  const content = (
-    <>
-      <ComponentIcon icon={component.icon} iconUrl={component.iconUrl} siteUrl={url} />
-      <span className="truncate">{component.name}</span>
-    </>
-  )
+  const feedUrl = inColumn ? feedUrlOf(component) : null
   if (url) {
     return (
-      <NavItem asChild label={label}>
+      <NavItem asChild label={inColumn ? component.name : undefined}>
         <a {...externalLinkProps(url)}>
-          {content}
+          <ComponentIcon icon={component.icon} iconUrl={component.iconUrl} siteUrl={url} />
+          <span className="truncate">{component.name}</span>
           <span className="sr-only">{t('shortcut.opensOutside')}</span>
           <ArrowUpRightIcon {...icon} className="ml-auto shrink-0 text-on-surface-variant" />
         </a>
       </NavItem>
     )
   }
+  if (feedUrl) {
+    return <FeedComponentLink component={component} pathname={pathname} feedUrl={feedUrl} />
+  }
   return (
-    <NavItem asChild label={label} active={pathname === `/c/${component.id}`}>
+    <ComponentPageLink
+      component={component}
+      pathname={pathname}
+      inColumn={inColumn}
+      unread={false}
+    />
+  )
+}
+
+/** A feed component's row in the column, flagged while its feed has unread entries. */
+function FeedComponentLink({
+  feedUrl,
+  ...props
+}: Omit<SidebarComponentLinkProps, 'inColumn'> & { feedUrl: string }): React.JSX.Element {
+  const unread = useFeedHasUnread(feedUrl)
+  return <ComponentPageLink {...props} inColumn unread={unread} />
+}
+
+/**
+ * The link to a component's page. `unread` adds a dot, beside the name or on the icon in the
+ * collapsed column, and adds "new entries" to the link's name.
+ */
+function ComponentPageLink({
+  component,
+  pathname,
+  inColumn,
+  unread
+}: Required<SidebarComponentLinkProps> & { unread: boolean }): React.JSX.Element {
+  const { t } = useTranslation()
+  const collapsed = useSidebarCollapsed()
+  const active = pathname === `/c/${component.id}`
+  const unreadText = t('nav.newEntries')
+  // Collapsed, the row's text is hidden and `label` is its name.
+  const label = inColumn ? (unread ? `${component.name} ${unreadText}` : component.name) : undefined
+  return (
+    <NavItem asChild label={label} active={active} className={unread ? 'relative' : undefined}>
       <Link to="/c/$componentId" params={{ componentId: component.id }}>
-        {content}
+        <ComponentIcon icon={component.icon} iconUrl={component.iconUrl} />
+        <span className="truncate">{component.name}</span>
+        {unread ? (
+          <>
+            <span className="sr-only"> {unreadText}</span>
+            {/* An <svg>, so the collapsed row, which hides every other child, keeps it. */}
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 8 8"
+              className={cn(
+                'size-2 forced-colors:text-[CanvasText]',
+                active ? 'text-on-primary' : 'text-primary',
+                collapsed ? 'absolute top-2.5 left-1/2 ml-1.5' : 'ml-auto'
+              )}
+            >
+              <circle cx="4" cy="4" r="4" fill="currentColor" />
+            </svg>
+          </>
+        ) : null}
       </Link>
     </NavItem>
   )

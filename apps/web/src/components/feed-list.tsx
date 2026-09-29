@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Button, Spinner } from '@ki4jlu/design-system'
 import type { Feed, FeedItem } from '@justcampus/shared'
 import { externalLinkProps } from '@/lib/external'
-import { feedErrorKey, formatFeedDate } from '@/lib/feed'
+import { feedErrorKey, formatFeedDate, isNewFeedItem } from '@/lib/feed'
 import { cn } from '@/lib/utils'
 
 /** `tile`: titles and dates, compact. `page`: roomier, with each entry's summary. */
@@ -14,6 +14,8 @@ interface FeedContentProps {
   feed: Feed | undefined
   error: Error | null
   pending: boolean
+  /** The user's previous read of the feed; entries published later are marked new. */
+  unreadSince: string | null
   onRetry: () => void
   variant: FeedVariant
 }
@@ -23,6 +25,7 @@ export function FeedContent({
   feed,
   error,
   pending,
+  unreadSince,
   onRetry,
   variant
 }: FeedContentProps): React.JSX.Element {
@@ -49,7 +52,7 @@ export function FeedContent({
     )
   }
   if (feed.items.length === 0) return <FeedMessage>{t('feed.empty')}</FeedMessage>
-  return <FeedItemList items={feed.items} variant={variant} />
+  return <FeedItemList items={feed.items} unreadSince={unreadSince} variant={variant} />
 }
 
 function FeedMessage({ children }: { children: ReactNode }): React.JSX.Element {
@@ -62,12 +65,21 @@ function FeedMessage({ children }: { children: ReactNode }): React.JSX.Element {
 
 interface FeedItemListProps {
   items: FeedItem[]
+  /** See `FeedContentProps.unreadSince`. */
+  unreadSince: string | null
   variant: FeedVariant
 }
 
-/** Entries as plain text; each with a link opens outside the app. */
-export function FeedItemList({ items, variant }: FeedItemListProps): React.JSX.Element {
-  const { i18n } = useTranslation()
+/**
+ * Entries as plain text; each with a link opens outside the app. A new entry gets a dot and a
+ * bolder title, and screen readers hear "New" before it.
+ */
+export function FeedItemList({
+  items,
+  unreadSince,
+  variant
+}: FeedItemListProps): React.JSX.Element {
+  const { t, i18n } = useTranslation()
   const language = i18n.resolvedLanguage ?? i18n.language
   const now = new Date()
   const page = variant === 'page'
@@ -76,14 +88,26 @@ export function FeedItemList({ items, variant }: FeedItemListProps): React.JSX.E
     <ul className="m-0 flex list-none flex-col p-0">
       {items.map((item) => {
         const date = item.publishedAt ? formatFeedDate(item.publishedAt, language, now) : null
+        const isNew = isNewFeedItem(item, unreadSince)
         const body = (
           <>
             <span
               className={cn(
                 'text-on-surface',
-                page ? 'font-semibold' : 'line-clamp-2 text-sm font-medium'
+                page ? 'font-semibold' : 'line-clamp-2 text-sm font-medium',
+                isNew && (page ? 'font-bold' : 'font-semibold')
               )}
             >
+              {isNew ? (
+                <>
+                  {/* Inline, so it sits on the first line and the title still clamps. */}
+                  <span
+                    aria-hidden="true"
+                    className="mr-1.5 inline-block size-2 rounded-full bg-primary align-middle forced-colors:bg-[CanvasText]"
+                  />
+                  <span className="sr-only">{t('feed.newEntry')} </span>
+                </>
+              ) : null}
               {item.title}
             </span>
             {date ? (
