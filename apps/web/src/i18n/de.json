@@ -266,7 +266,9 @@
         "loadFailed": "Die Dokumente konnten nicht geladen werden.",
         "announceDone": "„{{name}}“ ist übersetzt.",
         "announceFailed": "„{{name}}“ konnte nicht übersetzt werden.",
-        "engineHint": "Dokumente übersetzt DeepL."
+        "engineHint": "Dokumente übersetzt DeepL.",
+        "dropped_one": "Eine wartende Datei wurde nicht hochgeladen, weil Sie die Dokumentübersetzung verlassen haben.",
+        "dropped_other": "{{count}} wartende Dateien wurden nicht hochgeladen, weil Sie die Dokumentübersetzung verlassen haben."
       }
     }
   },

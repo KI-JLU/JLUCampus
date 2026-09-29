@@ -11,7 +11,13 @@ import { db } from '../../db/index.js'
 import { component, translatorDocument } from '../../db/schema.js'
 import { env } from '../../env.js'
 import { decryptSecret } from '../../secrets.js'
-import { DeepLHttpError, documentError, documentStatus, downloadDocument } from './deepl.js'
+import {
+  DeepLHttpError,
+  DocumentResultTooLargeError,
+  documentError,
+  documentStatus,
+  downloadDocument
+} from './deepl.js'
 
 export type DocumentRow = typeof translatorDocument.$inferSelect
 /** A job without its translated file, which only the download reads. */
@@ -194,11 +200,13 @@ export async function pollDocument(
           AbortSignal.timeout(60_000)
         )
       } catch (error) {
+        // Gone at DeepL, or too large to keep: either way it cannot be fetched again.
         if (
-          error instanceof DeepLHttpError &&
-          error.status >= 400 &&
-          error.status < 500 &&
-          error.status !== 429
+          error instanceof DocumentResultTooLargeError ||
+          (error instanceof DeepLHttpError &&
+            error.status >= 400 &&
+            error.status < 500 &&
+            error.status !== 429)
         ) {
           await db
             .update(translatorDocument)

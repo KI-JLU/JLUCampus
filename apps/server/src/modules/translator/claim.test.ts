@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { env } from '../../env.js'
 import { encryptSecret } from '../../secrets.js'
+import { DOCUMENT_RESULT_MAX_BYTES } from './deepl.js'
 import { pollDocument, startDocumentWorker } from './documents.js'
 
 const state = vi.hoisted(() => ({
@@ -96,6 +97,22 @@ describe('document claim', () => {
         .fn()
         .mockResolvedValueOnce(Response.json({ document_id: 'remote', status: 'done' }))
         .mockResolvedValueOnce(new Response('', { status: 404 }))
+    )
+    await pollDocument('00000000-0000-0000-0000-000000000001', null, 'key')
+    expect(state.writes).toMatchObject([{ status: 'error', error: 'failed' }])
+    vi.unstubAllGlobals()
+  })
+
+  it('ends a job whose result is larger than the limit', async () => {
+    reset()
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(Response.json({ document_id: 'remote', status: 'done' }))
+        .mockResolvedValueOnce(
+          new Response('', { headers: { 'content-length': String(DOCUMENT_RESULT_MAX_BYTES + 1) } })
+        )
     )
     await pollDocument('00000000-0000-0000-0000-000000000001', null, 'key')
     expect(state.writes).toMatchObject([{ status: 'error', error: 'failed' }])

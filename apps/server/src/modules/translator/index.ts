@@ -81,6 +81,16 @@ function validation(path: string, message: string): never {
   throw new ApiError(400, 'validation', 'Request validation failed', [{ path: [path], message }])
 }
 
+// Unavailable documents answer 404 before anything else looks at the request, the body limit too.
+translatorApp.use('/documents', async (context, next) => {
+  documentsRuntime(context)
+  await next()
+})
+translatorApp.use('/documents/*', async (context, next) => {
+  documentsRuntime(context)
+  await next()
+})
+
 translatorApp.use(
   '/documents',
   bodyLimit({

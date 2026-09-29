@@ -87,6 +87,25 @@ export function DocumentTranslator({
   /** Files waiting for their upload, in the order they were added. */
   const queue = useRef<QueuedFile[]>([])
   const draining = useRef(false)
+  // Leaving document mode unmounts this view: files not yet uploaded are dropped with it, so a
+  // queue of an earlier visit never competes with the next one for a free slot.
+  const unmounted = useRef(false)
+  const tRef = useRef(t)
+  tRef.current = t
+  useEffect(() => {
+    unmounted.current = false
+    return () => {
+      unmounted.current = true
+      const dropped = queue.current.length
+      queue.current = []
+      if (dropped > 0) {
+        toast({
+          variant: 'info',
+          title: tRef.current('component.translator.documents.dropped', { count: dropped })
+        })
+      }
+    }
+  }, [])
   const jobs = useTranslatorDocuments(true)
   const upload = useUploadTranslatorDocument()
   const remove = useDeleteTranslatorDocument()
@@ -148,7 +167,7 @@ export function DocumentTranslator({
       for (let next = queue.current.shift(); next; next = queue.current.shift()) {
         const { file, key, request } = next
         try {
-          await waitForSlot()
+          if (!(await waitForSlot())) return
           update(key, { state: 'uploading' })
           await upload.mutateAsync({ file, ...request })
           setUploads((current) => current.filter((item) => item.key !== key))
@@ -169,13 +188,15 @@ export function DocumentTranslator({
 
   /**
    * The server takes `TRANSLATOR_DOCUMENT_ACTIVE_MAX` running jobs per user; further files wait
-   * here until one of them is done instead of being turned away.
+   * here until one of them is done instead of being turned away. `false`: the view is gone.
    */
-  const waitForSlot = async (): Promise<void> => {
+  const waitForSlot = async (): Promise<boolean> => {
     for (;;) {
+      if (unmounted.current) return false
       const { data, error } = await jobs.refetch()
       if (error) throw error
-      if ((data ?? []).filter(isRunning).length < TRANSLATOR_DOCUMENT_ACTIVE_MAX) return
+      if (unmounted.current) return false
+      if ((data ?? []).filter(isRunning).length < TRANSLATOR_DOCUMENT_ACTIVE_MAX) return true
       await new Promise((resolve) => setTimeout(resolve, SLOT_POLL_MS))
     }
   }

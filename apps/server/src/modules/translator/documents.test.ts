@@ -5,7 +5,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiError } from '../../api.js'
 import type { AppEnvironment } from '../types.js'
-import { documentError, documentStatus, downloadDocument, uploadDocument } from './deepl.js'
+import {
+  documentError,
+  DocumentResultTooLargeError,
+  documentStatus,
+  downloadDocument,
+  readLimited,
+  uploadDocument
+} from './deepl.js'
 import { documentQuotaCounts, resultFilename } from './documents.js'
 import { translatorApp } from './index.js'
 
@@ -131,6 +138,39 @@ describe('DeepL documents', () => {
     const response = await app(false).request('http://test/documents')
     expect(response.status).toBe(404)
     await expect(response.json()).resolves.toEqual({ error: { code: 'not_found' } })
+  })
+
+  it('hides documents when disabled, before the body limit looks at an upload', async () => {
+    const form = new FormData()
+    form.set('file', new File([new Uint8Array(21 * 1024 * 1024)], 'a.pdf'))
+    const response = await app(false).request('http://test/documents', {
+      method: 'POST',
+      body: form
+    })
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toEqual({ error: { code: 'not_found' } })
+  })
+
+  it('reads a result up to the limit', async () => {
+    await expect(readLimited(new Response('abc'), 3)).resolves.toEqual(Buffer.from('abc'))
+  })
+
+  it('refuses a result declared larger than the limit', async () => {
+    const response = new Response('abcd', { headers: { 'content-length': '4' } })
+    await expect(readLimited(response, 3)).rejects.toBeInstanceOf(DocumentResultTooLargeError)
+  })
+
+  it('refuses a result that streams past the limit without declaring its size', async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(2))
+        controller.enqueue(new Uint8Array(2))
+        controller.close()
+      }
+    })
+    await expect(readLimited(new Response(stream), 3)).rejects.toBeInstanceOf(
+      DocumentResultTooLargeError
+    )
   })
 
   it.each([

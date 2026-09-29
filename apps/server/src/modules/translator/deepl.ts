@@ -47,6 +47,43 @@ export class DeepLHttpError extends Error {
   }
 }
 
+/**
+ * The most a translated document may take. Well above what a 20 MB original turns into, but
+ * bounded: the result is held in memory and stored, and `deeplApiUrl` can point anywhere.
+ */
+export const DOCUMENT_RESULT_MAX_BYTES = 50 * 1024 * 1024
+
+/** DeepL's result was larger than `DOCUMENT_RESULT_MAX_BYTES`; it cannot be fetched again. */
+export class DocumentResultTooLargeError extends Error {
+  constructor() {
+    super('Translated document is too large')
+  }
+}
+
+/** The body, read up to `max` bytes: refused early by `Content-Length`, else counted as it streams. */
+export async function readLimited(response: Response, max: number): Promise<Buffer> {
+  const declared = Number(response.headers.get('content-length'))
+  if (declared > max) {
+    await response.body?.cancel()
+    throw new DocumentResultTooLargeError()
+  }
+  if (!response.body) return Buffer.alloc(0)
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    size += value.byteLength
+    if (size > max) {
+      await reader.cancel()
+      throw new DocumentResultTooLargeError()
+    }
+    chunks.push(value)
+  }
+  return Buffer.concat(chunks)
+}
+
 export async function uploadDocument(
   file: File,
   input: { source: TranslatorLanguage | null; target: TranslatorLanguage; formality: string },
@@ -109,7 +146,7 @@ export async function downloadDocument(
   )
   if (!response.ok) throw new DeepLHttpError(response.status)
   return {
-    bytes: Buffer.from(await response.arrayBuffer()),
+    bytes: await readLimited(response, DOCUMENT_RESULT_MAX_BYTES),
     contentType: response.headers.get('content-type') ?? 'application/octet-stream'
   }
 }

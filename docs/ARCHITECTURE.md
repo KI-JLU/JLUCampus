@@ -202,8 +202,9 @@ expire 24 hours after upload; completed jobs expire 24 hours after completion.
 The worker checks active jobs every five seconds, four at a time, and never
 overlaps ticks. GET of one active job also checks DeepL, at most once every two
 seconds. A database claim makes the worker and GET share the one-time result
-download safely. Result storage retries three times; a missing DeepL result
-ends the job with `failed`.
+download safely. Result storage retries three times; a missing DeepL result,
+or one over 50 MiB (checked by `Content-Length` and while streaming), ends
+the job with `failed`. Unavailable documents answer 404 before the body limit.
 
 To add a module, add its type, config, secrets and widgets to shared, implement
 and register its server module, then add the web adapter. The typed server

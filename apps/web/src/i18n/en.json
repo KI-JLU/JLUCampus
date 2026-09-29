@@ -266,7 +266,9 @@
         "loadFailed": "The documents could not be loaded.",
         "announceDone": "“{{name}}” is translated.",
         "announceFailed": "“{{name}}” could not be translated.",
-        "engineHint": "Documents are translated by DeepL."
+        "engineHint": "Documents are translated by DeepL.",
+        "dropped_one": "One waiting file was not uploaded because you left document translation.",
+        "dropped_other": "{{count}} waiting files were not uploaded because you left document translation."
       }
     }
   },
