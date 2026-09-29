@@ -244,10 +244,13 @@ strings).
   engine, formality, writing style and tone, live mode (runs after a pause in
   typing, not offered for DeepL) and "show changes" (a word diff against the
   submitted text or the previous translation). These settings stay in
-  `localStorage`. From `lg` up they sit in a collapsible, resizable column on
-  the right of the shell (`PageSidePanel`: the page portals into a slot the
-  frame shows only while a page fills it), below `lg` in a card under the
-  translator. Languages are named with `Intl.DisplayNames`; the `quick`
+  `localStorage`. The layout follows HAWKI: one card with the language bar,
+  input and result side by side and the submit button. From `lg` up the
+  modes and the settings of the chosen one sit in a collapsible, resizable
+  column on the right of the shell (`PageSidePanel`: the page portals into a
+  slot the frame shows only while a page fills it); below `lg` the modes are
+  a segmented control above the card and the settings a card under it.
+  Languages are named with `Intl.DisplayNames`; the `quick`
   tile translates with the default engine and always detects the source
   language. The component form renders one write-only
   `SecretField` per `COMPONENT_SECRETS[type]` entry (texts under

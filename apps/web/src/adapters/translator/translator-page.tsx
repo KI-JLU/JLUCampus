@@ -25,21 +25,23 @@ import {
   type TranslatorFormality
 } from '@justcampus/shared'
 import { ComponentIcon } from '@/components/component-icon'
-import { Field } from '@/components/field'
 import { PageHeader } from '@/components/page-header'
 import { PageSidePanel } from '@/components/page-side-panel'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { SIDE_PANEL_MEDIA } from '@/lib/page-side-panel'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
+import { useMediaQuery } from '@/lib/use-media-query'
 import { useTranslatorEngines } from '@/lib/queries'
 import type { ComponentViewProps } from '../types'
 import { CopyButton } from './copy-button'
 import { LanguageSelect } from './language-select'
 import { isApplePlatform, isTranslateShortcut, languageOptions } from './languages'
 import { TranslationOutput } from './translation-output'
-import { TranslatorSettingsCard, TranslatorSettingsFields } from './translator-settings-card'
+import { TranslatorSettingsCard, TranslatorSidebar } from './translator-settings-card'
 import {
   rephraseOptions,
   resolveEngine,
+  TRANSLATOR_MODES,
   translatorModeSchema,
   useTranslatorSettings,
   type TranslatorSettings
@@ -63,11 +65,11 @@ interface RequestOptions {
 }
 
 /**
- * The translator: translate a text, or rephrase it in its own language. The
- * text is shared between the two modes, each keeps its own result. Input and
- * result sit side by side once the card is wide enough; the settings go
- * into a column on the right of the shell from `lg` up, below the card
- * otherwise.
+ * The translator, laid out after HAWKI's: translate a text, or rephrase it in its own language.
+ * The text is shared between the two modes, each keeps its own result. One card holds the
+ * language bar, input and result side by side once it is wide enough, and the submit button.
+ * From `lg` up the modes and the settings of the chosen one fill the column on the right of the
+ * shell; below it the modes sit above the card and the settings below it.
  */
 export function TranslatorPage({ component }: ComponentViewProps<'translator'>): React.JSX.Element {
   const { t, i18n } = useTranslation()
@@ -76,6 +78,7 @@ export function TranslatorPage({ component }: ComponentViewProps<'translator'>):
   const [text, setTextState] = useState('')
   const [settings, updateSettings] = useTranslatorSettings()
   const engines = useTranslatorEngines()
+  const wide = useMediaQuery(SIDE_PANEL_MEDIA)
   const locale = i18n.resolvedLanguage ?? i18n.language
   const languages = useMemo(() => languageOptions(locale), [locale])
 
@@ -175,6 +178,8 @@ export function TranslatorPage({ component }: ComponentViewProps<'translator'>):
   const translation = translator.result
   const rephrased = rephraser.result
   const resultText = translating ? translation?.response.translation : rephrased?.response.text
+  /** The result on screen: none while a request runs or after it failed. */
+  const shownResult = current.pending || current.error ? undefined : resultText
   const detectedName = rephrased?.response.detectedLanguage
     ? languages.find((option) => option.code === rephrased.response.detectedLanguage)?.name
     : undefined
@@ -192,19 +197,22 @@ export function TranslatorPage({ component }: ComponentViewProps<'translator'>):
           max: TRANSLATE_TEXT_MAX.toLocaleString(locale)
         })}
       />
-      <SegmentedControl
-        aria-label={t('component.translator.mode')}
-        options={[
-          { value: 'translate', label: t('component.translator.modes.translate') },
-          { value: 'rephrase', label: t('component.translator.modes.rephrase') }
-        ]}
-        value={settings.mode}
-        onValueChange={(next) => {
-          const mode = translatorModeSchema.safeParse(next)
-          if (mode.success) changeSettings({ mode: mode.data })
-        }}
-        className="self-start"
-      />
+      {/* From `lg` up the modes head the column on the right. */}
+      {wide ? null : (
+        <SegmentedControl
+          aria-label={t('component.translator.mode')}
+          options={TRANSLATOR_MODES.map((mode) => ({
+            value: mode,
+            label: t(`component.translator.modes.${mode}`)
+          }))}
+          value={settings.mode}
+          onValueChange={(next) => {
+            const mode = translatorModeSchema.safeParse(next)
+            if (mode.success) changeSettings({ mode: mode.data })
+          }}
+          className="self-start"
+        />
+      )}
       {notSetUp ? (
         <Alert variant="warning">
           <TriangleAlertIcon aria-hidden="true" />
@@ -212,47 +220,60 @@ export function TranslatorPage({ component }: ComponentViewProps<'translator'>):
           <AlertDescription>{t('component.translator.notSetUpDescription')}</AlertDescription>
         </Alert>
       ) : null}
-      <div className="grid items-start gap-gutter">
-        <Card className="@container">
-          <form noValidate onSubmit={submit} className="grid gap-gutter p-4 @xl:grid-cols-2 md:p-6">
-            <div className="flex min-w-0 flex-col gap-stack-sm">
-              {translating ? (
-                <div className="flex items-end gap-2">
-                  <Field
-                    id={`${id}-source`}
-                    label={t('component.translator.source')}
-                    className="min-w-0 flex-1"
-                  >
-                    {(control) => (
-                      <LanguageSelect
-                        {...control}
-                        allowDetect
-                        value={translator.source}
-                        detected={translation?.response.detectedSource}
-                        onChange={translator.setSource}
-                      />
-                    )}
-                  </Field>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={t('component.translator.swap')}
-                    title={t('component.translator.swap')}
-                    disabled={!translator.canSwap}
-                    onClick={translator.swap}
-                    className="mb-2"
-                  >
-                    <ArrowLeftRightIcon {...ICON} />
-                  </Button>
-                </div>
-              ) : null}
-              <Label htmlFor={`${id}-text`} className={translating ? 'sr-only' : undefined}>
+      <Card className="@container overflow-hidden">
+        <form noValidate onSubmit={submit} className="flex flex-col">
+          <div className="flex min-h-14 items-center justify-center gap-1 border-b border-outline-variant px-2 py-2 @xl:px-4">
+            {translating ? (
+              <>
+                <Label htmlFor={`${id}-source`} className="sr-only">
+                  {t('component.translator.source')}
+                </Label>
+                <LanguageSelect
+                  id={`${id}-source`}
+                  inBar
+                  allowDetect
+                  value={translator.source}
+                  detected={translation?.response.detectedSource}
+                  onChange={translator.setSource}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t('component.translator.swap')}
+                  title={t('component.translator.swap')}
+                  disabled={!translator.canSwap}
+                  onClick={translator.swap}
+                >
+                  <ArrowLeftRightIcon aria-hidden="true" className="size-4" />
+                </Button>
+                <Label htmlFor={`${id}-target`} className="sr-only">
+                  {t('component.translator.target')}
+                </Label>
+                <LanguageSelect
+                  id={`${id}-target`}
+                  inBar
+                  value={translator.target}
+                  onChange={translator.setTarget}
+                />
+              </>
+            ) : (
+              <p className="m-0 font-label-sm text-label-sm text-on-surface-variant">
+                {detectedName
+                  ? t('component.translator.detectedLanguage', { language: detectedName })
+                  : t('component.translator.rephraseLanguage')}
+              </p>
+            )}
+          </div>
+          <div className="grid @xl:grid-cols-2">
+            <div className="flex min-w-0 flex-col">
+              <Label htmlFor={`${id}-text`} className="sr-only">
                 {t(translating ? 'component.translator.text' : 'component.translator.rephraseText')}
               </Label>
               <Textarea
                 ref={textRef}
                 id={`${id}-text`}
+                variant="inline"
                 value={text}
                 maxLength={TRANSLATE_TEXT_MAX}
                 placeholder={t('component.translator.placeholder')}
@@ -262,61 +283,26 @@ export function TranslatorPage({ component }: ComponentViewProps<'translator'>):
                 aria-keyshortcuts="Control+Enter Meta+Enter"
                 onChange={(event) => setText(event.target.value)}
                 onKeyDown={handleKeyDown}
-                className="min-h-56 flex-1"
+                // eslint-disable-next-line design-system/layout-only-classname -- the text to translate reads at body size, like its result beside it
+                className="min-h-48 flex-1 resize-none px-6 py-5 text-base @xl:min-h-72"
               />
-              <div className="flex min-h-11 flex-wrap items-center justify-between gap-2">
+              <PaneFooter>
                 <p id={`${id}-count`} className="m-0 text-sm text-on-surface-variant">
                   {t('component.translator.count', {
                     length: text.length.toLocaleString(locale),
                     max: TRANSLATE_TEXT_MAX.toLocaleString(locale)
                   })}
                 </p>
-                <div className="flex items-center gap-stack-sm">
-                  <span
-                    aria-hidden="true"
-                    className="hidden text-sm text-on-surface-variant sm:inline"
-                  >
-                    {shortcut}
-                  </span>
-                  <Button
-                    type="submit"
-                    disabled={!canSubmit}
-                    aria-keyshortcuts="Control+Enter Meta+Enter"
-                  >
-                    {translating ? <LanguagesIcon {...ICON} /> : <PenLineIcon {...ICON} />}
-                    {translating
-                      ? t(
-                          translator.pending
-                            ? 'component.translator.translating'
-                            : 'component.translator.translate'
-                        )
-                      : t(
-                          rephraser.pending
-                            ? 'component.translator.rephrasing'
-                            : 'component.translator.rephrase'
-                        )}
-                  </Button>
-                </div>
-              </div>
+                <CopyButton text={text} label={t('component.translator.copyText')} />
+              </PaneFooter>
             </div>
-            <div className="flex min-w-0 flex-col gap-stack-sm">
-              {translating ? (
-                <Field id={`${id}-target`} label={t('component.translator.target')}>
-                  {(control) => (
-                    <LanguageSelect
-                      {...control}
-                      value={translator.target}
-                      onChange={translator.setTarget}
-                    />
-                  )}
-                </Field>
-              ) : (
-                <Label htmlFor={`${id}-result`}>{t('component.translator.rephrased')}</Label>
-              )}
+            <div className="flex min-w-0 flex-col border-t border-outline-variant @xl:border-t-0 @xl:border-l">
               <TranslationOutput
                 mode={settings.mode}
                 id={`${id}-result`}
-                label={translating ? t('component.translator.result') : undefined}
+                label={t(
+                  translating ? 'component.translator.result' : 'component.translator.rephrased'
+                )}
                 pending={current.pending}
                 error={current.error}
                 text={resultText}
@@ -331,46 +317,82 @@ export function TranslatorPage({ component }: ComponentViewProps<'translator'>):
                   translating ? translation?.language : rephrased?.response.detectedLanguage
                 }
                 htmlFor={`${id}-text`}
-                className="min-h-56 flex-1"
+                bare
+                className="min-h-48 flex-1 px-6 py-5 @xl:min-h-72"
               />
-              <div className="flex min-h-11 items-center justify-end gap-2">
-                {!translating && detectedName ? (
-                  <p className="m-0 mr-auto text-sm text-on-surface-variant">
-                    {t('component.translator.detectedLanguage', { language: detectedName })}
-                  </p>
-                ) : null}
-                {!translating ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    disabled={!rephrased || rephraser.pending || !!rephraser.error}
-                    title={t('component.translator.applyHint')}
-                    onClick={() => {
-                      if (!rephrased) return
-                      setText(rephrased.response.text)
-                      textRef.current?.focus()
-                    }}
-                  >
-                    <ArrowLeftToLineIcon {...ICON} />
-                    {t('component.translator.apply')}
-                  </Button>
-                ) : null}
-                <CopyButton
-                  text={current.pending || current.error ? undefined : resultText}
-                  label={translating ? undefined : t('component.translator.copyRephrased')}
-                />
-              </div>
+              <PaneFooter>
+                <p className="m-0 text-sm text-on-surface-variant">
+                  {t('component.translator.resultCount', {
+                    length: (shownResult?.length ?? 0).toLocaleString(locale)
+                  })}
+                </p>
+                <div className="flex items-center gap-2">
+                  {!translating ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={!rephrased || rephraser.pending || !!rephraser.error}
+                      title={t('component.translator.applyHint')}
+                      onClick={() => {
+                        if (!rephrased) return
+                        setText(rephrased.response.text)
+                        textRef.current?.focus()
+                      }}
+                    >
+                      <ArrowLeftToLineIcon {...ICON} />
+                      {t('component.translator.apply')}
+                    </Button>
+                  ) : null}
+                  <CopyButton
+                    text={shownResult}
+                    label={translating ? undefined : t('component.translator.copyRephrased')}
+                  />
+                </div>
+              </PaneFooter>
             </div>
-          </form>
-        </Card>
-        <PageSidePanel
-          label={t('component.translator.settings')}
-          fallback={<TranslatorSettingsCard {...settingsProps} />}
-        >
-          <TranslatorSettingsFields {...settingsProps} />
-        </PageSidePanel>
-      </div>
+          </div>
+          <div className="border-t border-outline-variant p-3">
+            <Button
+              type="submit"
+              disabled={!canSubmit}
+              aria-keyshortcuts="Control+Enter Meta+Enter"
+              className="w-full"
+            >
+              {translating ? <LanguagesIcon {...ICON} /> : <PenLineIcon {...ICON} />}
+              {translating
+                ? t(
+                    translator.pending
+                      ? 'component.translator.translating'
+                      : 'component.translator.translate'
+                  )
+                : t(
+                    rephraser.pending
+                      ? 'component.translator.rephrasing'
+                      : 'component.translator.rephrase'
+                  )}
+              <span aria-hidden="true" className="hidden font-normal opacity-75 sm:inline">
+                {shortcut}
+              </span>
+            </Button>
+          </div>
+        </form>
+      </Card>
+      <PageSidePanel
+        label={t('component.translator.settings')}
+        fallback={<TranslatorSettingsCard {...settingsProps} />}
+      >
+        <TranslatorSidebar {...settingsProps} />
+      </PageSidePanel>
     </Container>
+  )
+}
+
+/** The foot of a pane: its character count and what can be done with its text. */
+function PaneFooter({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return (
+    <div className="flex min-h-14 flex-wrap items-center justify-between gap-2 border-t border-outline-variant px-4 py-2">
+      {children}
+    </div>
   )
 }

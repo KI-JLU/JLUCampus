@@ -23,6 +23,8 @@ interface TranslationOutputProps {
   language?: TranslatorLanguage | null
   /** The source text field, which the result belongs to. */
   htmlFor: string
+  /** Without its own frame, for a pane the surrounding card frames. */
+  bare?: boolean
   className?: string
 }
 
@@ -40,6 +42,7 @@ export function TranslationOutput({
   compareTo,
   language,
   htmlFor,
+  bare,
   className
 }: TranslationOutputProps): React.JSX.Element {
   const { t } = useTranslation()
@@ -51,7 +54,8 @@ export function TranslationOutput({
       aria-busy={pending}
       aria-label={label}
       className={cn(
-        'block overflow-y-auto rounded-field border border-outline-variant bg-surface-container px-4 py-3',
+        'block overflow-y-auto',
+        !bare && 'rounded-field border border-outline-variant bg-surface-container px-4 py-3',
         className
       )}
     >

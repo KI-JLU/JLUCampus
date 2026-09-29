@@ -1,6 +1,6 @@
 import { useContext, useLayoutEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { PageSidePanelContext } from '@/lib/page-side-panel'
+import { PageSidePanelContext, SIDE_PANEL_MEDIA } from '@/lib/page-side-panel'
 import { useMediaQuery } from '@/lib/use-media-query'
 
 interface PageSidePanelProps {
@@ -17,7 +17,7 @@ interface PageSidePanelProps {
  * It exists while the page is shown; below `lg` the page renders `fallback` instead.
  */
 export function PageSidePanel({ label, children, fallback }: PageSidePanelProps): ReactNode {
-  const wide = useMediaQuery('(min-width: 64rem)')
+  const wide = useMediaQuery(SIDE_PANEL_MEDIA)
   const { element, setLabel } = useContext(PageSidePanelContext)
 
   // Before paint, so the shell's columns change in the same frame as the page: no frame without the
