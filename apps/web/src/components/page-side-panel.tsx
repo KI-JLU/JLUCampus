@@ -1,4 +1,4 @@
-import { useContext, useEffect, type ReactNode } from 'react'
+import { useContext, useLayoutEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { PageSidePanelContext } from '@/lib/page-side-panel'
 import { useMediaQuery } from '@/lib/use-media-query'
@@ -20,7 +20,9 @@ export function PageSidePanel({ label, children, fallback }: PageSidePanelProps)
   const wide = useMediaQuery('(min-width: 64rem)')
   const { element, setLabel } = useContext(PageSidePanelContext)
 
-  useEffect(() => {
+  // Before paint, so the shell's columns change in the same frame as the page: no frame without the
+  // column on arrival, none with an empty one after leaving.
+  useLayoutEffect(() => {
     if (!wide) return
     setLabel(label)
     return () => setLabel(null)
