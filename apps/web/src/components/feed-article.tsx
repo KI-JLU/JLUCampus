@@ -30,7 +30,11 @@ export function FeedArticle({ item, date, isNew }: FeedArticleProps): React.JSX.
   // Measured while collapsed only, so the button stays after expanding.
   useLayoutEffect(() => {
     const summary = summaryRef.current
-    if (!summary || expanded) return
+    if (!summary) {
+      setClamped(false)
+      return
+    }
+    if (expanded) return
     const measure = (): void => setClamped(summary.scrollHeight > summary.clientHeight + 1)
     measure()
     const observer = new ResizeObserver(measure)

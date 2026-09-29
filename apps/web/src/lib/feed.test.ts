@@ -23,8 +23,9 @@ describe('formatFeedDate', () => {
   })
 
   it('spells out the day for the feed page', () => {
-    expect(formatFeedDate('2026-09-16T08:00:00Z', 'en', NOW)?.long).toBe('September 16, 2026')
-    expect(formatFeedDate('2026-09-28T11:55:00Z', 'de', NOW)?.long).toBe('28. September 2026')
+    // Local times, so the day does not depend on the machine's time zone.
+    expect(formatFeedDate('2026-09-16T12:00:00', 'en', NOW)?.long).toBe('September 16, 2026')
+    expect(formatFeedDate('2026-09-28T12:00:00', 'de', NOW)?.long).toBe('28. September 2026')
   })
 
   it('returns null for an unreadable date', () => {
