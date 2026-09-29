@@ -14,7 +14,7 @@ import { useFeedHasUnread } from '@/lib/use-feed'
 import { useMediaQuery } from '@/lib/use-media-query'
 import { useSidebarArrangement } from '@/lib/use-sidebar-arrangement'
 import { cn } from '@/lib/utils'
-import { AllAppsPanel } from './all-apps'
+import { MoreAppsPanel } from './more-apps'
 import { ComponentIcon } from './component-icon'
 import { DropList, SidebarDragLayer, SidebarRows } from './sidebar-arrangement'
 
@@ -24,24 +24,21 @@ interface SidebarComponentsProps {
   /** The user's sidebar components, in their order. */
   components: Component[]
   pathname: string
-  /** Whether "All apps" is open and the sidebar edited; the `Popover` around the shell holds that. */
+  /** Whether "More apps" is open and the sidebar edited; the `Popover` around the shell holds that. */
   editing: boolean
-  /** Closes "All apps", and so ends editing. */
-  onClose: () => void
 }
 
 /**
- * The component links of the sidebar, or while "All apps" is open their editor: the links turn
- * into sortable rows in place and the panel beside the column lists every component; rows drag
- * between the two. `AllAppsButton` opens and closes the panel.
+ * The component links of the sidebar, or while "More apps" is open their editor: the links turn
+ * into sortable rows in place and the panel beside the column lists the other components; rows drag
+ * between the two. `MoreAppsButton` opens and closes the panel.
  */
 export function SidebarComponents({
   components,
   pathname,
-  editing,
-  onClose
+  editing
 }: SidebarComponentsProps): React.JSX.Element {
-  if (editing) return <SidebarEditor pathname={pathname} onClose={onClose} />
+  if (editing) return <SidebarEditor pathname={pathname} />
   return (
     <>
       {components.map((component) => (
@@ -138,17 +135,11 @@ function ComponentPageLink({
 }
 
 /**
- * The user's own sidebar rows in place, plus the "All apps" panel, one drag context for both.
+ * The user's own sidebar rows in place, plus the "More apps" panel, one drag context for both.
  * Changes are saved at once. The collapsed column has no room for the rows; it keeps its links
- * and the panel's buttons still add and remove.
+ * and the panel's buttons still add.
  */
-function SidebarEditor({
-  pathname,
-  onClose
-}: {
-  pathname: string
-  onClose: () => void
-}): React.JSX.Element {
+function SidebarEditor({ pathname }: { pathname: string }): React.JSX.Element {
   const { t } = useTranslation()
   const collapsed = useSidebarCollapsed()
   const catalogue = useQuery(componentsQuery)
@@ -208,13 +199,12 @@ function SidebarEditor({
           <SidebarRows arrangement={arrangement} list="sidebar" />
         </DropList>
       )}
-      <AllAppsPanel
+      <MoreAppsPanel
         arrangement={arrangement}
         catalogue={catalogue.data}
         loading={loading}
         failed={failed}
         wide={wide}
-        onClose={onClose}
       />
       <SidebarDragLayer component={arrangement.activeComponent} />
     </DndContext>

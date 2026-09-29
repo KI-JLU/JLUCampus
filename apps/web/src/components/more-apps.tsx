@@ -14,24 +14,24 @@ import {
 import type { Component } from '@justcampus/shared'
 import type { SidebarArrangement } from '@/lib/use-sidebar-arrangement'
 import { cn } from '@/lib/utils'
-import { SidebarEditRow, SidebarPinnedRow } from './sidebar-edit-row'
+import { SidebarEditRow } from './sidebar-edit-row'
 
 const icon = { 'aria-hidden': true, width: '1em', height: '1em' } as const
 
 /**
  * Rows keep their places while one is dragged over the list: its order is the catalogue's, and
- * a row only leaves or joins the sidebar.
+ * a row only joins the sidebar or comes back from it.
  */
 const keepInPlace: SortingStrategy = () => null
 
 /**
- * "All apps" at the foot of the column. It opens the panel of every component and, while it is
- * open, turns the sidebar's links into sortable rows (see `SidebarComponents`). A `Popover` around
- * the shell holds the state; this is its trigger.
+ * "More apps" at the foot of the column. It opens the panel of the components not in the sidebar
+ * and, while it is open, turns the sidebar's links into sortable rows (see `SidebarComponents`).
+ * A `Popover` around the shell holds the state; this is its trigger.
  */
-export function AllAppsButton(): React.JSX.Element {
+export function MoreAppsButton(): React.JSX.Element {
   const { t } = useTranslation()
-  const label = t('nav.allApps')
+  const label = t('nav.moreApps')
   return (
     <PopoverTrigger asChild>
       <NavItem type="button" label={label}>
@@ -42,7 +42,7 @@ export function AllAppsButton(): React.JSX.Element {
   )
 }
 
-interface AllAppsPanelProps {
+interface MoreAppsPanelProps {
   arrangement: SidebarArrangement
   /** Every component, in the admins' order. */
   catalogue: Component[] | undefined
@@ -50,36 +50,36 @@ interface AllAppsPanelProps {
   failed: boolean
   /** A second column of full height beside the sidebar; else a panel below its rows. */
   wide: boolean
-  onClose: () => void
 }
 
 /**
- * Every component, with a search, as rows like the sidebar's while it is edited: the icon and name
- * open the component, the rows not in the sidebar drag into it or join it with their button, the
- * others leave it with theirs. Rows dragged here from the sidebar leave it.
+ * The components not in the sidebar, with a search, as rows like the sidebar's while it is edited:
+ * they drag into it or join it with their button, and open nothing. Rows dragged here from the
+ * sidebar leave it.
  */
-export function AllAppsPanel({
+export function MoreAppsPanel({
   arrangement,
   catalogue,
   loading,
   failed,
-  wide,
-  onClose
-}: AllAppsPanelProps): React.JSX.Element {
+  wide
+}: MoreAppsPanelProps): React.JSX.Element {
   const { t } = useTranslation()
   const titleId = useId()
   const hintId = useId()
   const [search, setSearch] = useState('')
-  const { lists, listRef, availableRef, activeId, add, remove } = arrangement
-  const label = t('nav.allApps')
+  const { lists, listRef, availableRef, activeId, add } = arrangement
+  const label = t('nav.moreApps')
 
+  // The sidebar of the moment, so a row dragged across leaves or joins this list at once.
   const matches = useMemo(() => {
     const query = search.trim().toLocaleLowerCase()
-    const all = [...(catalogue ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)
-    return query ? all.filter((c) => c.name.toLocaleLowerCase().includes(query)) : all
-  }, [catalogue, search])
-  const inSidebar = new Set(lists.sidebar)
-  const movable = matches.filter((c) => !inSidebar.has(c.id)).map((c) => c.id)
+    const inSidebar = new Set(lists.sidebar)
+    return [...(catalogue ?? [])]
+      .filter((c) => !inSidebar.has(c.id))
+      .filter((c) => !query || c.name.toLocaleLowerCase().includes(query))
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+  }, [catalogue, lists.sidebar, search])
   const { setNodeRef, isOver } = useDroppable({ id: 'available' })
 
   return (
@@ -119,14 +119,14 @@ export function AllAppsPanel({
           </PopoverClose>
         </div>
         <p id={hintId} className="m-0 text-xs text-on-surface-variant">
-          {t('allApps.hint')}
+          {t('moreApps.hint')}
         </p>
         <Input
           type="search"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder={t('allApps.search')}
-          aria-label={t('allApps.search')}
+          placeholder={t('moreApps.search')}
+          aria-label={t('moreApps.search')}
           leadingIcon={<SearchIcon aria-hidden="true" />}
           // The search, not the close button, is where the panel starts.
           autoFocus
@@ -137,11 +137,10 @@ export function AllAppsPanel({
           <p className="m-0 text-sm text-on-surface-variant">{t('common.loading')}</p>
         ) : failed ? (
           <p role="alert" className="m-0 text-sm text-error">
-            {t('allApps.loadFailed')}
+            {t('moreApps.loadFailed')}
           </p>
         ) : (
-          <SortableContext id="available" items={movable} strategy={keepInPlace}>
-            {/* Following a link closes the panel; the page it opened is what the user wanted. */}
+          <SortableContext id="available" items={matches.map((c) => c.id)} strategy={keepInPlace}>
             <ul
               ref={(node) => {
                 setNodeRef(node)
@@ -152,37 +151,29 @@ export function AllAppsPanel({
                 'm-0 flex min-h-12 list-none flex-col gap-2 rounded-[var(--ui-radius-control,var(--radius-action))] p-0 transition-colors',
                 isOver && 'bg-secondary-container/40'
               )}
-              onClick={(event) => {
-                if (event.target instanceof Element && event.target.closest('a')) onClose()
-              }}
             >
-              {matches.map((component) =>
-                inSidebar.has(component.id) ? (
-                  <SidebarPinnedRow
-                    key={component.id}
-                    component={component}
-                    onRemove={() => remove(component.id, 'available')}
-                  />
-                ) : (
-                  <SidebarEditRow
-                    key={component.id}
-                    component={component}
-                    list="available"
-                    link
-                    onAction={() => add(component.id, 'available')}
-                  />
-                )
-              )}
+              {matches.map((component) => (
+                <SidebarEditRow
+                  key={component.id}
+                  component={component}
+                  list="available"
+                  onAction={() => add(component.id)}
+                />
+              ))}
             </ul>
           </SortableContext>
         )}
         {!loading && !failed && matches.length === 0 ? (
           <p className="m-0 text-sm text-on-surface-variant">
-            {search.trim() ? t('allApps.noMatches', { query: search.trim() }) : t('allApps.empty')}
+            {search.trim()
+              ? t('moreApps.noMatches', { query: search.trim() })
+              : catalogue?.length
+                ? t('moreApps.allInSidebar')
+                : t('moreApps.empty')}
           </p>
         ) : null}
         <p role="status" className="sr-only">
-          {!loading && search.trim() ? t('allApps.matches', { count: matches.length }) : ''}
+          {!loading && search.trim() ? t('moreApps.matches', { count: matches.length }) : ''}
         </p>
         <p role="status" className="sr-only">
           {arrangement.status}

@@ -23,7 +23,7 @@
   },
   "nav": {
     "dashboard": "Dashboard",
-    "allApps": "Alle Apps",
+    "moreApps": "Mehr Apps",
     "newEntries": "(neue Einträge)"
   },
   "account": {
@@ -452,9 +452,10 @@
       "cancelled": "Verschieben abgebrochen, {{name}} bleibt an der bisherigen Position."
     }
   },
-  "allApps": {
-    "hint": "Ziehen Sie Apps in die Seitenleiste und ordnen Sie sie dort an, oder nutzen Sie + und ×. Zurück hierher gezogen, verschwinden sie aus der Seitenleiste.",
+  "moreApps": {
+    "hint": "Ziehen Sie Apps in die Seitenleiste und ordnen Sie sie dort an, oder nutzen Sie +. Zurück hierher gezogen, verschwinden sie aus der Seitenleiste.",
     "empty": "Es sind noch keine Apps verfügbar.",
+    "allInSidebar": "Alle Apps stehen bereits in der Seitenleiste.",
     "loadFailed": "Die Apps konnten nicht geladen werden.",
     "search": "Apps durchsuchen",
     "noMatches": "Keine App passt zu „{{query}}“.",

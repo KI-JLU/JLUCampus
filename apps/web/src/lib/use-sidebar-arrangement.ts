@@ -59,26 +59,13 @@ export interface SidebarArrangement {
     | 'onDragCancel'
     | 'accessibility'
   >
-  /**
-   * Add or remove without dragging. `from` is the list whose button was used (by default the one
-   * the component leaves); focus stays on that component's row there, or moves to a neighbour.
-   */
-  add: (id: string, from?: SidebarList) => void
-  remove: (id: string, from?: SidebarList) => void
+  /** Add or remove without dragging; focus moves to a neighbour in the list the row leaves. */
+  add: (id: string) => void
+  remove: (id: string) => void
 }
 
 function sameOrder(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((id, index) => id === b[index])
-}
-
-/**
- * dnd-kit stops the click that ends a pointer drag from propagating, but not its default: dropped
- * back onto a row's link, the browser would follow it. Swallow that click for as long as dnd-kit does.
- */
-function preventClickAfterDrag(): void {
-  const prevent = (event: MouseEvent): void => event.preventDefault()
-  window.addEventListener('click', prevent, { capture: true, once: true })
-  setTimeout(() => window.removeEventListener('click', prevent, { capture: true }), 50)
 }
 
 function listOf(id: UniqueIdentifier, lists: SidebarLists): SidebarList | undefined {
@@ -103,7 +90,7 @@ export function useSidebarArrangement({
   const [draft, setDraft] = useState<SidebarLists | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [status, setStatus] = useState('')
-  const pendingFocus = useRef<{ list: SidebarList; id: string; index: number } | null>(null)
+  const pendingFocus = useRef<{ list: SidebarList; index: number } | null>(null)
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
@@ -133,34 +120,36 @@ export function useSidebarArrangement({
     setDraft(next)
   }
 
-  // After a button moved the focused row, focus its button again where the row stays in the list
-  // (a list of every component), else its neighbour instead of losing focus to <body>.
+  // The rows' buttons as rendered, so a search that hides rows does not shift the neighbours.
+  const actionsIn = (ref: typeof listRef): HTMLElement[] => [
+    ...(ref.current?.querySelectorAll<HTMLElement>('[data-row-action]') ?? [])
+  ]
+  const renderedIndex = (ref: typeof listRef, id: string): number =>
+    actionsIn(ref).findIndex((action) => action.dataset.rowAction === id)
+
+  // After a button moved the focused row out of its list, focus its neighbour's button instead of
+  // losing focus to <body>.
   useLayoutEffect(() => {
     const target = pendingFocus.current
     if (!target) return
     pendingFocus.current = null
     const [own, other] =
       target.list === 'sidebar' ? [listRef, availableRef] : [availableRef, listRef]
-    const actionsIn = (ref: typeof listRef): HTMLElement[] => [
-      ...(ref.current?.querySelectorAll<HTMLElement>('[data-row-action]') ?? [])
-    ]
     const actions = actionsIn(own)
     const next =
-      actions.find((action) => action.dataset.rowAction === target.id) ??
-      actions[Math.min(Math.max(target.index, 0), actions.length - 1)] ??
-      actionsIn(other)[0]
+      actions[Math.min(Math.max(target.index, 0), actions.length - 1)] ?? actionsIn(other)[0]
     next?.focus()
   }, [lists])
 
   const nameOf = (id: UniqueIdentifier): string => byId.get(String(id))?.name ?? ''
 
-  const add = (id: string, from: SidebarList = 'available'): void => {
-    pendingFocus.current = { list: from, id, index: lists[from].indexOf(id) }
+  const add = (id: string): void => {
+    pendingFocus.current = { list: 'available', index: renderedIndex(availableRef, id) }
     setStatus(t('sidebarEditor.added', { name: nameOf(id) }))
     onSave([...lists.sidebar, id])
   }
-  const remove = (id: string, from: SidebarList = 'sidebar'): void => {
-    pendingFocus.current = { list: from, id, index: lists[from].indexOf(id) }
+  const remove = (id: string): void => {
+    pendingFocus.current = { list: 'sidebar', index: renderedIndex(listRef, id) }
     setStatus(t('sidebarEditor.removed', { name: nameOf(id) }))
     onSave(lists.sidebar.filter((other) => other !== id))
   }
@@ -206,9 +195,8 @@ export function useSidebarArrangement({
     })
   }
 
-  const handleDragEnd = ({ active, over, activatorEvent }: DragEndEvent): void => {
+  const handleDragEnd = ({ active, over }: DragEndEvent): void => {
     dragging.current = false
-    if (!(activatorEvent instanceof KeyboardEvent)) preventClickAfterDrag()
     setActiveId(null)
     const current = listsRef.current
     if (!over) {
