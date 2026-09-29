@@ -5,6 +5,8 @@ import {
   COMPONENT_TYPES,
   componentSchema,
   dashboardPutSchema,
+  desktopLinkFor,
+  desktopLinkPath,
   isSingletonType,
   SINGLETON_COMPONENT_TYPES,
   translateRequestSchema,
@@ -321,5 +323,20 @@ describe('modules', () => {
       tone: null
     })
     expect(rephraseRequestSchema.safeParse({ text: 'Hallo', style: 'poetic' }).success).toBe(false)
+  })
+})
+
+describe('desktop links', () => {
+  it('maps jlucampus:// links to in-app paths and back', () => {
+    expect(desktopLinkPath('jlucampus://c/abc')).toBe('/c/abc')
+    expect(desktopLinkPath('jlucampus://d/files/')).toBe('/d/files')
+    expect(desktopLinkPath('jlucampus://')).toBe('/')
+    expect(desktopLinkFor('/c/abc')).toBe('jlucampus://c/abc')
+  })
+
+  it('refuses other schemes and paths that leave the app', () => {
+    expect(desktopLinkPath('https://example.org/c/abc')).toBeNull()
+    expect(desktopLinkPath('jlucampus:///evil.example')).toBeNull()
+    expect(desktopLinkPath('not a url')).toBeNull()
   })
 })

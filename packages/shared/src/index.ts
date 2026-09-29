@@ -916,16 +916,164 @@ export const KEYCLOAK_PROVIDER_ID = 'keycloak'
 // ---------------------------------------------------------------------------
 
 /**
+ * Desktop modules: features only the desktop app offers, because they need the
+ * operating system (tray, native notifications, the file system, autostart,
+ * `jlucampus://` links). They live entirely in the Electron app: no component
+ * row, no admin switch, nothing on the server. The main process implements
+ * them, the preload exposes each one as `DesktopBridge.modules[id]`, and the
+ * web app draws their pages and settings only when the bridge offers them, so
+ * the web app and PWA never show them. See `docs/DESKTOP-MODULES.md`.
+ */
+export const DESKTOP_MODULE_IDS = ['notifications', 'files', 'system'] as const
+export type DesktopModuleId = (typeof DESKTOP_MODULE_IDS)[number]
+
+/** The scheme of links that open the desktop app on a page: `jlucampus://c/<id>`. */
+export const DESKTOP_LINK_SCHEME = 'jlucampus'
+
+/**
+ * The in-app path a desktop link points at (`jlucampus://c/abc` → `/c/abc`),
+ * or `null` if the value is no such link or leaves the app.
+ */
+export function desktopLinkPath(value: string): string | null {
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    return null
+  }
+  if (url.protocol !== `${DESKTOP_LINK_SCHEME}:`) return null
+  // `jlucampus://c/abc`: the first segment parses as the host.
+  const path = `/${url.host}${url.pathname}`.replace(/\/+$/, '') || '/'
+  return isAppPath(path) ? `${path}${url.search}` : null
+}
+
+/** The desktop link for an in-app path (`/c/abc` → `jlucampus://c/abc`). */
+export function desktopLinkFor(path: string): string {
+  return `${DESKTOP_LINK_SCHEME}://${path.replace(/^\/+/, '')}`
+}
+
+/** Whether `path` is a path inside the app: absolute, not protocol-relative, no dot segments. */
+export function isAppPath(path: string): boolean {
+  return (
+    path.startsWith('/') &&
+    !path.startsWith('//') &&
+    !path.includes('\\') &&
+    !path.split('/').some((segment) => segment === '..' || segment === '.')
+  )
+}
+
+/** Tray and native notifications ("Benachrichtigungen & Tray"). */
+export interface DesktopNotificationSettings {
+  /** Native notifications for new feed entries. */
+  enabled: boolean
+  /** Closing the window keeps the app running in the tray. */
+  closeToTray: boolean
+}
+
+export interface DesktopNotification {
+  title: string
+  body: string
+  /** In-app path opened when the notification is clicked, e.g. `/c/<id>`. */
+  path: string
+}
+
+export interface DesktopNotificationsBridge {
+  getSettings: () => Promise<DesktopNotificationSettings>
+  setSettings: (patch: Partial<DesktopNotificationSettings>) => Promise<DesktopNotificationSettings>
+  /** Shows a native notification unless notifications are off. */
+  show: (notification: DesktopNotification) => Promise<void>
+  /** Number of feeds with unread entries: tray tooltip and app badge (macOS, Linux launchers). */
+  setUnreadCount: (count: number) => Promise<void>
+}
+
+/**
+ * A place in the files module. The renderer never handles paths itself: it
+ * gets ids, and the main process opens what an id stands for.
+ */
+export interface DesktopPlace {
+  id: string
+  /** Standard folders come from the OS; `folder` and `network` were added by the user. */
+  kind: 'downloads' | 'documents' | 'desktop' | 'folder' | 'network'
+  /** Display name; standard folders have none and are named by the web app. */
+  name: string | null
+  /** Where it points, for display: a local path, `\\server\share` or `smb://server/share`. */
+  location: string
+  /** Local: the folder exists. Network: the server answered on port 445. */
+  available: boolean
+}
+
+export interface DesktopRecentFile {
+  id: string
+  name: string
+  size: number
+  modifiedAt: string
+}
+
+export interface DesktopFilesBridge {
+  places: () => Promise<DesktopPlace[]>
+  /** The newest files in the Downloads folder, newest first. */
+  recentDownloads: () => Promise<DesktopRecentFile[]>
+  /** Opens the native folder picker; `null` when the user cancels. */
+  pickFolder: () => Promise<DesktopPlace | null>
+  /** Adds a folder dropped onto the page; rejects files that are not folders. */
+  addDropped: (file: File) => Promise<DesktopPlace>
+  /** Adds a network share given as `\\server\share` or `smb://server/share`. */
+  addNetwork: (address: string, name: string) => Promise<DesktopPlace>
+  /** Removes a place the user added; standard folders stay. */
+  remove: (id: string) => Promise<void>
+  /** Opens a place in the system file manager. */
+  open: (id: string) => Promise<void>
+  /** Opens a recent download with its default app. */
+  openFile: (id: string) => Promise<void>
+  /** Shows a recent download in its folder. */
+  showFile: (id: string) => Promise<void>
+}
+
+/** Autostart and `jlucampus://` links. */
+export interface DesktopSystemSettings {
+  /** The app starts when the user signs in to the computer. */
+  autostart: boolean
+  /** Whether the OS allows changing autostart for this build (not for development builds). */
+  autostartSupported: boolean
+  /** This app is the handler of `jlucampus://` links. */
+  linkHandler: boolean
+}
+
+export interface DesktopSystemBridge {
+  getSettings: () => Promise<DesktopSystemSettings>
+  setAutostart: (enabled: boolean) => Promise<DesktopSystemSettings>
+  /** Copies `jlucampus://…` for an in-app path to the clipboard. */
+  copyLink: (path: string) => Promise<string>
+}
+
+export interface DesktopModuleBridges {
+  notifications: DesktopNotificationsBridge
+  files: DesktopFilesBridge
+  system: DesktopSystemBridge
+}
+
+/**
  * What the Electron preload exposes as `window.justCampus`. The web app reads
  * it to find the API and to open external links through the OS browser; in
  * a plain browser the property is absent.
  */
 export interface DesktopBridge {
   platform: 'electron'
+  /** The operating system, for texts that differ ("Explorer", "Finder", "Dateimanager"). */
+  os: 'windows' | 'macos' | 'linux'
   /** API origin, e.g. `https://campus.example.org`. */
   apiUrl: string
   /** Opens a URL in the system browser. */
   openExternal: (url: string) => Promise<void>
+  /** The desktop modules this build offers; an absent key means the module is not there. */
+  modules: Partial<DesktopModuleBridges>
+  /**
+   * Called when the app is asked to show an in-app path: a `jlucampus://` link,
+   * a notification or the tray menu. Returns the unsubscribe function.
+   */
+  onNavigate: (listener: (path: string) => void) => () => void
+  /** Tells the main process the interface language, for the tray menu and notifications. */
+  setLanguage: (language: Language) => void
 }
 
 declare global {
