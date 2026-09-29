@@ -1,12 +1,12 @@
 import { ArrowDownIcon, ArrowUpIcon, PencilIcon, Trash2Icon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Button, Switch, TableCell, TableRow } from '@ki4jlu/design-system'
-import type { Component } from '@justcampus/shared'
-import { adapterOf, externalUrlOf } from '@/adapters/registry'
+import { Badge, Button, Switch, TableCell, TableRow } from '@ki4jlu/design-system'
+import { isSingletonType, type AdminComponent } from '@justcampus/shared'
+import { externalUrlOf, sourceUrlOf } from '@/adapters/registry'
 import { ComponentIcon } from './component-icon'
 
 interface AdminComponentRowProps {
-  component: Component
+  component: AdminComponent
   isFirst: boolean
   isLast: boolean
   onToggle: (enabled: boolean) => void
@@ -28,6 +28,8 @@ export function AdminComponentRow({
 }: AdminComponentRowProps): React.JSX.Element {
   const { t } = useTranslation()
   const { name } = component
+  const isModule = isSingletonType(component.type)
+  const url = sourceUrlOf(component)
   return (
     <TableRow>
       <TableCell className="w-10">
@@ -40,11 +42,25 @@ export function AdminComponentRow({
         </span>
       </TableCell>
       <TableCell className="font-medium">{name}</TableCell>
-      <TableCell className="whitespace-nowrap">{t(`componentTypes.${component.type}`)}</TableCell>
-      <TableCell>
-        <span className="block max-w-72 truncate text-on-surface-variant">
-          {adapterOf(component).sourceUrl(component)}
+      <TableCell className="whitespace-nowrap">
+        <span className="flex items-center gap-2">
+          {t(`componentTypes.${component.type}`)}
+          {isModule ? (
+            <Badge tone="secondary" appearance="filled">
+              {t('admin.table.module')}
+            </Badge>
+          ) : null}
         </span>
+      </TableCell>
+      <TableCell>
+        {url ? (
+          <span className="block max-w-72 truncate text-on-surface-variant">{url}</span>
+        ) : (
+          <span className="text-on-surface-variant">
+            <span aria-hidden="true">—</span>
+            <span className="sr-only">{t('admin.table.noUrl')}</span>
+          </span>
+        )}
       </TableCell>
       <TableCell>
         <Switch
@@ -81,11 +97,17 @@ export function AdminComponentRow({
           >
             <PencilIcon {...ICON} />
           </Button>
+          {/*
+           * Modules cannot be deleted. Their button stays as an invisible placeholder (hidden from
+           * pointer, keyboard and screenreaders alike), so every row's buttons line up.
+           */}
           <Button
             variant="ghost-destructive"
             size="icon"
             aria-label={t('admin.table.delete', { name })}
-            onClick={onDelete}
+            disabled={isModule}
+            onClick={isModule ? undefined : onDelete}
+            className={isModule ? 'invisible' : undefined}
           >
             <Trash2Icon {...ICON} />
           </Button>

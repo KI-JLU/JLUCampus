@@ -99,11 +99,18 @@ export const component = pgTable(
     iconUrl: text('icon_url'),
     config: jsonb('config').$type<ComponentConfig>().notNull(),
     enabled: boolean('enabled').notNull().default(true),
+    singleton: boolean('singleton').notNull().default(false),
+    secrets: jsonb('secrets').$type<Record<string, string>>().notNull().default({}),
     sortOrder: integer('sort_order').notNull(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow()
   },
-  (table) => [index('component_enabled_sort_order_idx').on(table.enabled, table.sortOrder)]
+  (table) => [
+    index('component_enabled_sort_order_idx').on(table.enabled, table.sortOrder),
+    uniqueIndex('component_singleton_type_uidx')
+      .on(table.type)
+      .where(sql`${table.singleton} = true`)
+  ]
 )
 
 export const folderTemplate = pgTable(

@@ -61,14 +61,30 @@ export const TILE_DEFAULT_H = 6
 
 /**
  * Component adapters: `iframe` embeds a site, `rss` shows a feed, `link` is a
- * shortcut that opens its URL outside the app. The type decides the page and
- * the widgets a component adds (see `COMPONENT_WIDGETS`). A future adapter
- * (Stud.IP, …) adds a literal here, a config schema, its widgets, and a
- * renderer in the web app's adapter registry.
+ * shortcut that opens its URL outside the app, `translator` is a module (see
+ * `SINGLETON_COMPONENT_TYPES`). The type decides the page and the widgets a
+ * component adds (see `COMPONENT_WIDGETS`). A future adapter (Stud.IP, …) adds
+ * a literal here, a config schema, its widgets, and a renderer in the web
+ * app's adapter registry.
  */
-export const COMPONENT_TYPES = ['iframe', 'rss', 'link'] as const
+export const COMPONENT_TYPES = ['iframe', 'rss', 'link', 'translator'] as const
 export const componentTypeSchema = z.enum(COMPONENT_TYPES)
 export type ComponentType = z.infer<typeof componentTypeSchema>
+
+/**
+ * Modules: small apps built into JLU Campus rather than links to somewhere
+ * else. Each module type exists as exactly one component, which the server
+ * creates (disabled) at startup; admins configure and enable it but cannot
+ * create a second one or delete it. A module has its own endpoints under
+ * `API.module(type)`, may keep secrets (API keys, see `COMPONENT_SECRETS`)
+ * and may own database tables that reference its component.
+ */
+export const SINGLETON_COMPONENT_TYPES = ['translator'] as const satisfies readonly ComponentType[]
+export type SingletonComponentType = (typeof SINGLETON_COMPONENT_TYPES)[number]
+
+export function isSingletonType(type: ComponentType): type is SingletonComponentType {
+  return (SINGLETON_COMPONENT_TYPES as readonly ComponentType[]).includes(type)
+}
 
 /** `https:` anywhere, `http:` only for loopback hosts in development. */
 export const httpsUrlSchema = z
@@ -130,7 +146,69 @@ export const linkComponentConfigSchema = z.object({
 })
 export type LinkComponentConfig = z.infer<typeof linkComponentConfigSchema>
 
-export type ComponentConfig = IframeComponentConfig | RssComponentConfig | LinkComponentConfig
+/** Languages the translator offers, as ISO 639-1 codes. */
+export const TRANSLATOR_LANGUAGES = [
+  'de',
+  'en',
+  'fr',
+  'es',
+  'it',
+  'nl',
+  'pl',
+  'pt',
+  'tr',
+  'uk',
+  'ru',
+  'ar',
+  'zh',
+  'ja'
+] as const
+export const translatorLanguageSchema = z.enum(TRANSLATOR_LANGUAGES)
+export type TranslatorLanguage = z.infer<typeof translatorLanguageSchema>
+
+export const translatorComponentConfigSchema = z.object({
+  /** Target language a user starts with. */
+  defaultTargetLanguage: translatorLanguageSchema
+})
+export type TranslatorComponentConfig = z.infer<typeof translatorComponentConfigSchema>
+
+export type ComponentConfig =
+  IframeComponentConfig | RssComponentConfig | LinkComponentConfig | TranslatorComponentConfig
+
+// ---------------------------------------------------------------------------
+// Component secrets (admin-only settings such as API keys)
+// ---------------------------------------------------------------------------
+
+/**
+ * The secrets each component type keeps. The server stores them encrypted and
+ * never returns them: admins only learn whether each one is set
+ * (`adminComponentSchema.secrets`) and can replace or remove it. Only the
+ * type's own endpoints (`API.module`) read them.
+ */
+export const COMPONENT_SECRETS = {
+  iframe: [],
+  rss: [],
+  link: [],
+  translator: ['apiKey']
+} as const satisfies { [T in ComponentType]: readonly string[] }
+
+export type SecretKey<T extends ComponentType = ComponentType> = T extends ComponentType
+  ? (typeof COMPONENT_SECRETS)[T][number]
+  : never
+
+export const SECRET_VALUE_MAX = 4096
+
+/**
+ * A change to one secret: a string sets it, `null` removes it, an absent key
+ * leaves it unchanged. Omitting `secrets` altogether changes nothing.
+ */
+const secretChangeSchema = z.string().trim().min(1).max(SECRET_VALUE_MAX).nullable().optional()
+
+const translatorSecretsInputSchema = z.strictObject({ apiKey: secretChangeSchema }).optional()
+
+/** Which of a component's secrets are set, keyed by secret. */
+const translatorSecretsStatusSchema = z.object({ apiKey: z.boolean() })
+const noSecretsStatusSchema = z.object({})
 
 /**
  * A Lucide icon name in kebab-case, e.g. `calendar-days`. Rendered with
@@ -156,11 +234,20 @@ const componentBaseSchema = z.object({
   enabled: z.boolean()
 })
 
-/** What an admin sends to create or fully replace a component. */
+/**
+ * What an admin sends to create or fully replace a component. Module types
+ * (`SINGLETON_COMPONENT_TYPES`) cannot be created, only replaced, and a
+ * component's type cannot change into or out of a module type.
+ */
 export const componentInputSchema = z.discriminatedUnion('type', [
   componentBaseSchema.extend({ type: z.literal('iframe'), config: iframeComponentConfigSchema }),
   componentBaseSchema.extend({ type: z.literal('rss'), config: rssComponentConfigSchema }),
-  componentBaseSchema.extend({ type: z.literal('link'), config: linkComponentConfigSchema })
+  componentBaseSchema.extend({ type: z.literal('link'), config: linkComponentConfigSchema }),
+  componentBaseSchema.extend({
+    type: z.literal('translator'),
+    config: translatorComponentConfigSchema,
+    secrets: translatorSecretsInputSchema
+  })
 ])
 export type ComponentInput = z.infer<typeof componentInputSchema>
 
@@ -172,16 +259,48 @@ const storedComponentSchema = componentBaseSchema.extend({
   updatedAt: z.string().datetime()
 })
 
-/** A component as the API returns it. */
+/** A component as the API returns it. Secrets are never part of it. */
 export const componentSchema = z.discriminatedUnion('type', [
   storedComponentSchema.extend({ type: z.literal('iframe'), config: iframeComponentConfigSchema }),
   storedComponentSchema.extend({ type: z.literal('rss'), config: rssComponentConfigSchema }),
-  storedComponentSchema.extend({ type: z.literal('link'), config: linkComponentConfigSchema })
+  storedComponentSchema.extend({ type: z.literal('link'), config: linkComponentConfigSchema }),
+  storedComponentSchema.extend({
+    type: z.literal('translator'),
+    config: translatorComponentConfigSchema
+  })
 ])
 export type Component = z.infer<typeof componentSchema>
 
 export const componentListSchema = z.object({ components: z.array(componentSchema) })
 export type ComponentList = z.infer<typeof componentListSchema>
+
+/** A component as the admin endpoints return it: plus which of its secrets are set. */
+export const adminComponentSchema = z.discriminatedUnion('type', [
+  storedComponentSchema.extend({
+    type: z.literal('iframe'),
+    config: iframeComponentConfigSchema,
+    secrets: noSecretsStatusSchema
+  }),
+  storedComponentSchema.extend({
+    type: z.literal('rss'),
+    config: rssComponentConfigSchema,
+    secrets: noSecretsStatusSchema
+  }),
+  storedComponentSchema.extend({
+    type: z.literal('link'),
+    config: linkComponentConfigSchema,
+    secrets: noSecretsStatusSchema
+  }),
+  storedComponentSchema.extend({
+    type: z.literal('translator'),
+    config: translatorComponentConfigSchema,
+    secrets: translatorSecretsStatusSchema
+  })
+])
+export type AdminComponent = z.infer<typeof adminComponentSchema>
+
+export const adminComponentListSchema = z.object({ components: z.array(adminComponentSchema) })
+export type AdminComponentList = z.infer<typeof adminComponentListSchema>
 
 /** New catalogue order: every existing id exactly once. */
 export const componentOrderSchema = z.object({
@@ -203,12 +322,14 @@ export interface WidgetDefinition {
  * The widgets each component type adds, keyed by widget key. Every enabled
  * component offers all widgets of its type; there is nothing to configure per
  * widget. `iframe.launcher` opens the page, `rss.feed` lists the newest
- * entries, `link.shortcut` opens the URL outside the app.
+ * entries, `link.shortcut` opens the URL outside the app, `translator.quick`
+ * translates a short text in place.
  */
 export const COMPONENT_WIDGETS = {
   iframe: { launcher: { minW: TILE_MIN_W, minH: TILE_MIN_H } },
   rss: { feed: { minW: TILE_MIN_W, minH: TILE_MIN_H } },
-  link: { shortcut: { minW: TILE_MIN_W, minH: TILE_MIN_H } }
+  link: { shortcut: { minW: TILE_MIN_W, minH: TILE_MIN_H } },
+  translator: { quick: { minW: 3, minH: 5 } }
 } as const satisfies { [T in ComponentType]: Record<string, WidgetDefinition> }
 
 export type WidgetKey<T extends ComponentType = ComponentType> = T extends ComponentType
@@ -541,6 +662,27 @@ export const feedReadPutSchema = z.object({
 export type FeedReadPut = z.infer<typeof feedReadPutSchema>
 
 // ---------------------------------------------------------------------------
+// Translator module (`API.translate`)
+// ---------------------------------------------------------------------------
+
+export const TRANSLATE_TEXT_MAX = 5000
+
+export const translateRequestSchema = z.object({
+  text: z.string().trim().min(1).max(TRANSLATE_TEXT_MAX),
+  /** `null` lets the service detect the language. */
+  source: translatorLanguageSchema.nullable(),
+  target: translatorLanguageSchema
+})
+export type TranslateRequest = z.infer<typeof translateRequestSchema>
+
+export const translateResponseSchema = z.object({
+  translation: z.string(),
+  /** The language the service detected when `source` was `null`, if it could tell. */
+  detectedSource: translatorLanguageSchema.nullable()
+})
+export type TranslateResponse = z.infer<typeof translateResponseSchema>
+
+// ---------------------------------------------------------------------------
 // Errors
 // ---------------------------------------------------------------------------
 
@@ -552,6 +694,8 @@ export const API_ERROR_CODES = [
   'conflict',
   /** `API.feed`: the feed host is not allowed, unreachable, too slow, too large, or not a feed. */
   'feed_unavailable',
+  /** `API.module`: the module's upstream service failed or the module lacks a required secret. */
+  'module_unavailable',
   'internal'
 ] as const
 export const apiErrorCodeSchema = z.enum(API_ERROR_CODES)
@@ -590,12 +734,27 @@ export const API = {
    * order, then `COMPONENT_WIDGETS` order). Any signed-in user.
    */
   widgets: '/api/widgets',
-  /** Admin only. GET: all components. POST: `componentInputSchema` → 201 with `componentSchema`. */
+  /**
+   * Admin only. GET: `adminComponentListSchema`, all components. POST:
+   * `componentInputSchema` → 201 with `adminComponentSchema`; a module type
+   * answers `409 conflict` (the server creates modules itself).
+   */
   adminComponents: '/api/admin/components',
   /** Admin only. PUT: `componentOrderSchema` → 204. */
   adminComponentOrder: '/api/admin/components/order',
-  /** Admin only. GET / PUT (`componentInputSchema`) / DELETE one component by id. */
+  /**
+   * Admin only. GET (`adminComponentSchema`) / PUT (`componentInputSchema`) /
+   * DELETE one component by id. Deleting a module, or changing a type into or
+   * out of a module type, answers `409 conflict`.
+   */
   adminComponent: (id: string) => `/api/admin/components/${id}`,
+  /**
+   * Base path of a module's own endpoints. Any signed-in user; while the
+   * module's component is disabled every endpoint answers `404 not_found`.
+   */
+  module: (type: SingletonComponentType) => `/api/modules/${type}`,
+  /** POST `translateRequestSchema` → `translateResponseSchema`. Failures answer `502 module_unavailable`. */
+  translate: '/api/modules/translator/translate',
   /** GET: `folderTemplateListSchema`, enabled templates with widgets of enabled components. Any signed-in user. */
   folderTemplates: '/api/folder-templates',
   /** Admin only. GET: all templates. POST: `folderTemplateInputSchema` → 201 with `folderTemplateSchema`. */

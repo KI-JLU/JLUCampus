@@ -1,7 +1,9 @@
 import { serveStatic } from '@hono/node-server/serve-static'
 import {
   API,
+  COMPONENT_SECRETS,
   COMPONENT_WIDGETS,
+  adminComponentSchema,
   componentInputSchema,
   componentOrderSchema,
   componentSchema,
@@ -16,10 +18,12 @@ import {
   layoutPresetSchema,
   mePatchSchema,
   meSchema,
+  isSingletonType,
   sidebarPutSchema,
   widgetDefinition,
   widgetRefKey,
   widgetSchema,
+  type AdminComponent,
   type Component,
   type ComponentType,
   type Me,
@@ -31,13 +35,14 @@ import {
 } from '@justcampus/shared'
 import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
-import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { basename, resolve } from 'node:path'
-import { z, type ZodType } from 'zod'
+import { z } from 'zod'
 
-import { auth, getSession, type AuthSession } from './auth.js'
+import { ApiError, parseBody, validationIssues } from './api.js'
+import { auth, getSession } from './auth.js'
+import { applySecretsPatch, componentTypeChangeConflicts } from './component-secrets.js'
 import { db } from './db/index.js'
 import {
   dashboardFolderItem,
@@ -60,53 +65,8 @@ import {
   tooSmall,
   widgetRefsFromDashboard
 } from './logic.js'
-
-type AppEnvironment = { Variables: { session: AuthSession } }
-
-class ApiError extends Error {
-  constructor(
-    readonly status: ContentfulStatusCode,
-    readonly code: 'not_found' | 'validation' | 'conflict' | 'feed_unavailable',
-    message: string,
-    readonly issues?: Array<{ path: Array<string | number>; message: string }>
-  ) {
-    super(message)
-  }
-}
-
-function validationIssues(
-  error: z.ZodError
-): Array<{ path: Array<string | number>; message: string }> {
-  return error.issues.map((issue) => ({
-    path: issue.path.map((part) => (typeof part === 'symbol' ? String(part) : part)),
-    message: issue.message
-  }))
-}
-
-async function parseBody<T>(
-  context: { req: { json: () => Promise<unknown> } },
-  schema: ZodType<T>
-): Promise<T> {
-  let body: unknown
-  try {
-    body = await context.req.json()
-  } catch {
-    throw new ApiError(400, 'validation', 'Request body is not valid JSON', [
-      { path: [], message: 'Expected a JSON request body' }
-    ])
-  }
-
-  const result = schema.safeParse(body)
-  if (!result.success) {
-    throw new ApiError(
-      400,
-      'validation',
-      'Request validation failed',
-      validationIssues(result.error)
-    )
-  }
-  return result.data
-}
+import { registerModuleRoutes, type AppEnvironment } from './modules/index.js'
+import { encryptSecret } from './secrets.js'
 
 function parseId(value: string, label: string): string {
   const result = z.uuid().safeParse(value)
@@ -123,6 +83,18 @@ function parseComponentId(value: string): string {
 function toComponent(row: typeof component.$inferSelect): Component {
   return componentSchema.parse({
     ...row,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString()
+  })
+}
+
+function toAdminComponent(row: typeof component.$inferSelect): AdminComponent {
+  const type = row.type as ComponentType
+  return adminComponentSchema.parse({
+    ...row,
+    secrets: Object.fromEntries(
+      COMPONENT_SECRETS[type].map((secretKey) => [secretKey, Boolean(row.secrets[secretKey])])
+    ),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()
   })
@@ -278,6 +250,8 @@ app.use('/api/admin/*', async (context, next) => {
   await next()
 })
 
+registerModuleRoutes(app)
+
 app.get(API.me, async (context) => context.json(await readMe(context.get('session').user.id)))
 
 app.patch(API.me, async (context) => {
@@ -360,11 +334,14 @@ app.put(API.feedRead, async (context) => {
 
 app.get(API.adminComponents, async (context) => {
   const rows = await db.select().from(component).orderBy(asc(component.sortOrder))
-  return context.json({ components: rows.map(toComponent) })
+  return context.json({ components: rows.map(toAdminComponent) })
 })
 
 app.post(API.adminComponents, async (context) => {
   const input = await parseBody(context, componentInputSchema)
+  if (isSingletonType(input.type)) {
+    throw new ApiError(409, 'conflict', 'Modules are created by the server')
+  }
   const [last] = await db
     .select({ sortOrder: component.sortOrder })
     .from(component)
@@ -372,9 +349,17 @@ app.post(API.adminComponents, async (context) => {
     .limit(1)
   const [created] = await db
     .insert(component)
-    .values({ ...input, sortOrder: (last?.sortOrder ?? -1) + 1 })
+    .values({
+      name: input.name,
+      type: input.type,
+      icon: input.icon,
+      iconUrl: input.iconUrl,
+      config: input.config,
+      enabled: input.enabled,
+      sortOrder: (last?.sortOrder ?? -1) + 1
+    })
     .returning()
-  return context.json(toComponent(created!), 201)
+  return context.json(toAdminComponent(created!), 201)
 })
 
 // Keep this route before /:id so "order" can never be interpreted as an id.
@@ -407,23 +392,49 @@ app.get('/api/admin/components/:id', async (context) => {
   const id = parseComponentId(context.req.param('id'))
   const [record] = await db.select().from(component).where(eq(component.id, id)).limit(1)
   if (!record) throw new ApiError(404, 'not_found', 'Component not found')
-  return context.json(toComponent(record))
+  return context.json(toAdminComponent(record))
 })
 
 app.put('/api/admin/components/:id', async (context) => {
   const id = parseComponentId(context.req.param('id'))
   const input = await parseBody(context, componentInputSchema)
+  const [record] = await db.select().from(component).where(eq(component.id, id)).limit(1)
+  if (!record) throw new ApiError(404, 'not_found', 'Component not found')
+  if (componentTypeChangeConflicts(record, input.type)) {
+    throw new ApiError(409, 'conflict', 'A component cannot change into or out of a module type')
+  }
+
+  const secretPatch = 'secrets' in input ? input.secrets : undefined
+  const secrets = applySecretsPatch(record.secrets, secretPatch, (secretKey, value) =>
+    encryptSecret(value, env.COMPONENT_SECRETS_KEY, id, secretKey)
+  )
   const [updated] = await db
     .update(component)
-    .set({ ...input, updatedAt: new Date() })
+    .set({
+      name: input.name,
+      type: input.type,
+      icon: input.icon,
+      iconUrl: input.iconUrl,
+      config: input.config,
+      enabled: input.enabled,
+      secrets,
+      updatedAt: new Date()
+    })
     .where(eq(component.id, id))
     .returning()
   if (!updated) throw new ApiError(404, 'not_found', 'Component not found')
-  return context.json(toComponent(updated))
+  return context.json(toAdminComponent(updated))
 })
 
 app.delete('/api/admin/components/:id', async (context) => {
   const id = parseComponentId(context.req.param('id'))
+  const [record] = await db
+    .select({ singleton: component.singleton })
+    .from(component)
+    .where(eq(component.id, id))
+    .limit(1)
+  if (!record) throw new ApiError(404, 'not_found', 'Component not found')
+  if (record.singleton) throw new ApiError(409, 'conflict', 'Modules cannot be deleted')
   const [deleted] = await db
     .delete(component)
     .where(eq(component.id, id))

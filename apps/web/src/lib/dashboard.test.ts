@@ -49,8 +49,15 @@ function component(id: string, type: Component['type']): Component {
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z'
   }
-  if (type === 'rss') return { ...base, type, config: { feedUrl: 'https://example.org/feed' } }
-  return { ...base, type, config: { url: 'https://example.org' } }
+  switch (type) {
+    case 'rss':
+      return { ...base, type, config: { feedUrl: 'https://example.org/feed' } }
+    case 'translator':
+      return { ...base, type, config: { defaultTargetLanguage: 'en' } }
+    case 'iframe':
+    case 'link':
+      return { ...base, type, config: { url: 'https://example.org' } }
+  }
 }
 
 /** Minimums come from the API's widget list; tests may use larger ones than the definitions. */

@@ -26,10 +26,23 @@ const commaSeparatedOrigins = z.string().transform((value, context) => {
   return origins
 })
 
+const encryptionKey = z.string().transform((value, context) => {
+  const decoded = Buffer.from(value, 'base64')
+  if (decoded.length !== 32 || decoded.toString('base64') !== value) {
+    context.addIssue({
+      code: 'custom',
+      message: 'COMPONENT_SECRETS_KEY must be base64 that decodes to exactly 32 bytes'
+    })
+    return z.NEVER
+  }
+  return decoded
+})
+
 const envSchema = z
   .object({
     PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
     DATABASE_URL: z.string().min(1),
+    COMPONENT_SECRETS_KEY: encryptionKey,
     BETTER_AUTH_URL: z.url(),
     BETTER_AUTH_SECRET: z.string().min(1),
     CORS_ORIGINS: commaSeparatedOrigins,

@@ -3,12 +3,14 @@ import type { Component, ComponentType } from '@justcampus/shared'
 import { iframeAdapter } from './iframe'
 import { linkAdapter } from './link'
 import { rssAdapter } from './rss'
+import { translatorAdapter } from './translator'
 import type { ComponentAdapter, ComponentConfigFieldsProps } from './types'
 
 export const componentAdapters: { [T in ComponentType]: ComponentAdapter<T> } = {
   iframe: iframeAdapter,
   rss: rssAdapter,
-  link: linkAdapter
+  link: linkAdapter,
+  translator: translatorAdapter
 }
 
 export function getAdapter<T extends ComponentType>(type: T): ComponentAdapter<T> {
@@ -21,7 +23,7 @@ type AnyComponentView = ReactComponentType<{ component: Component }>
 interface AnyComponentAdapter {
   Page: AnyComponentView
   ConfigFields: ReactComponentType<ComponentConfigFieldsProps<ComponentType>>
-  sourceUrl: (component: Component) => string
+  sourceUrl?: (component: Component) => string
   externalUrl?: (component: Component) => string
   feedUrl?: (component: Component) => string
   widgets: Readonly<Partial<Record<string, { Tile: AnyComponentView }>>>
@@ -41,6 +43,11 @@ export function adapterOf(componentOrType: Component | ComponentType): AnyCompon
 /** Where a shortcut component leads, or `null` for components that open as a page in the app. */
 export function externalUrlOf(component: Component): string | null {
   return adapterOf(component).externalUrl?.(component) ?? null
+}
+
+/** The address the admin list shows for a component, or `null` for modules, which have none. */
+export function sourceUrlOf(component: Component): string | null {
+  return adapterOf(component).sourceUrl?.(component) ?? null
 }
 
 /** The feed a component shows, whose unread entries its sidebar entry flags, or `null`. */

@@ -18,27 +18,30 @@ import {
   SelectValue,
   Switch
 } from '@ki4jlu/design-system'
-import { COMPONENT_TYPES, componentTypeSchema, type Component } from '@justcampus/shared'
+import { componentTypeSchema, isSingletonType, type AdminComponent } from '@justcampus/shared'
 import { adapterOf, componentAdapters } from '@/adapters/registry'
 import {
   configErrors,
   initialFormState,
+  selectableTypes,
   serverFieldErrors,
   validateComponentForm,
   type ComponentFormState,
   type FieldErrors
 } from '@/lib/component-form'
+import { isSecretSet, secretKeysOf } from '@/lib/component-secrets'
 import { useCreateComponent, useUpdateComponent } from '@/lib/queries'
 import { toast } from '@/lib/toast'
 import { Field } from './field'
 import { IconPicker } from './icon-picker'
+import { SecretField } from './secret-field'
 import { Alert, AlertDescription } from './ui/alert'
 
 interface ComponentFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   /** The component to edit; `null` creates a new one. */
-  component: Component | null
+  component: AdminComponent | null
 }
 
 /** Remounted per component by the caller (`key`), so the form starts from its values. */
@@ -56,6 +59,8 @@ export function ComponentFormDialog({
   const update = useUpdateComponent()
   const pending = create.isPending || update.isPending
   const adapter = adapterOf(state.type)
+  const isModule = component !== null && isSingletonType(component.type)
+  const types = selectableTypes(component)
 
   const set = <K extends keyof ComponentFormState>(key: K, value: ComponentFormState[K]): void =>
     setState((current) => ({ ...current, [key]: value }))
@@ -102,16 +107,23 @@ export function ComponentFormDialog({
               <AlertDescription>{errors.form ?? t('admin.form.saveFailed')}</AlertDescription>
             </Alert>
           ) : null}
-          <Field id={`${formId}-type`} label={t('admin.form.type')} error={errors.type}>
+          <Field
+            id={`${formId}-type`}
+            label={t('admin.form.type')}
+            hint={isModule ? t('admin.form.moduleTypeHint') : undefined}
+            error={errors.type}
+          >
             {(control) => (
               <Select
                 value={state.type}
+                disabled={isModule}
                 onValueChange={(value) => {
                   const type = componentTypeSchema.parse(value)
                   setState((current) => ({
                     ...current,
                     type,
-                    config: componentAdapters[type].defaultConfig
+                    config: componentAdapters[type].defaultConfig,
+                    secrets: {}
                   }))
                 }}
               >
@@ -119,7 +131,7 @@ export function ComponentFormDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {COMPONENT_TYPES.map((type) => (
+                  {types.map((type) => (
                     <SelectItem key={type} value={type}>
                       {t(`componentTypes.${type}`)}
                     </SelectItem>
@@ -172,6 +184,23 @@ export function ComponentFormDialog({
             errors={configErrors(errors)}
             idPrefix={formId}
           />
+          {secretKeysOf(state.type).map((secret) => (
+            <SecretField
+              key={`${state.type}-${secret}`}
+              id={`${formId}-secret-${secret}`}
+              type={state.type}
+              secret={secret}
+              isSet={component?.type === state.type && isSecretSet(component, secret)}
+              draft={state.secrets[secret]}
+              onChange={(draft) =>
+                setState((current) => ({
+                  ...current,
+                  secrets: { ...current.secrets, [secret]: draft }
+                }))
+              }
+              error={errors[`secrets.${secret}`]}
+            />
+          ))}
           <div className="flex items-center justify-between gap-stack-md">
             <Label htmlFor={`${formId}-enabled`}>{t('admin.form.enabled')}</Label>
             <Switch

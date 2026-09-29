@@ -34,8 +34,11 @@ export interface ComponentAdapter<T extends ComponentType> {
   /** The type-specific part of the admin form. */
   ConfigFields: ReactComponentType<ComponentConfigFieldsProps<T>>
   defaultConfig: ComponentConfigOf<T>
-  /** The address the component shows, fetches or opens; the admin list displays it. */
-  sourceUrl: (component: ComponentOf<T>) => string
+  /**
+   * The address the component shows, fetches or opens; the admin list displays it. Modules,
+   * built into the app, have none.
+   */
+  sourceUrl?: (component: ComponentOf<T>) => string
   /**
    * Set for components that live outside the app (shortcuts): sidebar entries,
    * folder entries and tiles open this URL externally instead of `/c/$componentId`.
