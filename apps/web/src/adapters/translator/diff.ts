@@ -1,3 +1,9 @@
+/**
+ * Cells of the LCS table at most (4 MB). Up to a thousand tokens on each
+ * side, about a page of text, get a word diff.
+ */
+export const DIFF_TABLE_MAX = 1_000_000
+
 export type DiffPart = { type: 'equal' | 'insert' | 'delete'; text: string }
 
 /**
@@ -34,6 +40,18 @@ export function diffWords(before: string, after: string): DiffPart[] {
   const midB = b.slice(start, b.length - end)
   const rows = midA.length
   const cols = midB.length
+  // Two long, thoroughly different texts would need a huge table; mark the middle as replaced.
+  if (rows * cols > DIFF_TABLE_MAX) {
+    const parts: DiffPart[] = []
+    const common = (tokens: string[]): void => {
+      if (tokens.length > 0) parts.push({ type: 'equal', text: tokens.join('') })
+    }
+    common(a.slice(0, start))
+    if (rows > 0) parts.push({ type: 'delete', text: midA.join('') })
+    if (cols > 0) parts.push({ type: 'insert', text: midB.join('') })
+    common(a.slice(a.length - end))
+    return parts
+  }
   // LCS lengths of every pair of suffixes, midA[i..] and midB[j..].
   const lengths = new Uint32Array((rows + 1) * (cols + 1))
   const lcs = (i: number, j: number): number => lengths[i * (cols + 1) + j] ?? 0

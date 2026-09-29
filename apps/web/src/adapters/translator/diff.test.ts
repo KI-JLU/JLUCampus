@@ -59,4 +59,15 @@ describe('diffWords', () => {
     expect(side(parts, 'delete')).toBe(before)
     expect(side(parts, 'insert')).toBe(after)
   })
+
+  it('marks the whole middle as replaced when a word diff would be too costly', () => {
+    const before = Array.from({ length: 1100 }, (_, index) => `a${index}`).join(' ')
+    const after = Array.from({ length: 1100 }, (_, index) => `b${index}`).join(' ')
+    expect(diffWords(`Start ${before} Ende`, `Start ${after} Ende`)).toEqual([
+      { type: 'equal', text: 'Start ' },
+      { type: 'delete', text: before },
+      { type: 'insert', text: after },
+      { type: 'equal', text: ' Ende' }
+    ])
+  })
 })

@@ -83,7 +83,9 @@ export function TranslatorPage({ component }: ComponentViewProps<'translator'>):
     return {
       engine,
       // Live editing would send DeepL a request per pause in typing.
-      live: next.live && engine?.kind !== 'deepl',
+      // Only once an AI model is resolved: before the engine list arrives, a request would go
+      // out without an engine and the server would pick its default, maybe DeepL.
+      live: next.live && engine?.kind === 'llm',
       formality: next.formality,
       ...rephraseOptions(next, engine?.kind)
     }

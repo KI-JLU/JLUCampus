@@ -177,7 +177,7 @@ export function TranslatorConfigFields({
                   spellCheck={false}
                   autoComplete="off"
                   aria-invalid={idError ? true : undefined}
-                  aria-describedby={idError ? `${rowId}-error` : undefined}
+                  aria-describedby={idError ? `${rowId}-id-error` : undefined}
                   onChange={(event) => setModel(index, { ...model, id: event.target.value })}
                 />
                 <Label htmlFor={`${rowId}-label`} className="sr-only">
@@ -188,7 +188,7 @@ export function TranslatorConfigFields({
                   value={model.label}
                   autoComplete="off"
                   aria-invalid={labelError ? true : undefined}
-                  aria-describedby={labelError ? `${rowId}-error` : undefined}
+                  aria-describedby={labelError ? `${rowId}-label-error` : undefined}
                   onChange={(event) => setModel(index, { ...model, label: event.target.value })}
                 />
                 <Button
@@ -202,9 +202,14 @@ export function TranslatorConfigFields({
                   <Trash2Icon {...ICON} />
                 </Button>
               </div>
-              {idError || labelError ? (
-                <p id={`${rowId}-error`} className="m-0 text-sm text-error">
-                  {idError ?? labelError}
+              {idError ? (
+                <p id={`${rowId}-id-error`} className="m-0 text-sm text-error">
+                  {idError}
+                </p>
+              ) : null}
+              {labelError ? (
+                <p id={`${rowId}-label-error`} className="m-0 text-sm text-error">
+                  {labelError}
                 </p>
               ) : null}
             </div>
