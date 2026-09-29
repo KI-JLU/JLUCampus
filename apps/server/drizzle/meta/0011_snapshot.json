@@ -1,5 +1,5 @@
 {
-  "id": "54268657-3bb8-49b9-a67a-9a62baf99a2a",
+  "id": "ab2dd059-9951-450d-a246-ce666a071060",
   "prevId": "94a7ad88-9fa8-454b-850f-73d13a035fec",
   "version": "7",
   "dialect": "postgresql",
@@ -1171,6 +1171,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "poll_claimed_at": {
           "name": "poll_claimed_at",
           "type": "timestamp",
@@ -1216,6 +1222,42 @@
             },
             {
               "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "translator_document_status_expires_idx": {
+          "name": "translator_document_status_expires_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "translator_document_expires_idx": {
+          "name": "translator_document_expires_idx",
+          "columns": [
+            {
+              "expression": "expires_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

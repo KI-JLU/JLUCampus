@@ -16,7 +16,15 @@ import {
   TriangleAlertIcon
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Button, Card, Container, Label, SegmentedControl, Textarea } from '@ki4jlu/design-system'
+import {
+  Button,
+  Card,
+  Container,
+  Label,
+  SegmentedControl,
+  Spinner,
+  Textarea
+} from '@ki4jlu/design-system'
 import {
   TRANSLATE_TEXT_MAX,
   TRANSLATOR_DOCUMENT_MAX_BYTES,
@@ -241,7 +249,10 @@ export function TranslatorPage({ component }: ComponentViewProps<'translator'>):
           <AlertDescription>{t('component.translator.notSetUpDescription')}</AlertDescription>
         </Alert>
       ) : null}
-      {documentMode ? (
+      {settings.mode === 'documents' && engines.isPending ? (
+        // Documents were chosen last time; whether they are still offered is not known yet.
+        <Spinner label={t('component.translator.documents.loading')} className="self-center" />
+      ) : documentMode ? (
         <DocumentTranslator
           id={id}
           defaultTarget={component.config.defaultTargetLanguage}

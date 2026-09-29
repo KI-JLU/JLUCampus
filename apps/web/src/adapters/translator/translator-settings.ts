@@ -19,11 +19,11 @@ export const translatorModeSchema = z.enum(TRANSLATOR_MODES)
 export type TranslatorMode = z.infer<typeof translatorModeSchema>
 
 /**
- * The mode shown for the stored one: documents fall back to translating once the module says
- * it does not offer them (`documents` is `undefined` until the engine list arrives).
+ * The mode shown for the stored one: documents only once the module says it offers them
+ * (`documents` is `undefined` until the engine list arrives, or if it failed), else translating.
  */
 export function offeredMode(mode: TranslatorMode, documents: boolean | undefined): TranslatorMode {
-  return mode === 'documents' && documents === false ? 'translate' : mode
+  return mode === 'documents' && documents !== true ? 'translate' : mode
 }
 
 /**

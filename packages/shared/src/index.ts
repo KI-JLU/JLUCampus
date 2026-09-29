@@ -817,6 +817,10 @@ export type TranslatorDocumentExtension = (typeof TRANSLATOR_DOCUMENT_EXTENSIONS
 export const TRANSLATOR_DOCUMENT_MAX_BYTES = 20 * 1024 * 1024
 export const TRANSLATOR_DOCUMENT_TTL_HOURS = 24
 export const TRANSLATOR_DOCUMENT_FILENAME_MAX = 255
+/** Jobs one user may have queued or translating at once. */
+export const TRANSLATOR_DOCUMENT_ACTIVE_MAX = 3
+/** Uploads one user may start within 24 hours; deleted jobs count too. */
+export const TRANSLATOR_DOCUMENT_DAILY_MAX = 50
 
 /** The file's extension if it is one the translator takes, else `null`. */
 export function translatorDocumentExtension(filename: string): TranslatorDocumentExtension | null {
@@ -869,7 +873,10 @@ export const translatorDocumentSchema = z.object({
   /** The name the download gets, e.g. `Bericht_en.docx`. */
   resultFilename: z.string(),
   createdAt: z.string().datetime(),
-  /** After this the server deletes the job and its file. */
+  /**
+   * After this the server deletes the job and its file: `TRANSLATOR_DOCUMENT_TTL_HOURS` after
+   * the upload while it runs, after the translation once it is done.
+   */
   expiresAt: z.string().datetime()
 })
 export type TranslatorDocument = z.infer<typeof translatorDocumentSchema>
@@ -894,6 +901,8 @@ export const API_ERROR_CODES = [
   'feed_unavailable',
   /** `API.module`: the module's upstream service failed or the module lacks a required secret. */
   'module_unavailable',
+  /** `API.translatorDocuments`: the user has too many running jobs or uploads (429). */
+  'rate_limited',
   'internal'
 ] as const
 export const apiErrorCodeSchema = z.enum(API_ERROR_CODES)
@@ -967,7 +976,9 @@ export const API = {
    * `file` and the fields of `translatorDocumentUploadSchema` → 201 with `translatorDocumentSchema`;
    * a missing file, a type outside `TRANSLATOR_DOCUMENT_EXTENSIONS` or more than
    * `TRANSLATOR_DOCUMENT_MAX_BYTES` answers `400 validation`, DeepL refusing it
-   * `502 module_unavailable`.
+   * `502 module_unavailable`. `TRANSLATOR_DOCUMENT_ACTIVE_MAX` running jobs, or
+   * `TRANSLATOR_DOCUMENT_DAILY_MAX` uploads within 24 hours, answer `429 rate_limited`
+   * before anything goes to DeepL.
    */
   translatorDocuments: '/api/modules/translator/documents',
   /**

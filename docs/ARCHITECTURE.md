@@ -88,7 +88,8 @@ translator_document id uuid pk, component_id → component (cascade), user_id �
                   deepl_document_id text, deepl_document_key text (encrypted),
                   result bytea null, result_content_type text null,
                   poll_claimed_at timestamp null, polled_at timestamp null,
-                  created_at, updated_at, expires_at; index (user_id, created_at)
+                  deleted_at timestamp null, created_at, updated_at, expires_at;
+                  indexes (user_id, created_at), (status, expires_at), (expires_at)
 sidebar_entry     user_id → user (cascade), component_id → component (cascade),
                   position int; pk (user_id, component_id)
 feed_read         user_id → user (cascade), feed_url text, read_at timestamp;
@@ -186,13 +187,19 @@ client aborts. Texts only pass through the server.
 
 Document translation needs `documentsEnabled` and a DeepL key. The signed-in
 user can upload a supported file at `/documents`, list unexpired jobs, read or
-delete one at `/documents/:id`, and download its result at
+soft-delete one at `/documents/:id`, and download its result at
 `/documents/:id/download` once done. The original goes straight to DeepL;
 `translator_document` stores metadata, an AES-256-GCM encrypted DeepL document
-key bound to the row id, and the translated bytes. Rows expire after 24 hours.
-A worker checks active jobs every five seconds and deletes expired rows. GET of
-one active job also checks DeepL, at most once every two seconds. A database
-claim makes the worker and GET share the one-time result download safely.
+key bound to the row id, and the translated bytes. Each user may have three
+active jobs and start 50 uploads per rolling 24 hours; deleted jobs count toward
+the latter. Concurrent upload reservations are per Node process. Delete hides
+the row and clears its result; expiry cleanup hard-deletes it. Running jobs
+expire 24 hours after upload; completed jobs expire 24 hours after completion.
+The worker checks active jobs every five seconds, four at a time, and never
+overlaps ticks. GET of one active job also checks DeepL, at most once every two
+seconds. A database claim makes the worker and GET share the one-time result
+download safely. Result storage retries three times; a missing DeepL result
+ends the job with `failed`.
 
 To add a module, add its type, config, secrets and widgets to shared, implement
 and register its server module, then add the web adapter. The typed server

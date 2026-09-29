@@ -5,7 +5,9 @@ import { ApiError } from '../../api.js'
 import type { AppEnvironment } from '../types.js'
 import {
   deeplBaseUrl,
+  DeepLHttpError,
   deeplDetectedLanguage,
+  downloadDocument,
   deeplTargetLanguage,
   translateWithDeepL
 } from './deepl.js'
@@ -86,5 +88,16 @@ describe('DeepL', () => {
     })
     expect(response.status).toBe(502)
     await expect(response.json()).resolves.toMatchObject({ error: { code: 'module_unavailable' } })
+  })
+
+  it('exposes the DeepL HTTP status on failed result downloads', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('', { status: 404 }))
+    )
+    await expect(
+      downloadDocument('doc', 'secret', null, 'key', new AbortController().signal)
+    ).rejects.toMatchObject({ status: 404 })
+    expect(new DeepLHttpError(429).message).toBe('DeepL returned 429')
   })
 })

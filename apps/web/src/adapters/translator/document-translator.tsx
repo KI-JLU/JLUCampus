@@ -11,6 +11,8 @@ import { useTranslation } from 'react-i18next'
 import { Button, Card, FileDropzone, Label, Spinner } from '@ki4jlu/design-system'
 import {
   API,
+  TRANSLATOR_DOCUMENT_ACTIVE_MAX,
+  TRANSLATOR_DOCUMENT_DAILY_MAX,
   TRANSLATOR_DOCUMENT_EXTENSIONS,
   TRANSLATOR_DOCUMENT_MAX_BYTES,
   TRANSLATOR_DOCUMENT_TTL_HOURS,
@@ -39,9 +41,17 @@ interface Upload {
   key: string
   name: string
   size: number
-  /** Why the upload failed; `null` while it runs. */
+  /** Waiting for a free slot (see `TRANSLATOR_DOCUMENT_ACTIVE_MAX`), uploading, or failed. */
+  state: 'waiting' | 'uploading' | 'error'
+  /** Why the upload failed. */
   error: string | null
 }
+
+/** How long to wait before looking again whether a running job has finished. */
+const SLOT_POLL_MS = 3000
+
+const isRunning = (job: TranslatorDocument): boolean =>
+  job.status === 'queued' || job.status === 'translating'
 
 interface DocumentTranslatorProps {
   id: string
@@ -98,18 +108,49 @@ export function DocumentTranslator({
     })
     // The languages as they are now, even if they change while earlier files upload.
     const request = { source, target, formality }
-    for (const file of accepted) {
-      const key = crypto.randomUUID()
-      setUploads((current) => [...current, { key, name: file.name, size: file.size, error: null }])
+    const queued = accepted.map((file) => ({ file, key: crypto.randomUUID() }))
+    const update = (key: string, patch: Partial<Upload>): void =>
+      setUploads((current) =>
+        current.map((item) => (item.key === key ? { ...item, ...patch } : item))
+      )
+    setUploads((current) => [
+      ...current,
+      ...queued.map(({ file, key }) => ({
+        key,
+        name: file.name,
+        size: file.size,
+        state: 'waiting' as const,
+        error: null
+      }))
+    ])
+    for (const { file, key } of queued) {
       try {
+        await waitForSlot()
+        update(key, { state: 'uploading' })
         await upload.mutateAsync({ file, ...request })
         setUploads((current) => current.filter((item) => item.key !== key))
       } catch (error) {
-        const message = t(uploadErrorKey(error))
-        setUploads((current) =>
-          current.map((item) => (item.key === key ? { ...item, error: message } : item))
-        )
+        update(key, {
+          state: 'error',
+          error: t(uploadErrorKey(error), {
+            active: TRANSLATOR_DOCUMENT_ACTIVE_MAX,
+            daily: TRANSLATOR_DOCUMENT_DAILY_MAX
+          })
+        })
       }
+    }
+  }
+
+  /**
+   * The server takes `TRANSLATOR_DOCUMENT_ACTIVE_MAX` running jobs per user; further files wait
+   * here until one of them is done instead of being turned away.
+   */
+  const waitForSlot = async (): Promise<void> => {
+    for (;;) {
+      const { data, error } = await jobs.refetch()
+      if (error) throw error
+      if ((data ?? []).filter(isRunning).length < TRANSLATOR_DOCUMENT_ACTIVE_MAX) return
+      await new Promise((resolve) => setTimeout(resolve, SLOT_POLL_MS))
     }
   }
 
@@ -206,16 +247,20 @@ export function DocumentTranslator({
                 name={item.name}
                 meta={formatSize(item.size, locale)}
                 status={
-                  item.error ? (
+                  item.state === 'error' ? (
                     <StatusText tone="error">{item.error}</StatusText>
                   ) : (
                     <StatusText tone="busy">
-                      {t('component.translator.documents.uploading')}
+                      {t(
+                        item.state === 'waiting'
+                          ? 'component.translator.documents.waiting'
+                          : 'component.translator.documents.uploading'
+                      )}
                     </StatusText>
                   )
                 }
                 actions={
-                  item.error ? (
+                  item.state === 'error' ? (
                     <IconButton
                       label={t('component.translator.documents.dismiss', { name: item.name })}
                       onClick={() =>
@@ -413,15 +458,18 @@ function useJobAnnouncement(jobs: TranslatorDocument[] | undefined): string {
         was !== undefined && was !== job.status && (job.status === 'done' || job.status === 'error')
       )
     })
-    const last = finished.at(-1)
-    if (!last) return
+    if (finished.length === 0) return
     setMessage(
-      t(
-        last.status === 'done'
-          ? 'component.translator.documents.announceDone'
-          : 'component.translator.documents.announceFailed',
-        { name: last.filename }
-      )
+      finished
+        .map((job) =>
+          t(
+            job.status === 'done'
+              ? 'component.translator.documents.announceDone'
+              : 'component.translator.documents.announceFailed',
+            { name: job.filename }
+          )
+        )
+        .join(' ')
     )
   }, [jobs, t])
 
@@ -432,6 +480,7 @@ function uploadErrorKey(
   error: unknown
 ):
   | 'component.translator.documents.uploadInvalid'
+  | 'component.translator.documents.rateLimited'
   | 'component.translator.errors.unavailable'
   | 'component.translator.errors.disabled'
   | 'component.translator.errors.failed' {
@@ -439,6 +488,8 @@ function uploadErrorKey(
   switch (error.code) {
     case 'validation':
       return 'component.translator.documents.uploadInvalid'
+    case 'rate_limited':
+      return 'component.translator.documents.rateLimited'
     case 'module_unavailable':
       return 'component.translator.errors.unavailable'
     case 'not_found':

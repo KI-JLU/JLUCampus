@@ -3,11 +3,13 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { ApiError } from '../../api.js'
 import type { AppEnvironment } from '../types.js'
-import { findDocument } from './documents.js'
+import { uploadDocument } from './deepl.js'
+import { documentQuotaCounts, findDocument } from './documents.js'
 import { translatorApp } from './index.js'
 
 vi.mock('./documents.js', () => ({
   findDocument: vi.fn(),
+  documentQuotaCounts: vi.fn(),
   findDocumentResult: vi.fn(),
   resultFilename: () => 'a_en.pdf',
   publicDocument: vi.fn(),
@@ -15,6 +17,19 @@ vi.mock('./documents.js', () => ({
   listDocuments: vi.fn(),
   pollDocument: vi.fn(),
   startDocumentWorker: vi.fn()
+}))
+vi.mock('./deepl.js', () => ({ uploadDocument: vi.fn() }))
+
+const deleteState = vi.hoisted(() => ({ values: {} as Record<string, unknown> }))
+vi.mock('../../db/index.js', () => ({
+  db: {
+    update: () => ({
+      set: (values: Record<string, unknown>) => {
+        deleteState.values = values
+        return { where: () => ({ returning: async () => [{ id: 'deleted' }] }) }
+      }
+    })
+  }
 }))
 
 function app(userId: string): Hono<AppEnvironment> {
@@ -48,6 +63,66 @@ function app(userId: string): Hono<AppEnvironment> {
 const id = '123e4567-e89b-42d3-a456-426614174000'
 
 describe('document routes', () => {
+  function uploadForm(): FormData {
+    const body = new FormData()
+    body.set('file', new File(['hello'], 'note.txt'))
+    body.set('target', 'en')
+    return body
+  }
+
+  it.each([
+    ['active', { active: 3, daily: 3 }],
+    ['daily', { active: 0, daily: 50 }]
+  ])('rejects the %s quota before DeepL', async (_limit, counts) => {
+    vi.mocked(documentQuotaCounts).mockResolvedValue(counts)
+    vi.mocked(uploadDocument).mockClear()
+    const response = await app('owner').request('http://test/documents', {
+      method: 'POST',
+      body: uploadForm()
+    })
+    expect(response.status).toBe(429)
+    await expect(response.json()).resolves.toEqual({ error: { code: 'rate_limited' } })
+    expect(uploadDocument).not.toHaveBeenCalled()
+  })
+
+  it('counts an upload in flight against a parallel request', async () => {
+    vi.mocked(documentQuotaCounts).mockResolvedValue({ active: 2, daily: 2 })
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    vi.mocked(uploadDocument).mockImplementationOnce(async () => {
+      await gate
+      throw new Error('upstream unavailable')
+    })
+    const first = app('owner').request('http://test/documents', {
+      method: 'POST',
+      body: uploadForm()
+    })
+    await vi.waitFor(() => expect(uploadDocument).toHaveBeenCalledTimes(1))
+    const second = await app('owner').request('http://test/documents', {
+      method: 'POST',
+      body: uploadForm()
+    })
+    expect(second.status).toBe(429)
+    expect(uploadDocument).toHaveBeenCalledTimes(1)
+    release()
+    expect((await first).status).toBe(502)
+  })
+
+  it('soft-deletes and clears the result', async () => {
+    const response = await app('owner').request(`http://test/documents/${id}`, { method: 'DELETE' })
+    expect(response.status).toBe(204)
+    expect(deleteState.values).toMatchObject({
+      deletedAt: expect.any(Date),
+      result: null,
+      resultContentType: null
+    })
+    vi.mocked(findDocument).mockResolvedValue(undefined)
+    const hidden = await app('owner').request(`http://test/documents/${id}`)
+    expect(hidden.status).toBe(404)
+  })
+
   it('answers 404 for another user’s job', async () => {
     vi.mocked(findDocument).mockImplementation(async (_id, _componentId, userId) =>
       userId === 'owner'

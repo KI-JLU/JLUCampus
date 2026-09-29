@@ -5,13 +5,13 @@ import {
   translatorDocumentSchema,
   type TranslatorDocument
 } from '@justcampus/shared'
-import { and, desc, eq, getTableColumns, gt, inArray, isNull, lt, or } from 'drizzle-orm'
+import { and, count, desc, eq, getTableColumns, gt, inArray, isNull, lt, or } from 'drizzle-orm'
 
 import { db } from '../../db/index.js'
 import { component, translatorDocument } from '../../db/schema.js'
 import { env } from '../../env.js'
 import { decryptSecret } from '../../secrets.js'
-import { documentError, documentStatus, downloadDocument } from './deepl.js'
+import { DeepLHttpError, documentError, documentStatus, downloadDocument } from './deepl.js'
 
 export type DocumentRow = typeof translatorDocument.$inferSelect
 /** A job without its translated file, which only the download reads. */
@@ -20,6 +20,35 @@ const running = ['queued', 'translating']
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- taken out so lists never load the file
 const { result, ...summaryColumns } = getTableColumns(translatorDocument)
+
+export async function documentQuotaCounts(
+  userId: string
+): Promise<{ active: number; daily: number }> {
+  const now = new Date()
+  const [active, daily] = await Promise.all([
+    db
+      .select({ value: count() })
+      .from(translatorDocument)
+      .where(
+        and(
+          eq(translatorDocument.userId, userId),
+          inArray(translatorDocument.status, running),
+          isNull(translatorDocument.deletedAt),
+          gt(translatorDocument.expiresAt, now)
+        )
+      ),
+    db
+      .select({ value: count() })
+      .from(translatorDocument)
+      .where(
+        and(
+          eq(translatorDocument.userId, userId),
+          gt(translatorDocument.createdAt, new Date(now.getTime() - 24 * 60 * 60 * 1000))
+        )
+      )
+  ])
+  return { active: active[0]?.value ?? 0, daily: daily[0]?.value ?? 0 }
+}
 
 export function resultFilename(filename: string, target: string): string {
   const extension = translatorDocumentExtension(filename)!
@@ -59,6 +88,7 @@ export async function findDocument(
         eq(translatorDocument.id, id),
         eq(translatorDocument.componentId, componentId),
         eq(translatorDocument.userId, userId),
+        isNull(translatorDocument.deletedAt),
         gt(translatorDocument.expiresAt, new Date())
       )
     )
@@ -83,6 +113,7 @@ export async function findDocumentResult(
         eq(translatorDocument.id, id),
         eq(translatorDocument.componentId, componentId),
         eq(translatorDocument.userId, userId),
+        isNull(translatorDocument.deletedAt),
         gt(translatorDocument.expiresAt, new Date())
       )
     )
@@ -101,6 +132,7 @@ export async function listDocuments(
       and(
         eq(translatorDocument.componentId, componentId),
         eq(translatorDocument.userId, userId),
+        isNull(translatorDocument.deletedAt),
         gt(translatorDocument.expiresAt, new Date())
       )
     )
@@ -121,6 +153,7 @@ export async function pollDocument(
       and(
         eq(translatorDocument.id, id),
         inArray(translatorDocument.status, running),
+        isNull(translatorDocument.deletedAt),
         gt(translatorDocument.expiresAt, now),
         or(
           isNull(translatorDocument.pollClaimedAt),
@@ -141,31 +174,83 @@ export async function pollDocument(
       `translator_document:${row.id}`,
       'document_key'
     )
-    const signal = AbortSignal.timeout(60_000)
-    const status = await documentStatus(row.deeplDocumentId, key, apiUrl, apiKey, signal)
+    const status = await documentStatus(
+      row.deeplDocumentId,
+      key,
+      apiUrl,
+      apiKey,
+      AbortSignal.timeout(15_000)
+    )
     if (status.document_id !== row.deeplDocumentId)
       throw new Error('DeepL returned another document id')
     if (status.status === 'done') {
-      const result = await downloadDocument(row.deeplDocumentId, key, apiUrl, apiKey, signal)
-      await db
-        .update(translatorDocument)
-        .set({
-          status: 'done',
-          secondsRemaining: null,
-          error: null,
-          result: result.bytes,
-          resultContentType: result.contentType,
-          pollClaimedAt: null,
-          polledAt: now,
-          updatedAt: new Date()
-        })
-        .where(
-          and(
-            eq(translatorDocument.id, id),
-            eq(translatorDocument.pollClaimedAt, now),
-            inArray(translatorDocument.status, running)
-          )
+      let downloaded: Awaited<ReturnType<typeof downloadDocument>>
+      try {
+        downloaded = await downloadDocument(
+          row.deeplDocumentId,
+          key,
+          apiUrl,
+          apiKey,
+          AbortSignal.timeout(60_000)
         )
+      } catch (error) {
+        if (
+          error instanceof DeepLHttpError &&
+          error.status >= 400 &&
+          error.status < 500 &&
+          error.status !== 429
+        ) {
+          await db
+            .update(translatorDocument)
+            .set({
+              status: 'error',
+              error: 'failed',
+              secondsRemaining: null,
+              pollClaimedAt: null,
+              polledAt: now,
+              updatedAt: new Date()
+            })
+            .where(
+              and(
+                eq(translatorDocument.id, id),
+                eq(translatorDocument.pollClaimedAt, now),
+                inArray(translatorDocument.status, running),
+                isNull(translatorDocument.deletedAt)
+              )
+            )
+          return
+        }
+        throw error
+      }
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          await db
+            .update(translatorDocument)
+            .set({
+              status: 'done',
+              secondsRemaining: null,
+              error: null,
+              result: downloaded.bytes,
+              resultContentType: downloaded.contentType,
+              expiresAt: documentExpiry(),
+              pollClaimedAt: null,
+              polledAt: now,
+              updatedAt: new Date()
+            })
+            .where(
+              and(
+                eq(translatorDocument.id, id),
+                eq(translatorDocument.pollClaimedAt, now),
+                inArray(translatorDocument.status, running),
+                isNull(translatorDocument.deletedAt)
+              )
+            )
+          break
+        } catch (error) {
+          if (attempt === 2) throw error
+          await new Promise((resolve) => setTimeout(resolve, 100))
+        }
+      }
     } else {
       await db
         .update(translatorDocument)
@@ -181,7 +266,8 @@ export async function pollDocument(
           and(
             eq(translatorDocument.id, id),
             eq(translatorDocument.pollClaimedAt, now),
-            inArray(translatorDocument.status, running)
+            inArray(translatorDocument.status, running),
+            isNull(translatorDocument.deletedAt)
           )
         )
     }
@@ -193,7 +279,8 @@ export async function pollDocument(
         and(
           eq(translatorDocument.id, id),
           eq(translatorDocument.pollClaimedAt, now),
-          inArray(translatorDocument.status, running)
+          inArray(translatorDocument.status, running),
+          isNull(translatorDocument.deletedAt)
         )
       )
     throw error
@@ -220,15 +307,16 @@ export function startDocumentWorker(): () => void {
         .where(
           and(
             inArray(translatorDocument.status, running),
+            isNull(translatorDocument.deletedAt),
             gt(translatorDocument.expiresAt, new Date()),
             eq(component.enabled, true),
             eq(component.type, 'translator')
           )
         )
-      for (const job of jobs) {
+      async function processJob(job: (typeof jobs)[number]): Promise<void> {
         try {
           const parsed = translatorComponentConfigSchema.safeParse(job.config)
-          if (!parsed.success || !parsed.data.documentsEnabled || !job.secrets.deeplApiKey) continue
+          if (!parsed.success || !parsed.data.documentsEnabled || !job.secrets.deeplApiKey) return
           const config = parsed.data
           const key = decryptSecret(
             job.secrets.deeplApiKey,
@@ -240,6 +328,9 @@ export function startDocumentWorker(): () => void {
         } catch (error) {
           console.error('Translator document poll failed', job.id, error)
         }
+      }
+      for (let offset = 0; offset < jobs.length; offset += 4) {
+        await Promise.all(jobs.slice(offset, offset + 4).map(processJob))
       }
     } catch (error) {
       console.error('Translator document worker failed', error)

@@ -1,13 +1,29 @@
 import { Hono } from 'hono'
+import { SQL } from 'drizzle-orm'
+import { PgDialect } from 'drizzle-orm/pg-core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiError } from '../../api.js'
 import type { AppEnvironment } from '../types.js'
 import { documentError, documentStatus, downloadDocument, uploadDocument } from './deepl.js'
-import { resultFilename } from './documents.js'
+import { documentQuotaCounts, resultFilename } from './documents.js'
 import { translatorApp } from './index.js'
 
 afterEach(() => vi.unstubAllGlobals())
+
+const quotaWhere = vi.hoisted(() => [] as SQL[])
+vi.mock('../../db/index.js', () => ({
+  db: {
+    select: () => ({
+      from: () => ({
+        where: (condition: SQL) => {
+          quotaWhere.push(condition)
+          return Promise.resolve([{ value: quotaWhere.length === 1 ? 2 : 49 }])
+        }
+      })
+    })
+  }
+}))
 
 function app(enabled: boolean): Hono<AppEnvironment> {
   const testApp = new Hono<AppEnvironment>()
@@ -37,6 +53,17 @@ function app(enabled: boolean): Hono<AppEnvironment> {
 }
 
 describe('DeepL documents', () => {
+  it('counts deleted uploads toward the daily quota', async () => {
+    quotaWhere.length = 0
+    await expect(documentQuotaCounts('owner')).resolves.toEqual({ active: 2, daily: 49 })
+    const dialect = new PgDialect()
+    const active = dialect.sqlToQuery(quotaWhere[0]!).sql
+    const daily = dialect.sqlToQuery(quotaWhere[1]!).sql
+    expect(active).toContain('"deleted_at" is null')
+    expect(daily).not.toContain('"deleted_at"')
+    expect(daily).toContain('"created_at" >')
+  })
+
   it('sends multipart fields and maps the status and result', async () => {
     const fetch = vi
       .fn()

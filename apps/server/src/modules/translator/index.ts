@@ -8,10 +8,12 @@ import {
   translatorDocumentExtension,
   translatorDocumentListSchema,
   translatorDocumentUploadSchema,
+  TRANSLATOR_DOCUMENT_ACTIVE_MAX,
+  TRANSLATOR_DOCUMENT_DAILY_MAX,
   TRANSLATOR_DOCUMENT_FILENAME_MAX,
   TRANSLATOR_DOCUMENT_MAX_BYTES
 } from '@justcampus/shared'
-import { and, eq, gt } from 'drizzle-orm'
+import { and, eq, gt, isNull } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { basename } from 'node:path'
@@ -28,6 +30,7 @@ import type { AppEnvironment, ModuleRuntime, ServerModule } from '../types.js'
 import { rephraseWithDeepL, translateWithDeepL, uploadDocument } from './deepl.js'
 import {
   documentExpiry,
+  documentQuotaCounts,
   findDocument,
   findDocumentResult,
   listDocuments,
@@ -40,6 +43,9 @@ import { listEngines, resolveDefaultEngine, resolveEngine } from './engines.js'
 import { rephraseWithLlm, translateWithLlm } from './llm.js'
 
 export const translatorApp = new Hono<AppEnvironment>()
+
+// Reservations cover overlapping requests in this Node process. Multiple server processes need a shared lock.
+const uploadsInFlight = new Map<string, number>()
 
 function upstreamSignal(signal: AbortSignal): AbortSignal {
   return AbortSignal.any([signal, AbortSignal.timeout(60_000)])
@@ -120,42 +126,58 @@ translatorApp.post('/documents', async (context) => {
       'Request validation failed',
       validationIssues(parsed.error)
     )
-  const file = new File([uploaded], filename, { type: uploaded.type })
-  let remote: Awaited<ReturnType<typeof uploadDocument>>
+  const userId = context.get('session').user.id
+  const inFlight = uploadsInFlight.get(userId) ?? 0
+  uploadsInFlight.set(userId, inFlight + 1)
   try {
-    remote = await uploadDocument(
-      file,
-      parsed.data,
-      config.deeplApiUrl,
-      secrets.deeplApiKey!,
-      upstreamSignal(context.req.raw.signal)
-    )
-  } catch {
-    throw new ApiError(502, 'module_unavailable', 'Translation service is unavailable')
+    const quota = await documentQuotaCounts(userId)
+    if (
+      quota.active + inFlight >= TRANSLATOR_DOCUMENT_ACTIVE_MAX ||
+      quota.daily + inFlight >= TRANSLATOR_DOCUMENT_DAILY_MAX
+    ) {
+      throw new ApiError(429, 'rate_limited', 'Document upload limit reached')
+    }
+    const file = new File([uploaded], filename, { type: uploaded.type })
+    let remote: Awaited<ReturnType<typeof uploadDocument>>
+    try {
+      remote = await uploadDocument(
+        file,
+        parsed.data,
+        config.deeplApiUrl,
+        secrets.deeplApiKey!,
+        upstreamSignal(context.req.raw.signal)
+      )
+    } catch {
+      throw new ApiError(502, 'module_unavailable', 'Translation service is unavailable')
+    }
+    const id = randomUUID()
+    const [row] = await db
+      .insert(translatorDocument)
+      .values({
+        id,
+        componentId,
+        userId,
+        filename,
+        size: uploaded.size,
+        source: parsed.data.source,
+        target: parsed.data.target,
+        formality: parsed.data.formality,
+        deeplDocumentId: remote.document_id,
+        deeplDocumentKey: encryptSecret(
+          remote.document_key,
+          env.COMPONENT_SECRETS_KEY,
+          `translator_document:${id}`,
+          'document_key'
+        ),
+        expiresAt: documentExpiry()
+      })
+      .returning()
+    return context.json(publicDocument(row!), 201)
+  } finally {
+    const remaining = (uploadsInFlight.get(userId) ?? 1) - 1
+    if (remaining === 0) uploadsInFlight.delete(userId)
+    else uploadsInFlight.set(userId, remaining)
   }
-  const id = randomUUID()
-  const [row] = await db
-    .insert(translatorDocument)
-    .values({
-      id,
-      componentId,
-      userId: context.get('session').user.id,
-      filename,
-      size: uploaded.size,
-      source: parsed.data.source,
-      target: parsed.data.target,
-      formality: parsed.data.formality,
-      deeplDocumentId: remote.document_id,
-      deeplDocumentKey: encryptSecret(
-        remote.document_key,
-        env.COMPONENT_SECRETS_KEY,
-        `translator_document:${id}`,
-        'document_key'
-      ),
-      expiresAt: documentExpiry()
-    })
-    .returning()
-  return context.json(publicDocument(row!), 201)
 })
 
 translatorApp.get('/documents/:id/download', async (context) => {
@@ -203,12 +225,14 @@ translatorApp.get('/documents/:id', async (context) => {
 translatorApp.delete('/documents/:id', async (context) => {
   const { componentId } = documentsRuntime(context)
   const [deleted] = await db
-    .delete(translatorDocument)
+    .update(translatorDocument)
+    .set({ deletedAt: new Date(), result: null, resultContentType: null })
     .where(
       and(
         eq(translatorDocument.id, documentId(context.req.param('id'))),
         eq(translatorDocument.componentId, componentId),
         eq(translatorDocument.userId, context.get('session').user.id),
+        isNull(translatorDocument.deletedAt),
         gt(translatorDocument.expiresAt, new Date())
       )
     )

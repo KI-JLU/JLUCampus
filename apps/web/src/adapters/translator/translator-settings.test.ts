@@ -103,12 +103,12 @@ describe('offeredMode', () => {
     expect(offeredMode('rephrase', undefined)).toBe('rephrase')
   })
 
-  it('keeps documents while offered or not known yet', () => {
+  it('keeps documents while offered', () => {
     expect(offeredMode('documents', true)).toBe('documents')
-    expect(offeredMode('documents', undefined)).toBe('documents')
   })
 
-  it('falls back to translating once documents are not offered', () => {
+  it('translates while documents are not offered or not known', () => {
     expect(offeredMode('documents', false)).toBe('translate')
+    expect(offeredMode('documents', undefined)).toBe('translate')
   })
 })

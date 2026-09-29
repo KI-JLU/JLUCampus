@@ -41,6 +41,12 @@ export function documentError(message: string | undefined): 'same_language' | 'f
     : 'failed'
 }
 
+export class DeepLHttpError extends Error {
+  constructor(readonly status: number) {
+    super(`DeepL returned ${status}`)
+  }
+}
+
 export async function uploadDocument(
   file: File,
   input: { source: TranslatorLanguage | null; target: TranslatorLanguage; formality: string },
@@ -62,7 +68,7 @@ export async function uploadDocument(
     headers: { Authorization: `DeepL-Auth-Key ${apiKey}` },
     body
   })
-  if (!response.ok) throw new Error(`DeepL returned ${response.status}`)
+  if (!response.ok) throw new DeepLHttpError(response.status)
   return documentUploadResponseSchema.parse(await response.json())
 }
 
@@ -101,7 +107,7 @@ export async function downloadDocument(
       body: JSON.stringify({ document_key: documentKey })
     }
   )
-  if (!response.ok) throw new Error(`DeepL returned ${response.status}`)
+  if (!response.ok) throw new DeepLHttpError(response.status)
   return {
     bytes: Buffer.from(await response.arrayBuffer()),
     contentType: response.headers.get('content-type') ?? 'application/octet-stream'
@@ -143,7 +149,7 @@ async function deeplFetch(
     headers: { Authorization: `DeepL-Auth-Key ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   })
-  if (!response.ok) throw new Error(`DeepL returned ${response.status}`)
+  if (!response.ok) throw new DeepLHttpError(response.status)
   return response.json()
 }
 

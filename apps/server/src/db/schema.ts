@@ -140,13 +140,18 @@ export const translatorDocument = pgTable(
     deeplDocumentKey: text('deepl_document_key').notNull(),
     result: bytea('result'),
     resultContentType: text('result_content_type'),
+    deletedAt: timestamp('deleted_at'),
     pollClaimedAt: timestamp('poll_claimed_at'),
     polledAt: timestamp('polled_at'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
     expiresAt: timestamp('expires_at').notNull()
   },
-  (table) => [index('translator_document_user_created_idx').on(table.userId, table.createdAt)]
+  (table) => [
+    index('translator_document_user_created_idx').on(table.userId, table.createdAt),
+    index('translator_document_status_expires_idx').on(table.status, table.expiresAt),
+    index('translator_document_expires_idx').on(table.expiresAt)
+  ]
 )
 
 export const folderTemplate = pgTable(
