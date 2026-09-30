@@ -1,5 +1,8 @@
 import { createContext } from 'react'
 
+/** From here up the shell shows a page's column on the right (`lg`). */
+export const SIDE_PANEL_MEDIA = '(min-width: 64rem)'
+
 /**
  * A column on the right of the shell that a page can fill, from `lg` up (see `PageSidePanel`).
  * The shell shows it only while a page has given it a label.

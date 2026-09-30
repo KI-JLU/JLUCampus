@@ -240,7 +240,9 @@ export const translatorComponentConfigSchema = z.object({
     })
     .default([]),
   /** Engine id (see `translatorEngineIdSchema`) users start with; `null` or unavailable: the first one. */
-  defaultEngine: translatorEngineIdSchema.nullable().default(null)
+  defaultEngine: translatorEngineIdSchema.nullable().default(null),
+  /** Offers document translation (DeepL only, so it also needs the DeepL key). */
+  documentsEnabled: z.boolean().default(false)
 })
 export type TranslatorComponentConfig = z.infer<typeof translatorComponentConfigSchema>
 
@@ -771,7 +773,9 @@ export type TranslatorEngine = z.infer<typeof translatorEngineSchema>
  */
 export const translatorEngineListSchema = z.object({
   engines: z.array(translatorEngineSchema),
-  defaultEngine: translatorEngineIdSchema.nullable()
+  defaultEngine: translatorEngineIdSchema.nullable(),
+  /** Whether documents can be translated: `documentsEnabled` and a DeepL key. */
+  documents: z.boolean()
 })
 export type TranslatorEngineList = z.infer<typeof translatorEngineListSchema>
 
@@ -834,6 +838,96 @@ export const rephraseResponseSchema = z.object({
 })
 export type RephraseResponse = z.infer<typeof rephraseResponseSchema>
 
+/**
+ * Document translation goes through DeepL's document API. The server uploads
+ * the file straight to DeepL (it keeps no copy of the original), follows the
+ * job until it is done, and keeps the translated file for
+ * `TRANSLATOR_DOCUMENT_TTL_HOURS`, so a user can download it again, also
+ * after closing the tab.
+ */
+export const TRANSLATOR_DOCUMENT_EXTENSIONS = [
+  'pdf',
+  'docx',
+  'pptx',
+  'xlsx',
+  'txt',
+  'html',
+  'htm'
+] as const
+export type TranslatorDocumentExtension = (typeof TRANSLATOR_DOCUMENT_EXTENSIONS)[number]
+export const TRANSLATOR_DOCUMENT_MAX_BYTES = 20 * 1024 * 1024
+export const TRANSLATOR_DOCUMENT_TTL_HOURS = 24
+export const TRANSLATOR_DOCUMENT_FILENAME_MAX = 255
+/** Jobs one user may have queued or translating at once. */
+export const TRANSLATOR_DOCUMENT_ACTIVE_MAX = 3
+/** Uploads one user may start within 24 hours; deleted jobs count too. */
+export const TRANSLATOR_DOCUMENT_DAILY_MAX = 50
+
+/** The file's extension if it is one the translator takes, else `null`. */
+export function translatorDocumentExtension(filename: string): TranslatorDocumentExtension | null {
+  const extension = filename.split('.').pop()?.toLowerCase() ?? ''
+  return filename.includes('.') &&
+    (TRANSLATOR_DOCUMENT_EXTENSIONS as readonly string[]).includes(extension)
+    ? (extension as TranslatorDocumentExtension)
+    : null
+}
+
+/** DeepL's job states; `error` carries `translatorDocumentSchema.error`. */
+export const TRANSLATOR_DOCUMENT_STATUSES = ['queued', 'translating', 'done', 'error'] as const
+export const translatorDocumentStatusSchema = z.enum(TRANSLATOR_DOCUMENT_STATUSES)
+export type TranslatorDocumentStatus = z.infer<typeof translatorDocumentStatusSchema>
+
+/** Why a job failed: source and target language are the same, or anything else. */
+export const TRANSLATOR_DOCUMENT_ERRORS = ['same_language', 'failed'] as const
+export const translatorDocumentErrorSchema = z.enum(TRANSLATOR_DOCUMENT_ERRORS)
+export type TranslatorDocumentError = z.infer<typeof translatorDocumentErrorSchema>
+
+/**
+ * The fields of `POST API.translatorDocuments` besides `file` (multipart form
+ * data, so every value is a string; `source` empty or absent: detect).
+ */
+export const translatorDocumentUploadSchema = z.object({
+  source: z
+    .union([z.literal(''), translatorLanguageSchema])
+    .optional()
+    .transform((value) => value || null),
+  target: translatorLanguageSchema,
+  formality: translatorFormalitySchema.default('default')
+})
+export type TranslatorDocumentUpload = z.input<typeof translatorDocumentUploadSchema>
+
+/** One of the current user's document jobs. */
+export const translatorDocumentSchema = z.object({
+  id: z.string().uuid(),
+  /** The uploaded file's name. */
+  filename: z.string(),
+  /** Size of the uploaded file in bytes. */
+  size: z.number().int().nonnegative(),
+  /** `null`: DeepL detected it. */
+  source: translatorLanguageSchema.nullable(),
+  target: translatorLanguageSchema,
+  status: translatorDocumentStatusSchema,
+  /** DeepL's estimate while translating, if it gave one. */
+  secondsRemaining: z.number().int().nonnegative().nullable(),
+  /** Set when `status` is `error`. */
+  error: translatorDocumentErrorSchema.nullable(),
+  /** The name the download gets, e.g. `Bericht_en.docx`. */
+  resultFilename: z.string(),
+  createdAt: z.string().datetime(),
+  /**
+   * After this the server deletes the job and its file: `TRANSLATOR_DOCUMENT_TTL_HOURS` after
+   * the upload while it runs, after the translation once it is done.
+   */
+  expiresAt: z.string().datetime()
+})
+export type TranslatorDocument = z.infer<typeof translatorDocumentSchema>
+
+/** The user's unexpired jobs, newest first. */
+export const translatorDocumentListSchema = z.object({
+  documents: z.array(translatorDocumentSchema)
+})
+export type TranslatorDocumentList = z.infer<typeof translatorDocumentListSchema>
+
 // ---------------------------------------------------------------------------
 // Errors
 // ---------------------------------------------------------------------------
@@ -848,6 +942,8 @@ export const API_ERROR_CODES = [
   'feed_unavailable',
   /** `API.module`: the module's upstream service failed or the module lacks a required secret. */
   'module_unavailable',
+  /** `API.translatorDocuments`: the user has too many running jobs or uploads (429). */
+  'rate_limited',
   'internal'
 ] as const
 export const apiErrorCodeSchema = z.enum(API_ERROR_CODES)
@@ -915,6 +1011,24 @@ export const API = {
   translate: '/api/modules/translator/translate',
   /** POST `rephraseRequestSchema` → `rephraseResponseSchema`. Errors as for `translate`. */
   rephrase: '/api/modules/translator/rephrase',
+  /**
+   * The current user's document jobs; only while `translatorEngineListSchema.documents`,
+   * else `404 not_found`. GET: `translatorDocumentListSchema`. POST: multipart form data with
+   * `file` and the fields of `translatorDocumentUploadSchema` → 201 with `translatorDocumentSchema`;
+   * a missing file, a type outside `TRANSLATOR_DOCUMENT_EXTENSIONS` or more than
+   * `TRANSLATOR_DOCUMENT_MAX_BYTES` answers `400 validation`, DeepL refusing it
+   * `502 module_unavailable`. `TRANSLATOR_DOCUMENT_ACTIVE_MAX` running jobs, or
+   * `TRANSLATOR_DOCUMENT_DAILY_MAX` uploads within 24 hours, answer `429 rate_limited`
+   * before anything goes to DeepL.
+   */
+  translatorDocuments: '/api/modules/translator/documents',
+  /**
+   * One of the current user's jobs (others' answer `404 not_found`). GET: `translatorDocumentSchema`,
+   * with the status checked at DeepL if the job is still running. DELETE → 204.
+   */
+  translatorDocument: (id: string) => `/api/modules/translator/documents/${id}`,
+  /** GET: the translated file as an attachment named `resultFilename`; before `done`, `409 conflict`. */
+  translatorDocumentDownload: (id: string) => `/api/modules/translator/documents/${id}/download`,
   /** GET: `folderTemplateListSchema`, enabled templates with widgets of enabled components. Any signed-in user. */
   folderTemplates: '/api/folder-templates',
   /** Admin only. GET: all templates. POST: `folderTemplateInputSchema` → 201 with `folderTemplateSchema`. */

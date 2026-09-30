@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { TranslatorEngineList } from '@justcampus/shared'
 import {
   DEFAULT_SETTINGS,
+  offeredMode,
   parseSettings,
   rephraseOptions,
   resolveEngine
@@ -56,7 +57,8 @@ describe('resolveEngine', () => {
       { id: 'deepl', kind: 'deepl', label: 'DeepL' },
       { id: 'llm:mistral', kind: 'llm', label: 'Mistral' }
     ],
-    defaultEngine: 'llm:mistral'
+    defaultEngine: 'llm:mistral',
+    documents: false
   }
 
   it('keeps an offered engine', () => {
@@ -69,7 +71,9 @@ describe('resolveEngine', () => {
   })
 
   it('has nothing to offer without engines', () => {
-    expect(resolveEngine('deepl', { engines: [], defaultEngine: null })).toBeNull()
+    expect(
+      resolveEngine('deepl', { engines: [], defaultEngine: null, documents: false })
+    ).toBeNull()
   })
 })
 
@@ -90,5 +94,21 @@ describe('rephraseOptions', () => {
       style: null,
       tone: 'friendly'
     })
+  })
+})
+
+describe('offeredMode', () => {
+  it('keeps text modes', () => {
+    expect(offeredMode('translate', false)).toBe('translate')
+    expect(offeredMode('rephrase', undefined)).toBe('rephrase')
+  })
+
+  it('keeps documents while offered', () => {
+    expect(offeredMode('documents', true)).toBe('documents')
+  })
+
+  it('translates while documents are not offered or not known', () => {
+    expect(offeredMode('documents', false)).toBe('translate')
+    expect(offeredMode('documents', undefined)).toBe('translate')
   })
 })

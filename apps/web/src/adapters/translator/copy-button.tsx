@@ -37,7 +37,7 @@ export function CopyButton({ text, label, className }: CopyButtonProps): React.J
       onClick={() => void copy()}
       className={className}
     >
-      <CopyIcon aria-hidden="true" width="1em" height="1em" />
+      <CopyIcon aria-hidden="true" className="size-4" />
     </Button>
   )
 }

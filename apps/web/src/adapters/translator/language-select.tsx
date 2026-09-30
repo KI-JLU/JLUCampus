@@ -21,6 +21,8 @@ type LanguageSelectProps = Partial<FieldControlProps> & {
   disabled?: boolean
   /** Compact trigger for dashboard tiles. */
   compact?: boolean
+  /** For the translator's language bar: shares a narrow card, only as wide as needed in a wide one. */
+  inBar?: boolean
   className?: string
 } & (
     | {
@@ -41,7 +43,7 @@ type LanguageSelectProps = Partial<FieldControlProps> & {
 
 /** The translator's languages, named in the UI language. */
 export function LanguageSelect(props: LanguageSelectProps): React.JSX.Element {
-  const { id, disabled, compact, className, value, detected } = props
+  const { id, disabled, compact, inBar, className, value, detected } = props
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage ?? i18n.language
   const options = useMemo(() => languageOptions(locale), [locale])
@@ -62,7 +64,11 @@ export function LanguageSelect(props: LanguageSelectProps): React.JSX.Element {
         id={id}
         aria-describedby={props['aria-describedby']}
         aria-invalid={props['aria-invalid']}
-        className={cn(compact && 'h-8 px-3 py-0 text-sm', className)}
+        className={cn(
+          compact && 'h-8 px-3 py-0 text-sm',
+          inBar && 'min-w-0 px-3 text-sm @xl:w-auto @xl:min-w-44 @xl:px-4 @xl:text-base',
+          className
+        )}
       >
         <SelectValue />
       </SelectTrigger>

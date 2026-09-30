@@ -23,6 +23,134 @@ const deeplRephraseResponseSchema = z.object({
     .min(1)
 })
 
+const documentUploadResponseSchema = z.object({
+  document_id: z.string().min(1),
+  document_key: z.string().min(1)
+})
+const documentStatusResponseSchema = z.object({
+  document_id: z.string().min(1),
+  status: z.enum(['queued', 'translating', 'done', 'error']),
+  seconds_remaining: z.number().int().nonnegative().optional(),
+  billed_characters: z.number().int().nonnegative().optional(),
+  error_message: z.string().optional()
+})
+
+export function documentError(message: string | undefined): 'same_language' | 'failed' {
+  return message && /language/i.test(message) && /same|equal/i.test(message)
+    ? 'same_language'
+    : 'failed'
+}
+
+export class DeepLHttpError extends Error {
+  constructor(readonly status: number) {
+    super(`DeepL returned ${status}`)
+  }
+}
+
+/**
+ * The most a translated document may take. Well above what a 20 MB original turns into, but
+ * bounded: the result is held in memory and stored, and `deeplApiUrl` can point anywhere.
+ */
+export const DOCUMENT_RESULT_MAX_BYTES = 50 * 1024 * 1024
+
+/** DeepL's result was larger than `DOCUMENT_RESULT_MAX_BYTES`; it cannot be fetched again. */
+export class DocumentResultTooLargeError extends Error {
+  constructor() {
+    super('Translated document is too large')
+  }
+}
+
+/** The body, read up to `max` bytes: refused early by `Content-Length`, else counted as it streams. */
+export async function readLimited(response: Response, max: number): Promise<Buffer> {
+  const declared = Number(response.headers.get('content-length'))
+  if (declared > max) {
+    await response.body?.cancel()
+    throw new DocumentResultTooLargeError()
+  }
+  if (!response.body) return Buffer.alloc(0)
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    size += value.byteLength
+    if (size > max) {
+      await reader.cancel()
+      throw new DocumentResultTooLargeError()
+    }
+    chunks.push(value)
+  }
+  return Buffer.concat(chunks)
+}
+
+export async function uploadDocument(
+  file: File,
+  input: { source: TranslatorLanguage | null; target: TranslatorLanguage; formality: string },
+  apiUrl: string | null,
+  apiKey: string,
+  signal: AbortSignal
+): Promise<z.infer<typeof documentUploadResponseSchema>> {
+  const body = new FormData()
+  body.append('file', file, file.name)
+  body.append('target_lang', deeplTargetLanguage(input.target))
+  if (input.source) body.append('source_lang', input.source.toUpperCase())
+  if (input.formality !== 'default') {
+    body.append('formality', input.formality === 'formal' ? 'prefer_more' : 'prefer_less')
+  }
+  const response = await fetch(`${deeplBaseUrl(apiUrl, apiKey)}/v2/document`, {
+    method: 'POST',
+    redirect: 'error',
+    signal,
+    headers: { Authorization: `DeepL-Auth-Key ${apiKey}` },
+    body
+  })
+  if (!response.ok) throw new DeepLHttpError(response.status)
+  return documentUploadResponseSchema.parse(await response.json())
+}
+
+export async function documentStatus(
+  documentId: string,
+  documentKey: string,
+  apiUrl: string | null,
+  apiKey: string,
+  signal: AbortSignal
+): Promise<z.infer<typeof documentStatusResponseSchema>> {
+  return documentStatusResponseSchema.parse(
+    await deeplFetch(
+      deeplBaseUrl(apiUrl, apiKey),
+      apiKey,
+      `/v2/document/${encodeURIComponent(documentId)}`,
+      { document_key: documentKey },
+      signal
+    )
+  )
+}
+
+export async function downloadDocument(
+  documentId: string,
+  documentKey: string,
+  apiUrl: string | null,
+  apiKey: string,
+  signal: AbortSignal
+): Promise<{ bytes: Buffer; contentType: string }> {
+  const response = await fetch(
+    `${deeplBaseUrl(apiUrl, apiKey)}/v2/document/${encodeURIComponent(documentId)}/result`,
+    {
+      method: 'POST',
+      redirect: 'error',
+      signal,
+      headers: { Authorization: `DeepL-Auth-Key ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ document_key: documentKey })
+    }
+  )
+  if (!response.ok) throw new DeepLHttpError(response.status)
+  return {
+    bytes: await readLimited(response, DOCUMENT_RESULT_MAX_BYTES),
+    contentType: response.headers.get('content-type') ?? 'application/octet-stream'
+  }
+}
+
 export function deeplBaseUrl(apiUrl: string | null, apiKey: string): string {
   if (apiUrl) return apiUrl.replace(/\/$/, '')
   return apiKey.endsWith(':fx') ? 'https://api-free.deepl.com' : 'https://api.deepl.com'
@@ -58,7 +186,7 @@ async function deeplFetch(
     headers: { Authorization: `DeepL-Auth-Key ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   })
-  if (!response.ok) throw new Error(`DeepL returned ${response.status}`)
+  if (!response.ok) throw new DeepLHttpError(response.status)
   return response.json()
 }
 

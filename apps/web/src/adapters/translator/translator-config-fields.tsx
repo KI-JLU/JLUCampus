@@ -9,9 +9,14 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
+  SelectValue,
+  Switch
 } from '@ki4jlu/design-system'
-import { TRANSLATOR_LLM_MODELS_MAX, type TranslatorLlmModel } from '@justcampus/shared'
+import {
+  TRANSLATOR_DOCUMENT_TTL_HOURS,
+  TRANSLATOR_LLM_MODELS_MAX,
+  type TranslatorLlmModel
+} from '@justcampus/shared'
 import { Field } from '@/components/field'
 import { cn } from '@/lib/utils'
 import type { ComponentConfigFieldsProps } from '../types'
@@ -261,6 +266,22 @@ export function TranslatorConfigFields({
           </Select>
         )}
       </Field>
+      <div className="grid gap-2">
+        <div className="flex items-center justify-between gap-stack-md">
+          <Label htmlFor={`${idPrefix}-documents`}>
+            {t('component.translator.documentsEnabledLabel')}
+          </Label>
+          <Switch
+            id={`${idPrefix}-documents`}
+            checked={config.documentsEnabled}
+            aria-describedby={`${idPrefix}-documents-hint`}
+            onCheckedChange={(documentsEnabled) => onChange({ ...config, documentsEnabled })}
+          />
+        </div>
+        <p id={`${idPrefix}-documents-hint`} className="m-0 text-sm text-on-surface-variant">
+          {t('component.translator.documentsEnabledHint', { hours: TRANSLATOR_DOCUMENT_TTL_HOURS })}
+        </p>
+      </div>
     </>
   )
 }

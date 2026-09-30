@@ -61,7 +61,8 @@ function component(id: string, type: Component['type']): Component {
           deeplApiUrl: null,
           llmBaseUrl: null,
           llmModels: [],
-          defaultEngine: null
+          defaultEngine: null,
+          documentsEnabled: false
         }
       }
     case 'iframe':

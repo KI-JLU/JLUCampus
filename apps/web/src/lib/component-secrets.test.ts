@@ -28,7 +28,8 @@ const translator: AdminComponent = {
     deeplApiUrl: null,
     llmBaseUrl: null,
     llmModels: [],
-    defaultEngine: null
+    defaultEngine: null,
+    documentsEnabled: false
   },
   secrets: { deeplApiKey: true, llmApiKey: false }
 }

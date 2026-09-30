@@ -93,4 +93,13 @@ export async function ensureSingletonComponents(): Promise<void> {
   }
 }
 
+export function startModules(): () => void {
+  const stops = Object.values(moduleRegistry)
+    .map((module) => module.start?.())
+    .filter((stop) => stop !== undefined)
+  return () => {
+    for (const stop of stops) stop()
+  }
+}
+
 export type { AppEnvironment, ServerModule } from './types.js'

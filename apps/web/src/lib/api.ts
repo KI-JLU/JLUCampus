@@ -29,10 +29,12 @@ export function isUnauthorized(error: unknown): boolean {
 interface ApiFetchInit extends Omit<RequestInit, 'body'> {
   /** Sent as the JSON request body. */
   json?: unknown
+  /** Sent as a multipart body (file uploads); the browser sets its content type. */
+  form?: FormData
 }
 
 export async function apiFetch<T>(path: string, init: ApiFetchInit = {}): Promise<T> {
-  const { json, headers: initHeaders, ...rest } = init
+  const { json, form, headers: initHeaders, ...rest } = init
   const headers = new Headers(initHeaders)
   headers.set('Accept', 'application/json')
   if (json !== undefined) headers.set('Content-Type', 'application/json')
@@ -40,7 +42,7 @@ export async function apiFetch<T>(path: string, init: ApiFetchInit = {}): Promis
   const response = await fetch(`${apiBase()}${path}`, {
     ...rest,
     headers,
-    body: json === undefined ? undefined : JSON.stringify(json),
+    body: form ?? (json === undefined ? undefined : JSON.stringify(json)),
     credentials: 'include'
   })
 

@@ -5,7 +5,12 @@ export class ApiError extends Error {
   constructor(
     readonly status: ContentfulStatusCode,
     readonly code:
-      'not_found' | 'validation' | 'conflict' | 'feed_unavailable' | 'module_unavailable',
+      | 'not_found'
+      | 'validation'
+      | 'conflict'
+      | 'rate_limited'
+      | 'feed_unavailable'
+      | 'module_unavailable',
     message: string,
     readonly issues?: Array<{ path: Array<string | number>; message: string }>
   ) {

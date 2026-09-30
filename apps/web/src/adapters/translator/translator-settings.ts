@@ -13,9 +13,18 @@ import {
   type TranslatorEngineList
 } from '@justcampus/shared'
 
-export const TRANSLATOR_MODES = ['translate', 'rephrase'] as const
+/** In HAWKI's order; `documents` only while the module offers it (see `offeredMode`). */
+export const TRANSLATOR_MODES = ['translate', 'documents', 'rephrase'] as const
 export const translatorModeSchema = z.enum(TRANSLATOR_MODES)
 export type TranslatorMode = z.infer<typeof translatorModeSchema>
+
+/**
+ * The mode shown for the stored one: documents only once the module says it offers them
+ * (`documents` is `undefined` until the engine list arrives, or if it failed), else translating.
+ */
+export function offeredMode(mode: TranslatorMode, documents: boolean | undefined): TranslatorMode {
+  return mode === 'documents' && documents !== true ? 'translate' : mode
+}
 
 /**
  * The translator page's settings, remembered per device. Each field falls

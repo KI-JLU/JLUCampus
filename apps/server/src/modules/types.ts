@@ -38,4 +38,5 @@ export interface ServerModule<T extends SingletonComponentType> {
   defaultConfig: ModuleConfigMap[T]
   configSchema: ZodType<ModuleConfigMap[T]>
   app: Hono<AppEnvironment>
+  start?: () => () => void
 }

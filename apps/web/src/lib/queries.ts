@@ -15,6 +15,8 @@ import {
   API,
   rephraseResponseSchema,
   translateResponseSchema,
+  translatorDocumentListSchema,
+  translatorDocumentSchema,
   translatorEngineListSchema,
   type AdminComponent,
   type AdminComponentList,
@@ -38,7 +40,10 @@ import {
   type Sidebar,
   type TranslateRequest,
   type TranslateResponse,
+  type TranslatorDocument,
   type TranslatorEngineList,
+  type TranslatorFormality,
+  type TranslatorLanguage,
   type UserFeed,
   type WidgetList
 } from '@justcampus/shared'
@@ -82,7 +87,8 @@ export const queryKeys = {
   adminPreset: (id: string) => ['admin', 'preset', id] as const,
   adminPresetAudiences: ['admin', 'preset-audiences'] as const,
   feed: (url: string) => ['feed', url] as const,
-  translatorEngines: ['translator', 'engines'] as const
+  translatorEngines: ['translator', 'engines'] as const,
+  translatorDocuments: ['translator', 'documents'] as const
 }
 
 export const meQuery = queryOptions({
@@ -153,6 +159,78 @@ export const translatorEnginesQuery = queryOptions({
 
 export function useTranslatorEngines(): UseQueryResult<TranslatorEngineList> {
   return useQuery(translatorEnginesQuery)
+}
+
+/** How often the document list is fetched again while a job is still running. */
+const DOCUMENT_POLL_MS = 3000
+
+/**
+ * The user's document jobs, newest first. While one is queued or translating the list is
+ * fetched again every few seconds; the server follows the jobs at DeepL in the meantime.
+ */
+export function useTranslatorDocuments(enabled: boolean): UseQueryResult<TranslatorDocument[]> {
+  return useQuery({
+    queryKey: queryKeys.translatorDocuments,
+    queryFn: async ({ signal }) =>
+      translatorDocumentListSchema.parse(
+        await apiFetch<unknown>(API.translatorDocuments, { signal })
+      ).documents,
+    enabled,
+    retry: (count, error) => !(error instanceof ApiRequestError) && count < 2,
+    refetchInterval: (query) =>
+      query.state.data?.some((job) => job.status === 'queued' || job.status === 'translating')
+        ? DOCUMENT_POLL_MS
+        : false
+  })
+}
+
+/** One file with its languages; `source` `null` lets DeepL detect it. */
+export interface DocumentUploadRequest {
+  file: File
+  source: TranslatorLanguage | null
+  target: TranslatorLanguage
+  formality: TranslatorFormality
+}
+
+/** Uploads one document for translation; the new job heads the list right away. */
+export function useUploadTranslatorDocument(): UseMutationResult<
+  TranslatorDocument,
+  Error,
+  DocumentUploadRequest
+> {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ file, source, target, formality }) => {
+      const form = new FormData()
+      form.set('file', file)
+      form.set('source', source ?? '')
+      form.set('target', target)
+      form.set('formality', formality)
+      return translatorDocumentSchema.parse(
+        await apiFetch<unknown>(API.translatorDocuments, { method: 'POST', form })
+      )
+    },
+    onSuccess: (job) => {
+      client.setQueryData<TranslatorDocument[]>(queryKeys.translatorDocuments, (jobs) => [
+        job,
+        ...(jobs ?? []).filter((other) => other.id !== job.id)
+      ])
+      void client.invalidateQueries({ queryKey: queryKeys.translatorDocuments })
+    }
+  })
+}
+
+/** Deletes one of the user's document jobs and its file. */
+export function useDeleteTranslatorDocument(): UseMutationResult<void, Error, string> {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<void>(API.translatorDocument(id), { method: 'DELETE' }),
+    onSuccess: (_, id) => {
+      client.setQueryData<TranslatorDocument[]>(queryKeys.translatorDocuments, (jobs) =>
+        jobs?.filter((job) => job.id !== id)
+      )
+    }
+  })
 }
 
 /** Every component, disabled ones too, with which of its secrets are set. */

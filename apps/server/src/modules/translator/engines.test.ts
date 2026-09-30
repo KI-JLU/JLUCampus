@@ -7,7 +7,8 @@ const config = {
   deeplApiUrl: null,
   llmBaseUrl: 'https://llm.example.test/v1',
   llmModels: [{ id: 'campus-1', label: 'Campus model' }],
-  defaultEngine: 'llm:campus-1'
+  defaultEngine: 'llm:campus-1',
+  documentsEnabled: false
 }
 
 describe('translator engines', () => {

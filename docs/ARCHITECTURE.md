@@ -67,7 +67,11 @@ Copy `.env.example` to `.env` at the repo root. The server loads the root
   API, so session cookies are `SameSite=None; Secure` by default (Chromium and
   Firefox accept Secure cookies from `http://localhost`). `CORS_ORIGINS` and
   Better-Auth `trustedOrigins` list every frontend origin including `app://-`.
-  CORS allows credentials.
+  CORS allows credentials. Because the cookie goes along on cross-site
+  requests and CORS does not stop simple ones (form posts, multipart,
+  `text/plain`), every `/api/*` request other than GET/HEAD/OPTIONS that
+  carries an `Origin` outside `CORS_ORIGINS` and the API's own origin answers
+  `403 forbidden` (`src/origin.ts`).
 - API authorization: every `/api/*` route except `/api/health` and `/api/auth/*`
   requires a session → `401 { error: { code: 'unauthorized' } }`. `/api/admin/*`
   requires `role === 'admin'` → `403 forbidden`.
@@ -82,6 +86,14 @@ component         id uuid pk, name text, type text ('iframe' | 'rss' | 'link' | 
                   icon text null, icon_url text null, config jsonb, enabled bool,
                   singleton bool default false, secrets jsonb default {}, sort_order int,
                   created_at, updated_at
+translator_document id uuid pk, component_id → component (cascade), user_id → user (cascade),
+                  filename text, size int, source text null, target text, formality text,
+                  status text, seconds_remaining int null, error text null,
+                  deepl_document_id text, deepl_document_key text (encrypted),
+                  result bytea null, result_content_type text null,
+                  poll_claimed_at timestamp null, polled_at timestamp null,
+                  deleted_at timestamp null, created_at, updated_at, expires_at;
+                  indexes (user_id, created_at), (status, expires_at), (expires_at)
 sidebar_entry     user_id → user (cascade), component_id → component (cascade),
                   position int; pk (user_id, component_id)
 feed_read         user_id → user (cascade), feed_url text, read_at timestamp;
@@ -153,7 +165,7 @@ a secret, `null` removes it, and an absent key leaves it unchanged.
 
 A module may add tables whose rows reference `component.id`; use that foreign
 key as the module instance and cascade deletes only if the module lifecycle
-allows it. The translator has no module-owned table.
+allows it. Translator documents reference their module's component row.
 
 ### Translator
 
@@ -173,10 +185,26 @@ of engines:
   for a JSON answer, which the server parses leniently.
 
 `GET /api/modules/translator/engines` lists the offered engines and the
-default (`defaultEngine`, else the first). Upstream calls refuse redirects,
-time out after 60 s and are cancelled when the client aborts, which live mode
-does whenever a newer request supersedes one. Nothing is stored: the texts
-only pass through the server.
+default (`defaultEngine`, else the first), plus whether documents are offered.
+Text calls refuse redirects, time out after 60 s and are cancelled when the
+client aborts. Texts only pass through the server.
+
+Document translation needs `documentsEnabled` and a DeepL key. The signed-in
+user can upload a supported file at `/documents`, list unexpired jobs, read or
+soft-delete one at `/documents/:id`, and download its result at
+`/documents/:id/download` once done. The original goes straight to DeepL;
+`translator_document` stores metadata, an AES-256-GCM encrypted DeepL document
+key bound to the row id, and the translated bytes. Each user may have three
+active jobs and start 50 uploads per rolling 24 hours; deleted jobs count toward
+the latter. Concurrent upload reservations are per Node process. Delete hides
+the row and clears its result; expiry cleanup hard-deletes it. Running jobs
+expire 24 hours after upload; completed jobs expire 24 hours after completion.
+The worker checks active jobs every five seconds, four at a time, and never
+overlaps ticks. GET of one active job also checks DeepL, at most once every two
+seconds. A database claim makes the worker and GET share the one-time result
+download safely. Result storage retries three times; a missing DeepL result,
+or one over 50 MiB (checked by `Content-Length` and while streaming), ends
+the job with `failed`. Unavailable documents answer 404 before the body limit.
 
 Desktop components (`DESKTOP_COMPONENT_TYPES`, so far `files`) are built-in
 rows too (`singleton = true`, same rules), created **enabled** with the name
@@ -246,14 +274,20 @@ strings).
   them "Module" and offers no delete, and the component form neither offers
   module types for new components nor lets a module change its type. The
   translator page (`src/adapters/translator/`) switches between translating
-  (`API.translate`) and rephrasing (`API.rephrase`), with settings for
+  (`API.translate`), translating documents (`API.translatorDocuments`, only
+  while the engine list says `documents`; a dropzone and the user's jobs,
+  refetched every 3 s while one runs, downloads are plain links to
+  `API.translatorDocumentDownload`) and rephrasing (`API.rephrase`), with settings for
   engine, formality, writing style and tone, live mode (runs after a pause in
   typing, not offered for DeepL) and "show changes" (a word diff against the
   submitted text or the previous translation). These settings stay in
-  `localStorage`. From `lg` up they sit in a collapsible, resizable column on
-  the right of the shell (`PageSidePanel`: the page portals into a slot the
-  frame shows only while a page fills it), below `lg` in a card under the
-  translator. Languages are named with `Intl.DisplayNames`; the `quick`
+  `localStorage`. The layout follows HAWKI: one card with the language bar,
+  input and result side by side and the submit button. From `lg` up the
+  modes and the settings of the chosen one sit in a collapsible, resizable
+  column on the right of the shell (`PageSidePanel`: the page portals into a
+  slot the frame shows only while a page fills it); below `lg` the modes are
+  a segmented control above the card and the settings a card under it.
+  Languages are named with `Intl.DisplayNames`; the `quick`
   tile translates with the default engine and always detects the source
   language. The component form renders one write-only
   `SecretField` per `COMPONENT_SECRETS[type]` entry (texts under
