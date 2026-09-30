@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildRephrasePrompt, buildTranslationPrompt, parseLlmResponse } from './llm.js'
+import {
+  buildRephrasePrompt,
+  buildTranslationPrompt,
+  parseLlmResponse,
+  parseModelList
+} from './llm.js'
 
 describe('LLM translator prompts', () => {
   it('includes formality in translation prompts', () => {
@@ -34,5 +39,29 @@ describe('LLM response parsing', () => {
       text: 'plain answer',
       detectedLanguage: null
     })
+  })
+})
+
+describe('LLM model list', () => {
+  it('keeps chat models in order, labelled by name or id', () => {
+    expect(
+      parseModelList({
+        object: 'list',
+        data: [
+          { id: 'jlu/qwen3.8-27b', object: 'model', name: 'Qwen 3.8 27B' },
+          { id: 'text-embedding-3-small', object: 'model' },
+          { id: 'jlu/gemma-4-26b-it', object: 'model', name: '  ' },
+          { id: 'whisper-1' },
+          { id: 'jlu/qwen3.8-27b', name: 'Duplicate' }
+        ]
+      })
+    ).toEqual([
+      { id: 'jlu/qwen3.8-27b', label: 'Qwen 3.8 27B' },
+      { id: 'jlu/gemma-4-26b-it', label: 'jlu/gemma-4-26b-it' }
+    ])
+  })
+
+  it('rejects an answer that is not a model list', () => {
+    expect(() => parseModelList({ models: [] })).toThrow()
   })
 })

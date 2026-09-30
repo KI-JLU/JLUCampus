@@ -1,5 +1,6 @@
+import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { PlusIcon, Trash2Icon } from 'lucide-react'
+import { DownloadIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   Button,
@@ -18,9 +19,12 @@ import {
   type TranslatorLlmModel
 } from '@justcampus/shared'
 import { Field } from '@/components/field'
+import { ApiRequestError } from '@/lib/api'
+import { useFetchTranslatorModels } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import type { ComponentConfigFieldsProps } from '../types'
 import { LanguageSelect } from './language-select'
+import { applyFetchedModels } from './llm-models'
 
 /** Radix Select needs a non-empty value; this one stands for "no default engine". */
 const AUTO = 'auto'
@@ -37,20 +41,68 @@ function urlOrNull(value: string): string | null {
   return value.trim() ? value : null
 }
 
+/** What the last model fetch did, told below the model list. */
+type FetchStatus =
+  { kind: 'fetched'; count: number; omitted: number } | { kind: 'empty' | 'invalidUrl' | 'failed' }
+
 /**
  * The translator's engines: DeepL with its optional API URL, and an
- * OpenAI-compatible endpoint with the models offered from it. The API keys
- * follow as secret fields.
+ * OpenAI-compatible endpoint with the models offered from it, which the
+ * endpoint can list itself. The API keys follow as secret fields.
  */
 export function TranslatorConfigFields({
   config,
   onChange,
   errors,
+  secrets,
   idPrefix
 }: ComponentConfigFieldsProps<'translator'>): React.JSX.Element {
   const { t } = useTranslation()
   const modelsId = `${idPrefix}-llm-models`
   const models = config.llmModels
+  const fetchModels = useFetchTranslatorModels()
+  const [fetchStatus, setFetchStatus] = useState<FetchStatus | null>(null)
+  // The fetched models land in the config as it is by then, not as it was when the fetch began.
+  const latestConfig = useRef(config)
+  useEffect(() => {
+    latestConfig.current = config
+  })
+
+  const loadModels = (): void => {
+    const baseUrl = config.llmBaseUrl
+    if (!baseUrl) return
+    // The key as the form will save it: typed, removed, or else the saved one.
+    const key = secrets.llmApiKey
+    const apiKey = key?.remove ? null : key?.value.trim() || undefined
+    setFetchStatus(null)
+    fetchModels.mutate(
+      { baseUrl, apiKey },
+      {
+        onSuccess: (fetched) => {
+          // The address changed meanwhile; these models belong to the old one.
+          if (latestConfig.current.llmBaseUrl !== baseUrl) return
+          if (fetched.length === 0) {
+            setFetchStatus({ kind: 'empty' })
+            return
+          }
+          const result = applyFetchedModels(latestConfig.current, fetched)
+          onChange(result.config)
+          setFetchStatus({
+            kind: 'fetched',
+            count: result.config.llmModels.length,
+            omitted: result.omitted
+          })
+        },
+        onError: (error) =>
+          setFetchStatus({
+            kind:
+              error instanceof ApiRequestError && error.code === 'validation'
+                ? 'invalidUrl'
+                : 'failed'
+          })
+      }
+    )
+  }
 
   const setModel = (index: number, model: TranslatorLlmModel): void => {
     // The default engine follows its model through a changed id.
@@ -220,18 +272,56 @@ export function TranslatorConfigFields({
             </div>
           )
         })}
-        <Button
-          id={`${modelsId}-add`}
-          type="button"
-          variant="secondary"
-          size="sm"
-          disabled={models.length >= TRANSLATOR_LLM_MODELS_MAX}
-          onClick={addModel}
-          className="self-start"
+        <div className="flex flex-wrap gap-2">
+          <Button
+            id={`${modelsId}-add`}
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={models.length >= TRANSLATOR_LLM_MODELS_MAX}
+            onClick={addModel}
+          >
+            <PlusIcon {...ICON} />
+            {t('component.translator.addModel')}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={!config.llmBaseUrl || fetchModels.isPending}
+            aria-describedby={`${modelsId}-fetch-status`}
+            onClick={loadModels}
+          >
+            <DownloadIcon {...ICON} />
+            {fetchModels.isPending
+              ? t('component.translator.fetchingModels')
+              : t('component.translator.fetchModels')}
+          </Button>
+        </div>
+        <p
+          id={`${modelsId}-fetch-status`}
+          aria-live="polite"
+          className={cn(
+            'm-0 text-sm empty:hidden',
+            fetchStatus?.kind === 'fetched' ? 'text-on-surface-variant' : 'text-error'
+          )}
         >
-          <PlusIcon {...ICON} />
-          {t('component.translator.addModel')}
-        </Button>
+          {fetchStatus?.kind === 'fetched'
+            ? [
+                t('component.translator.fetchedModels', { count: fetchStatus.count }),
+                fetchStatus.omitted > 0
+                  ? t('component.translator.fetchedModelsOmitted', {
+                      count: fetchStatus.omitted,
+                      max: TRANSLATOR_LLM_MODELS_MAX
+                    })
+                  : null
+              ]
+                .filter(Boolean)
+                .join(' ')
+            : fetchStatus
+              ? t(`component.translator.fetchModelsErrors.${fetchStatus.kind}`)
+              : null}
+        </p>
         <p id={`${modelsId}-hint`} className="m-0 text-sm text-on-surface-variant">
           {t('component.translator.llmModelsHint', { max: TRANSLATOR_LLM_MODELS_MAX })}
         </p>

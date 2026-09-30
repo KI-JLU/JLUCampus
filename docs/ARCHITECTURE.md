@@ -155,7 +155,10 @@ but cannot create, delete or change the type of one.
 Each server module supplies its defaults, config schema and a Hono sub-app in
 `apps/server/src/modules`. Its routes live below `/api/modules/<type>` and use
 the normal session middleware. The module middleware only loads enabled
-singleton rows. Missing or disabled modules answer `404 not_found`.
+singleton rows. Missing or disabled modules answer `404 not_found`. A module
+may add an admin sub-app below `/api/admin/modules/<type>`; it runs after the
+admin check and also loads disabled rows, so admins can set a module up before
+enabling it.
 
 `component.secrets` maps secret names to AES-256-GCM ciphertexts. The server
 uses `COMPONENT_SECRETS_KEY`, a base64-encoded 32-byte key. Each ciphertext has
@@ -182,7 +185,12 @@ of engines:
 - **Models of an OpenAI-compatible endpoint** (`llmBaseUrl` up to `/v1`, the
   admin-listed `llmModels`, optional `llmApiKey`), engine id `llm:<model id>`.
   Requests go to `/chat/completions` with prompts ported from HAWKI and ask
-  for a JSON answer, which the server parses leniently.
+  for a JSON answer, which the server parses leniently. The admin form fills
+  `llmModels` from the endpoint's `GET /models` (through
+  `POST /api/admin/modules/translator/models`, with the key typed in the form
+  or the saved one): chat models in the endpoint's order, labelled by their
+  `name` or id, without embedding, speech and image models. Display names the
+  admin gave stay; the list is saved like any other config change.
 
 `GET /api/modules/translator/engines` lists the offered engines and the
 default (`defaultEngine`, else the first), plus whether documents are offered.

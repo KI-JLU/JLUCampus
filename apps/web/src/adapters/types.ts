@@ -1,5 +1,6 @@
 import type { ComponentType as ReactComponentType } from 'react'
 import type { Component, ComponentType, DesktopModuleId, WidgetKey } from '@justcampus/shared'
+import type { SecretDrafts } from '@/lib/component-secrets'
 
 export type ComponentOf<T extends ComponentType> = Extract<Component, { type: T }>
 export type ComponentConfigOf<T extends ComponentType> = ComponentOf<T>['config']
@@ -13,6 +14,8 @@ export interface ComponentConfigFieldsProps<T extends ComponentType> {
   onChange: (config: ComponentConfigOf<T>) => void
   /** Validation messages keyed by the path inside `config`, e.g. `url`. */
   errors: Partial<Record<string, string>>
+  /** The secrets as typed in the form so far (see `SecretField`), not yet saved. */
+  secrets: SecretDrafts
   /** Prefix for element ids, unique per form. */
   idPrefix: string
 }
