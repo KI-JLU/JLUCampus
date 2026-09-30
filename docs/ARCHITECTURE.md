@@ -329,7 +329,8 @@ import.meta.env.VITE_API_URL ?? ''` as base and `credentials: 'include'`.
   tray unless the user turned that off.
 - Sign-in navigates the main window to Keycloak and back; the server's final
   redirect targets `app://-/`. Main handles `will-redirect` / `will-navigate`
-  to `app://` by loading the URL itself if Chromium does not follow it.
+  to `app://` by loading the URL itself if Chromium does not follow it. Only
+  main-frame redirects count: embedded sites redirect inside their iframe.
 - CSP via `session.webRequest.onHeadersReceived`: `default-src 'self'`,
   `connect-src` the API origin, `frame-src https: http://localhost:*`,
   `img-src 'self' https: data:`, fonts and styles self/inline.
