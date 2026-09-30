@@ -67,6 +67,8 @@ function component(id: string, type: Component['type']): Component {
     case 'iframe':
     case 'link':
       return { ...base, type, config: { url: 'https://example.org' } }
+    case 'files':
+      return { ...base, type, config: {} }
   }
 }
 

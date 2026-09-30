@@ -613,5 +613,7 @@ export function toComponentInput(component: Component): ComponentInput {
       return { ...base, type: component.type, config: component.config }
     case 'translator':
       return { ...base, type: component.type, config: component.config }
+    case 'files':
+      return { ...base, type: component.type, config: component.config }
   }
 }

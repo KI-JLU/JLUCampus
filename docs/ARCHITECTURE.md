@@ -78,7 +78,7 @@ Better-Auth tables (`user`, `session`, `account`, `verification`) as generated
 by the Better-Auth CLI, plus:
 
 ```
-component         id uuid pk, name text, type text ('iframe' | 'rss' | 'link' | 'translator'),
+component         id uuid pk, name text, type text ('iframe' | 'rss' | 'link' | 'translator' | 'files'),
                   icon text null, icon_url text null, config jsonb, enabled bool,
                   singleton bool default false, secrets jsonb default {}, sort_order int,
                   created_at, updated_at
@@ -177,6 +177,12 @@ default (`defaultEngine`, else the first). Upstream calls refuse redirects,
 time out after 60 s and are cancelled when the client aborts, which live mode
 does whenever a newer request supersedes one. Nothing is stored: the texts
 only pass through the server.
+
+Desktop components (`DESKTOP_COMPONENT_TYPES`, so far `files`) are built-in
+rows too (`singleton = true`, same rules), created **enabled** with the name
+and icon from `desktopComponentDefaults` and an empty config. They have no
+server module: their page and everything it does live in the desktop app (see
+[Desktop modules](DESKTOP-MODULES.md)).
 
 To add a module, add its type, config, secrets and widgets to shared, implement
 and register its server module, then add the web adapter. The typed server
@@ -277,8 +283,16 @@ import.meta.env.VITE_API_URL ?? ''` as base and `credentials: 'include'`.
   `app://-/` with an SPA fallback to `index.html`. In development it loads
   `http://localhost:5173` instead.
 - Preload exposes `window.justCampus` (`DesktopBridge` from shared):
-  `platform`, `apiUrl` (`JUSTCAMPUS_API_URL` env, else the build-time
-  `DESKTOP_API_URL`, else `http://localhost:3000`), `openExternal`.
+  `platform`, `os`, `apiUrl` (`JUSTCAMPUS_API_URL` env, else the build-time
+  `DESKTOP_API_URL`, else `http://localhost:3000`), `openExternal`,
+  `onNavigate`, `setLanguage` and `modules`, the desktop modules
+  (`notifications`, `files`, `system`). Each module is a main-process part in
+  `src/main/modules/` plus UI in the web build that stays dormant without the
+  bridge; see [docs/DESKTOP-MODULES.md](DESKTOP-MODULES.md). Their local state
+  is `desktop-settings.json` in `userData`.
+- The app holds a single-instance lock and handles `jlucampus://` links
+  (`protocols` in `electron-builder.yml`); closing the window keeps it in the
+  tray unless the user turned that off.
 - Sign-in navigates the main window to Keycloak and back; the server's final
   redirect targets `app://-/`. Main handles `will-redirect` / `will-navigate`
   to `app://` by loading the URL itself if Chromium does not follow it.

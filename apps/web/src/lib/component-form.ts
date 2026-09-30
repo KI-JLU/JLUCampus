@@ -2,7 +2,7 @@ import type { TFunction } from 'i18next'
 import {
   COMPONENT_TYPES,
   componentInputSchema,
-  isSingletonType,
+  isBuiltInType,
   SECRET_VALUE_MAX,
   TRANSLATOR_LLM_MODELS_MAX,
   type AdminComponent,
@@ -28,14 +28,14 @@ export interface ComponentFormState {
 export type FieldErrors = Partial<Record<string, string>>
 
 /**
- * The types the type field offers. Modules are created by the server, one
- * per type, and a component's type cannot change into or out of a module
- * type: a new or ordinary component chooses among the ordinary types, a
- * module keeps its own.
+ * The types the type field offers. Built-in components (modules, desktop
+ * components) are created by the server, one per type, and a component's type
+ * cannot change into or out of a built-in type: a new or ordinary component
+ * chooses among the ordinary types, a built-in one keeps its own.
  */
 export function selectableTypes(component: AdminComponent | null): readonly ComponentType[] {
-  if (component && isSingletonType(component.type)) return [component.type]
-  return COMPONENT_TYPES.filter((type) => !isSingletonType(type))
+  if (component && isBuiltInType(component.type)) return [component.type]
+  return COMPONENT_TYPES.filter((type) => !isBuiltInType(type))
 }
 
 export function initialFormState(component: AdminComponent | null): ComponentFormState {

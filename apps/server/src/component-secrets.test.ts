@@ -32,5 +32,7 @@ describe('componentTypeChangeConflicts', () => {
   it('prevents changing an ordinary component into a module', () => {
     expect(componentTypeChangeConflicts({ type: 'rss', singleton: false }, 'link')).toBe(false)
     expect(componentTypeChangeConflicts({ type: 'rss', singleton: false }, 'translator')).toBe(true)
+    expect(componentTypeChangeConflicts({ type: 'rss', singleton: false }, 'files')).toBe(true)
+    expect(componentTypeChangeConflicts({ type: 'files', singleton: true }, 'link')).toBe(true)
   })
 })

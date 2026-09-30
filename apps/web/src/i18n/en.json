@@ -229,13 +229,19 @@
         "modelId": "Enter a model ID of at most 200 characters.",
         "modelLabel": "Enter a display name of at most 80 characters."
       }
+    },
+    "files": {
+      "configNote": "Nothing to set up here: everyone sets up their places in the desktop app on their device.",
+      "desktopOnlyTitle": "Only available in the desktop app",
+      "desktopOnlyDescription": "Open the files and network drives of your computer in the JLU Campus desktop app."
     }
   },
   "componentTypes": {
     "iframe": "Embedded website",
     "rss": "RSS feed",
     "link": "Shortcut",
-    "translator": "Translator"
+    "translator": "Translator",
+    "files": "Files & drives"
   },
   "shortcut": {
     "new": "New shortcut",
@@ -339,7 +345,8 @@
       "edit": "Edit {{name}}",
       "delete": "Delete {{name}}",
       "toggleFailed": "The component could not be changed.",
-      "reorderFailed": "The order could not be saved."
+      "reorderFailed": "The order could not be saved.",
+      "desktop": "Desktop"
     },
     "form": {
       "createTitle": "New component",
@@ -377,7 +384,8 @@
         "url": "Enter a full https address (http only for localhost).",
         "externalUrl": "Enter a full web address starting with http:// or https://.",
         "secret": "Enter at most {{max}} characters."
-      }
+      },
+      "desktopTypeHint": "Desktop components are built into JLU Campus and only visible in the desktop app; their type cannot be changed."
     },
     "delete": {
       "title": "Delete component?",
@@ -528,7 +536,8 @@
       "droppedSidebar": "{{name}} dropped in the sidebar, position {{position}} of {{total}}.",
       "droppedAvailable": "{{name}} is with the available components.",
       "cancelled": "Moving cancelled, {{name}} stays where it was."
-    }
+    },
+    "desktopBadge": "Desktop app only"
   },
   "moreApps": {
     "hint": "Drag apps into the sidebar and arrange them there, or use +. Dragged back here, they leave the sidebar.",
@@ -539,5 +548,88 @@
     "noMatches": "No app matches “{{query}}”.",
     "matches_one": "{{count}} app found.",
     "matches_other": "{{count}} apps found."
+  },
+  "desktop": {
+    "settings": {
+      "title": "Desktop app"
+    },
+    "settingsLoadFailed": "The settings could not be loaded.",
+    "settingsSaveFailed": "The setting could not be saved. Please try again.",
+    "notifications": {
+      "name": "Notifications & tray",
+      "enabled": "Notify me about new feed entries",
+      "enabledDescription": "Announces new entries of the feeds in your sidebar, even while the window is in the background.",
+      "closeToTray": "Keep running in the tray when closed",
+      "closeToTrayDescription": "The window closes, JLU Campus stays in the tray and keeps announcing new entries.",
+      "test": "Check notifications",
+      "testDescription": "Shows a notification the way JLU Campus sends them on this device.",
+      "testOff": "Turn on notifications first.",
+      "sendTest": "Send test notification",
+      "testBody": "This is what notifications from JLU Campus look like.",
+      "testFailed": "The test notification could not be sent.",
+      "newEntries_one": "{{count}} new entry",
+      "newEntries_other": "{{count}} new entries"
+    },
+    "files": {
+      "description": "Your folders and network drives at a glance. They open in your computer's file manager.",
+      "addFolder": "Add folder",
+      "connectNetwork": "Connect network drive",
+      "places": "Places",
+      "placesFailed": "The places could not be loaded.",
+      "recent": "Recently downloaded",
+      "recentFailed": "The downloads could not be loaded.",
+      "recentEmpty": "There are no files in the Downloads folder yet.",
+      "standard": {
+        "downloads": "Downloads",
+        "documents": "Documents",
+        "desktop": "Desktop"
+      },
+      "reachable": "Reachable",
+      "unreachable": "Not reachable",
+      "missing": "Not found",
+      "vpnHint": "Connected to the VPN? Outside the university network, network drives are only reachable through the JLU VPN.",
+      "open": "Open",
+      "openPlace": "Open {{name}}",
+      "openFile": "Open {{name}}",
+      "notOpenable": "Program, not opened here",
+      "remove": "Remove {{name}}",
+      "showInExplorer": "Show in Explorer",
+      "showInFinder": "Show in Finder",
+      "showInFolder": "Show in folder",
+      "openFailed": "This could not be opened. It may have been moved or deleted.",
+      "addFailed": "The folder could not be added.",
+      "removeFailed": "The place could not be removed.",
+      "dropTitle": "Drop a folder here to add it",
+      "dropHint": "Only folders can be added, not files.",
+      "dropNotFolder": "“{{name}}” is not a folder and was not added.",
+      "network": {
+        "title": "Connect network drive",
+        "description": "Add a share on the network, such as a drive of your institute. Your operating system takes care of signing in.",
+        "address": "Address",
+        "addressHint": "As in your file manager: \\\\server\\share on Windows, smb://server/share on macOS and Linux.",
+        "addressRequired": "Enter the address of the share.",
+        "addressInvalid": "This address cannot be connected. Check how it is written.",
+        "placeholder": "smb://server/share",
+        "placeholderWindows": "\\\\server\\share",
+        "name": "Name (optional)",
+        "nameHint": "Leave empty to use the name of the share.",
+        "connect": "Connect",
+        "connecting": "Connecting …"
+      }
+    },
+    "system": {
+      "name": "Autostart & links",
+      "autostart": "Start with the computer",
+      "autostartDescription": "JLU Campus starts when you sign in to your computer.",
+      "autostartUnsupported": "Only available in the installed app.",
+      "links": "{{scheme}}://… links open this app",
+      "linksDescription": "Copied desktop links open the page directly in JLU Campus.",
+      "linksOffDescription": "Another app handles these links. Reinstall JLU Campus to change that.",
+      "yes": "Yes",
+      "no": "No",
+      "copyLink": "Copy desktop link",
+      "linkCopied": "Link copied",
+      "copyLinkFailed": "The link could not be copied."
+    }
   }
 }

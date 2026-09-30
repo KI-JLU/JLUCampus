@@ -62,12 +62,13 @@ export const TILE_DEFAULT_H = 6
 /**
  * Component adapters: `iframe` embeds a site, `rss` shows a feed, `link` is a
  * shortcut that opens its URL outside the app, `translator` is a module (see
- * `SINGLETON_COMPONENT_TYPES`). The type decides the page and the widgets a
+ * `SINGLETON_COMPONENT_TYPES`), `files` a desktop component (see
+ * `DESKTOP_COMPONENT_TYPES`). The type decides the page and the widgets a
  * component adds (see `COMPONENT_WIDGETS`). A future adapter (Stud.IP, …) adds
  * a literal here, a config schema, its widgets, and a renderer in the web
  * app's adapter registry.
  */
-export const COMPONENT_TYPES = ['iframe', 'rss', 'link', 'translator'] as const
+export const COMPONENT_TYPES = ['iframe', 'rss', 'link', 'translator', 'files'] as const
 export const componentTypeSchema = z.enum(COMPONENT_TYPES)
 export type ComponentType = z.infer<typeof componentTypeSchema>
 
@@ -84,6 +85,29 @@ export type SingletonComponentType = (typeof SINGLETON_COMPONENT_TYPES)[number]
 
 export function isSingletonType(type: ComponentType): type is SingletonComponentType {
   return (SINGLETON_COMPONENT_TYPES as readonly ComponentType[]).includes(type)
+}
+
+/**
+ * Desktop components: the catalogue's reference to a desktop module that has
+ * a page (see `DESKTOP_MODULE_IDS`). The page and everything it does live in
+ * the Electron app; the row only lets users place the page in their sidebar
+ * like any other component, and admins put it into layout presets. Like a
+ * module, each type exists as one component that the server creates (enabled,
+ * there is nothing to configure) and nobody can create a second of or delete.
+ * It has no endpoints, no secrets and no widgets. The web app and PWA hide
+ * these components; a type's name is the id of its desktop module.
+ */
+export const DESKTOP_COMPONENT_TYPES = ['files'] as const satisfies readonly (ComponentType &
+  DesktopModuleId)[]
+export type DesktopComponentType = (typeof DESKTOP_COMPONENT_TYPES)[number]
+
+export function isDesktopComponentType(type: ComponentType): type is DesktopComponentType {
+  return (DESKTOP_COMPONENT_TYPES as readonly ComponentType[]).includes(type)
+}
+
+/** Types the server creates itself, once each: modules and desktop components. */
+export function isBuiltInType(type: ComponentType): boolean {
+  return isSingletonType(type) || isDesktopComponentType(type)
 }
 
 /** `https:` anywhere, `http:` only for loopback hosts in development. */
@@ -145,6 +169,10 @@ export const linkComponentConfigSchema = z.object({
   url: externalUrlSchema
 })
 export type LinkComponentConfig = z.infer<typeof linkComponentConfigSchema>
+
+/** Desktop components keep their settings on the device, so their config is empty. */
+export const desktopComponentConfigSchema = z.strictObject({})
+export type DesktopComponentConfig = z.infer<typeof desktopComponentConfigSchema>
 
 /** Languages the translator offers, as ISO 639-1 codes. */
 export const TRANSLATOR_LANGUAGES = [
@@ -217,7 +245,11 @@ export const translatorComponentConfigSchema = z.object({
 export type TranslatorComponentConfig = z.infer<typeof translatorComponentConfigSchema>
 
 export type ComponentConfig =
-  IframeComponentConfig | RssComponentConfig | LinkComponentConfig | TranslatorComponentConfig
+  | IframeComponentConfig
+  | RssComponentConfig
+  | LinkComponentConfig
+  | TranslatorComponentConfig
+  | DesktopComponentConfig
 
 // ---------------------------------------------------------------------------
 // Component secrets (admin-only settings such as API keys)
@@ -233,7 +265,8 @@ export const COMPONENT_SECRETS = {
   iframe: [],
   rss: [],
   link: [],
-  translator: ['deeplApiKey', 'llmApiKey']
+  translator: ['deeplApiKey', 'llmApiKey'],
+  files: []
 } as const satisfies { [T in ComponentType]: readonly string[] }
 
 export type SecretKey<T extends ComponentType = ComponentType> = T extends ComponentType
@@ -281,9 +314,9 @@ const componentBaseSchema = z.object({
 })
 
 /**
- * What an admin sends to create or fully replace a component. Module types
- * (`SINGLETON_COMPONENT_TYPES`) cannot be created, only replaced, and a
- * component's type cannot change into or out of a module type.
+ * What an admin sends to create or fully replace a component. Built-in types
+ * (modules and desktop components, see `isBuiltInType`) cannot be created,
+ * only replaced, and a component's type cannot change into or out of one.
  */
 export const componentInputSchema = z.discriminatedUnion('type', [
   componentBaseSchema.extend({ type: z.literal('iframe'), config: iframeComponentConfigSchema }),
@@ -293,7 +326,8 @@ export const componentInputSchema = z.discriminatedUnion('type', [
     type: z.literal('translator'),
     config: translatorComponentConfigSchema,
     secrets: translatorSecretsInputSchema
-  })
+  }),
+  componentBaseSchema.extend({ type: z.literal('files'), config: desktopComponentConfigSchema })
 ])
 export type ComponentInput = z.infer<typeof componentInputSchema>
 
@@ -313,7 +347,8 @@ export const componentSchema = z.discriminatedUnion('type', [
   storedComponentSchema.extend({
     type: z.literal('translator'),
     config: translatorComponentConfigSchema
-  })
+  }),
+  storedComponentSchema.extend({ type: z.literal('files'), config: desktopComponentConfigSchema })
 ])
 export type Component = z.infer<typeof componentSchema>
 
@@ -341,6 +376,11 @@ export const adminComponentSchema = z.discriminatedUnion('type', [
     type: z.literal('translator'),
     config: translatorComponentConfigSchema,
     secrets: translatorSecretsStatusSchema
+  }),
+  storedComponentSchema.extend({
+    type: z.literal('files'),
+    config: desktopComponentConfigSchema,
+    secrets: noSecretsStatusSchema
   })
 ])
 export type AdminComponent = z.infer<typeof adminComponentSchema>
@@ -375,7 +415,8 @@ export const COMPONENT_WIDGETS = {
   iframe: { launcher: { minW: TILE_MIN_W, minH: TILE_MIN_H } },
   rss: { feed: { minW: TILE_MIN_W, minH: TILE_MIN_H } },
   link: { shortcut: { minW: TILE_MIN_W, minH: TILE_MIN_H } },
-  translator: { quick: { minW: 3, minH: 5 } }
+  translator: { quick: { minW: 3, minH: 5 } },
+  files: {}
 } as const satisfies { [T in ComponentType]: Record<string, WidgetDefinition> }
 
 export type WidgetKey<T extends ComponentType = ComponentType> = T extends ComponentType
@@ -916,16 +957,171 @@ export const KEYCLOAK_PROVIDER_ID = 'keycloak'
 // ---------------------------------------------------------------------------
 
 /**
+ * Desktop modules: features only the desktop app offers, because they need the
+ * operating system (tray, native notifications, the file system, autostart,
+ * `jlucampus://` links). Their code lives entirely in the Electron app: the
+ * main process implements them, the preload exposes each one as
+ * `DesktopBridge.modules[id]`, and the web app draws their UI only when the
+ * bridge offers them, so the web app and PWA never show them. A module with a
+ * page also has a desktop component (`DESKTOP_COMPONENT_TYPES`), so its page
+ * sits in sidebars and presets like any component. See
+ * `docs/DESKTOP-MODULES.md`.
+ */
+export const DESKTOP_MODULE_IDS = ['notifications', 'files', 'system'] as const
+export type DesktopModuleId = (typeof DESKTOP_MODULE_IDS)[number]
+
+/** The scheme of links that open the desktop app on a page: `jlucampus://c/<id>`. */
+export const DESKTOP_LINK_SCHEME = 'jlucampus'
+
+/**
+ * The in-app path a desktop link points at (`jlucampus://c/abc` → `/c/abc`),
+ * or `null` if the value is no such link or leaves the app.
+ */
+export function desktopLinkPath(value: string): string | null {
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    return null
+  }
+  if (url.protocol !== `${DESKTOP_LINK_SCHEME}:`) return null
+  // `jlucampus://c/abc`: the first segment parses as the host.
+  const path = `/${url.host}${url.pathname}`.replace(/\/+$/, '') || '/'
+  return isAppPath(path) ? `${path}${url.search}` : null
+}
+
+/** The desktop link for an in-app path (`/c/abc` → `jlucampus://c/abc`). */
+export function desktopLinkFor(path: string): string {
+  return `${DESKTOP_LINK_SCHEME}://${path.replace(/^\/+/, '')}`
+}
+
+/** Whether `path` is a path inside the app: absolute, not protocol-relative, no dot segments. */
+export function isAppPath(path: string): boolean {
+  return (
+    path.startsWith('/') &&
+    !path.startsWith('//') &&
+    !path.includes('\\') &&
+    !path.split('/').some((segment) => segment === '..' || segment === '.')
+  )
+}
+
+/** Tray and native notifications ("Benachrichtigungen & Tray"). */
+export interface DesktopNotificationSettings {
+  /** Native notifications for new feed entries. */
+  enabled: boolean
+  /** Closing the window keeps the app running in the tray. */
+  closeToTray: boolean
+}
+
+export interface DesktopNotification {
+  title: string
+  body: string
+  /** In-app path opened when the notification is clicked, e.g. `/c/<id>`. */
+  path: string
+}
+
+export interface DesktopNotificationsBridge {
+  getSettings: () => Promise<DesktopNotificationSettings>
+  setSettings: (patch: Partial<DesktopNotificationSettings>) => Promise<DesktopNotificationSettings>
+  /** Shows a native notification unless notifications are off. */
+  show: (notification: DesktopNotification) => Promise<void>
+  /** Number of feeds with unread entries: tray tooltip and app badge (macOS, Linux launchers). */
+  setUnreadCount: (count: number) => Promise<void>
+}
+
+/**
+ * A place in the files module. The renderer never handles paths itself: it
+ * gets ids, and the main process opens what an id stands for.
+ */
+export interface DesktopPlace {
+  id: string
+  /** Standard folders come from the OS; `folder` and `network` were added by the user. */
+  kind: 'downloads' | 'documents' | 'desktop' | 'folder' | 'network'
+  /** Display name; standard folders have none and are named by the web app. */
+  name: string | null
+  /** Where it points, for display: a local path, `\\server\share` or `smb://server/share`. */
+  location: string
+  /** Local: the folder exists. Network: the server answered on port 445. */
+  available: boolean
+}
+
+export interface DesktopRecentFile {
+  id: string
+  name: string
+  size: number
+  modifiedAt: string
+  /**
+   * `false` for programs, installers and scripts, which the app never runs; they can still be
+   * shown in their folder.
+   */
+  openable: boolean
+}
+
+export interface DesktopFilesBridge {
+  places: () => Promise<DesktopPlace[]>
+  /** The newest files in the Downloads folder, newest first. */
+  recentDownloads: () => Promise<DesktopRecentFile[]>
+  /** Opens the native folder picker; `null` when the user cancels. */
+  pickFolder: () => Promise<DesktopPlace | null>
+  /** Adds a folder dropped onto the page; rejects files that are not folders. */
+  addDropped: (file: File) => Promise<DesktopPlace>
+  /** Adds a network share given as `\\server\share` or `smb://server/share`. */
+  addNetwork: (address: string, name: string) => Promise<DesktopPlace>
+  /** Removes a place the user added; standard folders stay. */
+  remove: (id: string) => Promise<void>
+  /** Opens a place in the system file manager. */
+  open: (id: string) => Promise<void>
+  /** Opens a recent download with its default app. */
+  openFile: (id: string) => Promise<void>
+  /** Shows a recent download in its folder. */
+  showFile: (id: string) => Promise<void>
+}
+
+/** Autostart and `jlucampus://` links. */
+export interface DesktopSystemSettings {
+  /** The app starts when the user signs in to the computer. */
+  autostart: boolean
+  /** Whether the OS allows changing autostart for this build (not for development builds). */
+  autostartSupported: boolean
+  /** This app is the handler of `jlucampus://` links. */
+  linkHandler: boolean
+}
+
+export interface DesktopSystemBridge {
+  getSettings: () => Promise<DesktopSystemSettings>
+  setAutostart: (enabled: boolean) => Promise<DesktopSystemSettings>
+  /** Copies `jlucampus://…` for an in-app path to the clipboard. */
+  copyLink: (path: string) => Promise<string>
+}
+
+export interface DesktopModuleBridges {
+  notifications: DesktopNotificationsBridge
+  files: DesktopFilesBridge
+  system: DesktopSystemBridge
+}
+
+/**
  * What the Electron preload exposes as `window.justCampus`. The web app reads
  * it to find the API and to open external links through the OS browser; in
  * a plain browser the property is absent.
  */
 export interface DesktopBridge {
   platform: 'electron'
+  /** The operating system, for texts that differ ("Explorer", "Finder", "Dateimanager"). */
+  os: 'windows' | 'macos' | 'linux'
   /** API origin, e.g. `https://campus.example.org`. */
   apiUrl: string
   /** Opens a URL in the system browser. */
   openExternal: (url: string) => Promise<void>
+  /** The desktop modules this build offers; an absent key means the module is not there. */
+  modules: Partial<DesktopModuleBridges>
+  /**
+   * Called when the app is asked to show an in-app path: a `jlucampus://` link,
+   * a notification or the tray menu. Returns the unsubscribe function.
+   */
+  onNavigate: (listener: (path: string) => void) => () => void
+  /** Tells the main process the interface language, for the tray menu and notifications. */
+  setLanguage: (language: Language) => void
 }
 
 declare global {

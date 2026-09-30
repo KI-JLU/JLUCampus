@@ -18,7 +18,7 @@ import {
   layoutPresetSchema,
   mePatchSchema,
   meSchema,
-  isSingletonType,
+  isBuiltInType,
   sidebarPutSchema,
   widgetDefinition,
   widgetRefKey,
@@ -339,8 +339,8 @@ app.get(API.adminComponents, async (context) => {
 
 app.post(API.adminComponents, async (context) => {
   const input = await parseBody(context, componentInputSchema)
-  if (isSingletonType(input.type)) {
-    throw new ApiError(409, 'conflict', 'Modules are created by the server')
+  if (isBuiltInType(input.type)) {
+    throw new ApiError(409, 'conflict', 'Modules and desktop components are created by the server')
   }
   const [last] = await db
     .select({ sortOrder: component.sortOrder })

@@ -1,9 +1,9 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVerticalIcon, PlusIcon, XIcon } from 'lucide-react'
+import { GripVerticalIcon, MonitorIcon, PlusIcon, XIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button, navItemVariants } from '@ki4jlu/design-system'
-import type { Component } from '@justcampus/shared'
+import { isDesktopComponentType, type Component } from '@justcampus/shared'
 import { externalUrlOf } from '@/adapters/registry'
 import type { SidebarList } from '@/lib/use-sidebar-arrangement'
 import { cn } from '@/lib/utils'
@@ -74,8 +74,12 @@ export function SidebarEditRow({
   )
 }
 
-/** Icon and name, as in the sidebar's link. */
+/**
+ * Icon and name, as in the sidebar's link. Desktop components are marked: they show only in the
+ * desktop app, which matters where the browser lists them anyway (layout presets).
+ */
 function RowLabel({ component }: { component: Component }): React.JSX.Element {
+  const { t } = useTranslation()
   return (
     <>
       <ComponentIcon
@@ -84,6 +88,13 @@ function RowLabel({ component }: { component: Component }): React.JSX.Element {
         siteUrl={externalUrlOf(component)}
       />
       <span className="min-w-0 flex-1 truncate">{component.name}</span>
+      {isDesktopComponentType(component.type) ? (
+        // The rows are narrow: a badge would squeeze the name, so the mark is an icon.
+        <span className="shrink-0 text-on-surface-variant" title={t('sidebarEditor.desktopBadge')}>
+          <MonitorIcon aria-hidden="true" width="1em" height="1em" />
+          <span className="sr-only">{t('sidebarEditor.desktopBadge')}</span>
+        </span>
+      ) : null}
     </>
   )
 }

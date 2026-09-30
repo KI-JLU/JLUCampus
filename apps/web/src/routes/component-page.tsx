@@ -3,8 +3,11 @@ import { useQuery } from '@tanstack/react-query'
 import { CloudOffIcon, SearchXIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@ki4jlu/design-system'
-import { adapterOf } from '@/adapters/registry'
+import { adapterOf, isAvailableHere } from '@/adapters/registry'
 import { PageLoading, PageMessage } from '@/components/page-message'
+import { desktopModule } from '@/desktop/bridge'
+import { CopyDesktopLinkButton } from '@/desktop/system/copy-desktop-link-button'
+import { PageHeaderExtraActionsContext } from '@/lib/page-header-slots'
 import { componentsQuery } from '@/lib/queries'
 
 const route = getRouteApi('/app/c/$componentId')
@@ -26,7 +29,8 @@ export function ComponentPage(): React.JSX.Element {
     )
   }
 
-  const component = components.find((item) => item.id === componentId)
+  // A desktop component outside the desktop app is not there, as far as the user can tell.
+  const component = components.find((item) => item.id === componentId && isAvailableHere(item))
   if (!component) {
     return (
       <PageMessage
@@ -43,5 +47,13 @@ export function ComponentPage(): React.JSX.Element {
   }
 
   const adapter = adapterOf(component)
-  return <adapter.Page key={component.id} component={component} />
+  // In the desktop app, every component page can hand out a link that opens it there.
+  const extraActions = desktopModule('system') ? (
+    <CopyDesktopLinkButton path={`/c/${component.id}`} />
+  ) : null
+  return (
+    <PageHeaderExtraActionsContext.Provider value={extraActions}>
+      <adapter.Page key={component.id} component={component} />
+    </PageHeaderExtraActionsContext.Provider>
+  )
 }
