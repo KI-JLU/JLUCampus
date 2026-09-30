@@ -208,7 +208,10 @@ function createWindow(): void {
     void openExternalUrl(url).catch(() => {})
     return { action: 'deny' }
   })
-  window.webContents.on('will-redirect', (event, url) => handleNavigation(window, event, url))
+  // Also fired for redirects inside an embedded site's iframe; those stay in the iframe.
+  window.webContents.on('will-redirect', (event, url) => {
+    if (event.isMainFrame) handleNavigation(window, event, url)
+  })
   window.webContents.on('will-navigate', (event, url) => handleNavigation(window, event, url))
 
   if (is.dev) void window.loadURL(developmentUrl)
