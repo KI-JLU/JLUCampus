@@ -194,6 +194,7 @@ export function ComponentFormDialog({
             config={state.config}
             onChange={(config) => set('config', config)}
             errors={configErrors(errors)}
+            secrets={state.secrets}
             idPrefix={formId}
           />
           {secretKeysOf(state.type).map((secret) => (

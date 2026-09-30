@@ -5,6 +5,8 @@ import {
   translateResponseSchema,
   translatorComponentConfigSchema,
   translatorEngineListSchema,
+  translatorModelListSchema,
+  translatorModelsRequestSchema,
   translatorDocumentExtension,
   translatorDocumentListSchema,
   translatorDocumentUploadSchema,
@@ -40,7 +42,7 @@ import {
   startDocumentWorker
 } from './documents.js'
 import { listEngines, resolveDefaultEngine, resolveEngine } from './engines.js'
-import { rephraseWithLlm, translateWithLlm } from './llm.js'
+import { listLlmModels, rephraseWithLlm, translateWithLlm } from './llm.js'
 
 export const translatorApp = new Hono<AppEnvironment>()
 
@@ -292,6 +294,22 @@ translatorApp.post('/rephrase', async (context) => {
   }
 })
 
+export const translatorAdminApp = new Hono<AppEnvironment>()
+
+translatorAdminApp.post('/models', async (context) => {
+  const input = await parseBody(context, translatorModelsRequestSchema)
+  const { secrets } = getModuleRuntime(context, 'translator')
+  const apiKey = input.apiKey === undefined ? secrets.llmApiKey : input.apiKey
+  try {
+    // An admin waits on this list, so it gives up sooner than a translation.
+    const signal = AbortSignal.any([context.req.raw.signal, AbortSignal.timeout(15_000)])
+    const models = await listLlmModels(input.baseUrl, apiKey, signal)
+    return context.json(translatorModelListSchema.parse({ models }))
+  } catch {
+    throw new ApiError(502, 'module_unavailable', 'The AI endpoint did not list its models')
+  }
+})
+
 export const translatorModule: ServerModule<'translator'> = {
   type: 'translator',
   defaultName: 'Übersetzer',
@@ -306,5 +324,6 @@ export const translatorModule: ServerModule<'translator'> = {
   },
   configSchema: translatorComponentConfigSchema,
   app: translatorApp,
+  adminApp: translatorAdminApp,
   start: startDocumentWorker
 }

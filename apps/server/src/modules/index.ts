@@ -10,47 +10,59 @@ import { decryptSecret } from '../secrets.js'
 import { desktopComponentDefaults, moduleRegistry } from './registry.js'
 import type { AppEnvironment, ModuleConfigMap, ModuleRuntime, ModuleSecretsMap } from './types.js'
 
-export const moduleMiddleware: MiddlewareHandler<AppEnvironment> = async (context, next) => {
-  const parsedType = componentTypeSchema.safeParse(context.req.param('type'))
-  if (!parsedType.success || !isSingletonType(parsedType.data)) {
-    throw new ApiError(404, 'not_found', 'Module not found')
+/** Loads a module's component row with its config and decrypted secrets. */
+function moduleMiddleware(enabledOnly: boolean): MiddlewareHandler<AppEnvironment> {
+  return async (context, next) => {
+    const parsedType = componentTypeSchema.safeParse(context.req.param('type'))
+    if (!parsedType.success || !isSingletonType(parsedType.data)) {
+      throw new ApiError(404, 'not_found', 'Module not found')
+    }
+    const type = parsedType.data
+
+    const [record] = await db
+      .select()
+      .from(component)
+      .where(
+        and(
+          eq(component.type, type),
+          eq(component.singleton, true),
+          enabledOnly ? eq(component.enabled, true) : undefined
+        )
+      )
+      .limit(1)
+    if (!record) throw new ApiError(404, 'not_found', 'Module not found')
+
+    const serverModule = moduleRegistry[type]
+    const config = serverModule.configSchema.parse(record.config) as ModuleConfigMap[typeof type]
+    const secrets = Object.fromEntries(
+      COMPONENT_SECRETS[type].map((secretKey) => {
+        const encrypted = record.secrets[secretKey]
+        return [
+          secretKey,
+          encrypted
+            ? decryptSecret(encrypted, env.COMPONENT_SECRETS_KEY, record.id, secretKey)
+            : null
+        ]
+      })
+    ) as ModuleSecretsMap[typeof type]
+
+    context.set('module', {
+      type,
+      componentId: record.id,
+      config,
+      secrets
+    } as ModuleRuntime<typeof type>)
+    await next()
   }
-  const type = parsedType.data
-
-  const [record] = await db
-    .select()
-    .from(component)
-    .where(
-      and(eq(component.type, type), eq(component.singleton, true), eq(component.enabled, true))
-    )
-    .limit(1)
-  if (!record) throw new ApiError(404, 'not_found', 'Module not found')
-
-  const serverModule = moduleRegistry[type]
-  const config = serverModule.configSchema.parse(record.config) as ModuleConfigMap[typeof type]
-  const secrets = Object.fromEntries(
-    COMPONENT_SECRETS[type].map((secretKey) => {
-      const encrypted = record.secrets[secretKey]
-      return [
-        secretKey,
-        encrypted ? decryptSecret(encrypted, env.COMPONENT_SECRETS_KEY, record.id, secretKey) : null
-      ]
-    })
-  ) as ModuleSecretsMap[typeof type]
-
-  context.set('module', {
-    type,
-    componentId: record.id,
-    config,
-    secrets
-  } as ModuleRuntime<typeof type>)
-  await next()
 }
 
+/** Registers each module's endpoints and admin endpoints; the admin check must come first. */
 export function registerModuleRoutes(app: Hono<AppEnvironment>): void {
-  app.use('/api/modules/:type/*', moduleMiddleware)
+  app.use('/api/modules/:type/*', moduleMiddleware(true))
+  app.use('/api/admin/modules/:type/*', moduleMiddleware(false))
   for (const serverModule of Object.values(moduleRegistry)) {
     app.route(API.module(serverModule.type), serverModule.app)
+    if (serverModule.adminApp) app.route(API.adminModule(serverModule.type), serverModule.adminApp)
   }
 }
 

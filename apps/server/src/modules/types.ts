@@ -38,5 +38,7 @@ export interface ServerModule<T extends SingletonComponentType> {
   defaultConfig: ModuleConfigMap[T]
   configSchema: ZodType<ModuleConfigMap[T]>
   app: Hono<AppEnvironment>
+  /** Endpoints under `API.adminModule(type)`: admins only, also while the module is disabled. */
+  adminApp?: Hono<AppEnvironment>
   start?: () => () => void
 }

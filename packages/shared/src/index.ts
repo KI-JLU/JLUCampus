@@ -780,6 +780,26 @@ export const translatorEngineListSchema = z.object({
 export type TranslatorEngineList = z.infer<typeof translatorEngineListSchema>
 
 /**
+ * Asks an OpenAI-compatible endpoint which models it offers, for the admin
+ * form. `apiKey` is the key as typed in the form: a string uses it, `null`
+ * sends none, left out uses the saved `llmApiKey`.
+ */
+export const translatorModelsRequestSchema = z.object({
+  baseUrl: httpsUrlSchema,
+  apiKey: z.string().trim().min(1).max(SECRET_VALUE_MAX).nullable().optional()
+})
+export type TranslatorModelsRequest = z.infer<typeof translatorModelsRequestSchema>
+
+/**
+ * The endpoint's chat models in its order, labelled with the name it gives
+ * them, else their id. Embedding, speech and image models are left out.
+ */
+export const translatorModelListSchema = z.object({
+  models: z.array(translatorLlmModelSchema)
+})
+export type TranslatorModelList = z.infer<typeof translatorModelListSchema>
+
+/**
  * Formal or informal address in the translation ("Sie" or "du"). DeepL
  * applies it where the target language has the distinction and ignores it
  * elsewhere.
@@ -1001,6 +1021,17 @@ export const API = {
    * module's component is disabled every endpoint answers `404 not_found`.
    */
   module: (type: SingletonComponentType) => `/api/modules/${type}`,
+  /**
+   * Base path of a module's admin endpoints. Admin only; they work while the
+   * module is disabled, so admins can set it up first.
+   */
+  adminModule: (type: SingletonComponentType) => `/api/admin/modules/${type}`,
+  /**
+   * Admin only. POST `translatorModelsRequestSchema` → `translatorModelListSchema`:
+   * the models `GET <baseUrl>/models` lists. An unreachable endpoint, a refused
+   * key or an answer that is not a model list answers `502 module_unavailable`.
+   */
+  adminTranslatorModels: '/api/admin/modules/translator/models',
   /** GET: `translatorEngineListSchema`. */
   translatorEngines: '/api/modules/translator/engines',
   /**

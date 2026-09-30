@@ -18,6 +18,7 @@ import {
   translatorDocumentListSchema,
   translatorDocumentSchema,
   translatorEngineListSchema,
+  translatorModelListSchema,
   type AdminComponent,
   type AdminComponentList,
   type Component,
@@ -44,6 +45,8 @@ import {
   type TranslatorEngineList,
   type TranslatorFormality,
   type TranslatorLanguage,
+  type TranslatorLlmModel,
+  type TranslatorModelsRequest,
   type UserFeed,
   type WidgetList
 } from '@justcampus/shared'
@@ -430,6 +433,20 @@ export function useUpdateComponent(): UseMutationResult<
       if (context?.previous) client.setQueryData(queryKeys.adminComponents, context.previous)
     },
     onSettled: () => invalidateCatalogue(client)
+  })
+}
+
+/** The models an OpenAI-compatible endpoint offers, for the translator's admin form. */
+export function useFetchTranslatorModels(): UseMutationResult<
+  TranslatorLlmModel[],
+  Error,
+  TranslatorModelsRequest
+> {
+  return useMutation({
+    mutationFn: async (request: TranslatorModelsRequest) =>
+      translatorModelListSchema.parse(
+        await apiFetch<unknown>(API.adminTranslatorModels, { method: 'POST', json: request })
+      ).models
   })
 }
 
