@@ -1,3 +1,4 @@
+import { TRANSLATOR_REQUESTS_PER_MINUTE, TRANSLATOR_THROTTLED_MESSAGE } from '@justcampus/shared'
 import { Hono } from 'hono'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -7,18 +8,21 @@ import { translatorAdminApp, translatorApp } from './index.js'
 
 function testApp(
   routes: Hono<AppEnvironment>,
-  secrets = { deeplApiKey: 'key' as string | null, llmApiKey: null as string | null }
+  secrets = { deeplApiKey: 'key' as string | null, llmApiKey: null as string | null },
+  userId = 'user'
 ): Hono<AppEnvironment> {
   const app = new Hono<AppEnvironment>()
   app.use('*', async (context, next) => {
+    context.set('session', { user: { id: userId } } as AppEnvironment['Variables']['session'])
     context.set('module', {
       type: 'translator',
       componentId: 'component',
       config: {
-        defaultTargetLanguage: 'en',
+        defaultTargetLanguage: 'en-gb',
         deeplApiUrl: null,
         llmBaseUrl: null,
         llmModels: [],
+        llmProviderName: null,
         defaultEngine: null,
         documentsEnabled: false
       },
@@ -51,6 +55,41 @@ describe('translator routes', () => {
     })
     expect(response.status).toBe(400)
     await expect(response.json()).resolves.toMatchObject({ error: { code: 'validation' } })
+  })
+})
+
+describe('the translator throttle', () => {
+  const post = (app: Hono<AppEnvironment>, path: string, body: unknown): Promise<Response> =>
+    Promise.resolve(
+      app.request(`http://test${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+    )
+
+  it('counts Python runs and translations together, as HAWKI does', async () => {
+    const app = testApp(translatorApp, undefined, 'throttled-user')
+    const first = await post(app, '/execute-python', { code: ' ' })
+    expect(first.status).toBe(400)
+    expect(first.headers.get('X-RateLimit-Limit')).toBe(String(TRANSLATOR_REQUESTS_PER_MINUTE))
+    expect(first.headers.get('X-RateLimit-Remaining')).toBe(
+      String(TRANSLATOR_REQUESTS_PER_MINUTE - 1)
+    )
+    for (let run = 1; run < TRANSLATOR_REQUESTS_PER_MINUTE; run++) {
+      expect((await post(app, '/execute-python', { code: ' ' })).status).toBe(400)
+    }
+
+    const translation = await post(app, '/translate', { text: ['Hallo'], target: 'en-gb' })
+    expect(translation.status).toBe(429)
+    expect(translation.headers.get('X-RateLimit-Remaining')).toBe('0')
+    expect(Number(translation.headers.get('Retry-After'))).toBeGreaterThan(0)
+    await expect(translation.json()).resolves.toEqual({
+      error: { code: 'rate_limited', message: TRANSLATOR_THROTTLED_MESSAGE }
+    })
+    // Another user's minute is their own.
+    const other = await post(testApp(translatorApp, undefined, 'other-user'), '/rephrase', {})
+    expect(other.status).toBe(400)
   })
 })
 

@@ -85,6 +85,20 @@
       "when": 1790691730154,
       "tag": "0011_translator_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790778316752,
+      "tag": "0012_translator_glossaries",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790835443825,
+      "tag": "0013_translator_glossary_rights",
+      "breakpoints": true
     }
   ]
 }

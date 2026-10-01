@@ -142,10 +142,11 @@ describe('document claim', () => {
       id: `00000000-0000-0000-0000-00000000000${number}`,
       componentId,
       config: {
-        defaultTargetLanguage: 'en',
+        defaultTargetLanguage: 'en-gb',
         deeplApiUrl: null,
         llmBaseUrl: null,
         llmModels: [],
+        llmProviderName: null,
         defaultEngine: null,
         documentsEnabled: true
       },

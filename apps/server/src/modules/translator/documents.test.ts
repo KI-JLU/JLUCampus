@@ -13,7 +13,7 @@ import {
   readLimited,
   uploadDocument
 } from './deepl.js'
-import { documentQuotaCounts, resultFilename } from './documents.js'
+import { activeDocumentCount, resultFilename } from './documents.js'
 import { translatorApp } from './index.js'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -25,8 +25,7 @@ vi.mock('../../db/index.js', () => ({
       from: () => ({
         where: (condition: SQL) => {
           quotaWhere.push(condition)
-          // Each quota check asks for the active count, then the daily one.
-          return Promise.resolve([{ value: quotaWhere.length % 2 === 1 ? 2 : 49 }])
+          return Promise.resolve([{ value: 2 }])
         }
       })
     })
@@ -41,10 +40,11 @@ function app(enabled: boolean): Hono<AppEnvironment> {
       type: 'translator',
       componentId: '00000000-0000-0000-0000-000000000001',
       config: {
-        defaultTargetLanguage: 'en',
+        defaultTargetLanguage: 'en-gb',
         deeplApiUrl: null,
         llmBaseUrl: null,
         llmModels: [],
+        llmProviderName: null,
         defaultEngine: null,
         documentsEnabled: enabled
       },
@@ -62,15 +62,14 @@ function app(enabled: boolean): Hono<AppEnvironment> {
 }
 
 describe('DeepL documents', () => {
-  it('counts deleted uploads toward the daily quota', async () => {
+  it('counts only running jobs, with no daily quota', async () => {
     quotaWhere.length = 0
-    await expect(documentQuotaCounts('owner')).resolves.toEqual({ active: 2, daily: 49 })
-    const dialect = new PgDialect()
-    const active = dialect.sqlToQuery(quotaWhere[0]!).sql
-    const daily = dialect.sqlToQuery(quotaWhere[1]!).sql
+    await expect(activeDocumentCount('owner')).resolves.toBe(2)
+    expect(quotaWhere).toHaveLength(1)
+    const active = new PgDialect().sqlToQuery(quotaWhere[0]!).sql
     expect(active).toContain('"deleted_at" is null')
-    expect(daily).not.toContain('"deleted_at"')
-    expect(daily).toContain('"created_at" >')
+    expect(active).toContain('"status" in')
+    expect(active).not.toContain('"created_at"')
   })
 
   it('sends multipart fields and maps the status and result', async () => {
@@ -92,7 +91,7 @@ describe('DeepL documents', () => {
     await expect(
       uploadDocument(
         new File(['hi'], 'Bericht.docx'),
-        { source: null, target: 'en', formality: 'formal' },
+        { source: null, target: 'en-gb', formality: 'formal' },
         null,
         'key',
         signal
@@ -114,6 +113,8 @@ describe('DeepL documents', () => {
       contentType: 'application/pdf'
     })
     expect(resultFilename('Bericht.docx', 'en')).toBe('Bericht_en.docx')
+    expect(resultFilename('r9-pruefung.doc', 'en-gb')).toBe('r9-pruefung_en-gb.docx')
+    expect(resultFilename('alt.htm', 'en-gb')).toBe('alt_en-gb.htm')
   })
 
   it('sends an explicit source and informal formality', async () => {

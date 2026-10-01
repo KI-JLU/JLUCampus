@@ -1,92 +1,143 @@
 /**
- * Cells of the LCS table at most (4 MB). Up to a thousand tokens on each
- * side, about a page of text, get a word diff.
+ * The word diff behind "show changes", after HAWKI's: words and punctuation each keep the spaces
+ * after them, and compare without those spaces, so a moved space does not mark a word.
+ */
+
+/**
+ * Cells of the LCS table at most (4 MB). Up to a thousand tokens on each side, about a page of
+ * text, get a word diff; beyond that the changed middle is marked as replaced as a whole.
  */
 export const DIFF_TABLE_MAX = 1_000_000
 
 export type DiffPart = { type: 'equal' | 'insert' | 'delete'; text: string }
 
-/**
- * Words, single punctuation marks and the whitespace between them, so a diff
- * keeps line breaks and spacing and an added comma leaves its word unmarked.
- */
+/** Words (with apostrophes and hyphens), runs of punctuation, and line breaks. */
 function tokenize(text: string): string[] {
-  return text.match(/\s+|[\p{L}\p{M}\p{N}]+|[^\s\p{L}\p{M}\p{N}]/gu) ?? []
+  return text.match(/[\wÀ-ɏ'’-]+[ \t]*|[^\wÀ-ɏ'’ \t\n]+[ \t]*|\n/g) ?? []
+}
+
+const norm = (token: string): string => token.trimEnd()
+
+function merge(parts: DiffPart[]): DiffPart[] {
+  const merged: DiffPart[] = []
+  for (const part of parts) {
+    const last = merged[merged.length - 1]
+    if (last?.type === part.type) last.text += part.text
+    else merged.push({ ...part })
+  }
+  return merged
 }
 
 /**
- * What changed from `before` to `after`, word by word: the longest common
- * subsequence of their word and whitespace tokens is kept, the rest is
- * deleted or inserted. Adjacent parts of the same type are merged, and a
- * deletion comes before the insertion that replaces it.
+ * What changed from `before` to `after`, as the longest common subsequence of their tokens.
+ * Adjacent parts of one type are merged; the text of `equal` parts is the new text's.
  */
 export function diffWords(before: string, after: string): DiffPart[] {
   const a = tokenize(before)
   const b = tokenize(after)
-
   // The common start and end need no table; texts that were only edited in places stay cheap.
   let start = 0
-  while (start < a.length && start < b.length && a[start] === b[start]) start++
+  while (start < a.length && start < b.length && norm(a[start]!) === norm(b[start]!)) start++
   let end = 0
   while (
     end < a.length - start &&
     end < b.length - start &&
-    a[a.length - 1 - end] === b[b.length - 1 - end]
+    norm(a[a.length - 1 - end]!) === norm(b[b.length - 1 - end]!)
   ) {
     end++
   }
-
   const midA = a.slice(start, a.length - end)
   const midB = b.slice(start, b.length - end)
   const rows = midA.length
   const cols = midB.length
-  // Two long, thoroughly different texts would need a huge table; mark the middle as replaced.
+  const parts: DiffPart[] = b.slice(0, start).map((text) => ({ type: 'equal', text }))
+
   if (rows * cols > DIFF_TABLE_MAX) {
-    const parts: DiffPart[] = []
-    const common = (tokens: string[]): void => {
-      if (tokens.length > 0) parts.push({ type: 'equal', text: tokens.join('') })
-    }
-    common(a.slice(0, start))
     if (rows > 0) parts.push({ type: 'delete', text: midA.join('') })
     if (cols > 0) parts.push({ type: 'insert', text: midB.join('') })
-    common(a.slice(a.length - end))
-    return parts
+  } else {
+    // LCS lengths of every pair of prefixes, midA[..i] and midB[..j].
+    const width = cols + 1
+    const table = new Uint32Array((rows + 1) * width)
+    for (let i = 1; i <= rows; i++) {
+      for (let j = 1; j <= cols; j++) {
+        table[i * width + j] =
+          norm(midA[i - 1]!) === norm(midB[j - 1]!)
+            ? table[(i - 1) * width + j - 1]! + 1
+            : Math.max(table[(i - 1) * width + j]!, table[i * width + j - 1]!)
+      }
+    }
+    const middle: DiffPart[] = []
+    let i = rows
+    let j = cols
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && norm(midA[i - 1]!) === norm(midB[j - 1]!)) {
+        middle.push({ type: 'equal', text: midB[j - 1]! })
+        i--
+        j--
+      } else if (j > 0 && (i === 0 || table[i * width + j - 1]! >= table[(i - 1) * width + j]!)) {
+        middle.push({ type: 'insert', text: midB[j - 1]! })
+        j--
+      } else {
+        middle.push({ type: 'delete', text: midA[i - 1]! })
+        i--
+      }
+    }
+    parts.push(...middle.reverse())
   }
-  // LCS lengths of every pair of suffixes, midA[i..] and midB[j..].
-  const lengths = new Uint32Array((rows + 1) * (cols + 1))
-  const lcs = (i: number, j: number): number => lengths[i * (cols + 1) + j] ?? 0
-  for (let i = rows - 1; i >= 0; i--) {
-    for (let j = cols - 1; j >= 0; j--) {
-      lengths[i * (cols + 1) + j] =
-        midA[i] === midB[j] ? lcs(i + 1, j + 1) + 1 : Math.max(lcs(i + 1, j), lcs(i, j + 1))
+  parts.push(...b.slice(b.length - end).map((text) => ({ type: 'equal' as const, text })))
+  return merge(parts)
+}
+
+/** One piece of the full diff view: unchanged text, a deletion, an insertion, or the arrow between. */
+export type ChangePiece =
+  | { type: 'equal'; text: string }
+  | { type: 'delete' | 'insert'; text: string; trailing: string }
+  | { type: 'arrow' }
+
+/** Text with its trailing spaces apart, so marks cover the words only. */
+function split(text: string): { text: string; trailing: string } {
+  const trimmed = text.replace(/[ \t]+$/, '')
+  return { text: trimmed, trailing: text.slice(trimmed.length) }
+}
+
+/**
+ * The diff as the full view shows it: each run of deletions paired with the insertions that
+ * replace it, `deleted → inserted`, one pair after another.
+ */
+export function changePieces(parts: readonly DiffPart[]): ChangePiece[] {
+  const pieces: ChangePiece[] = []
+  let k = 0
+  while (k < parts.length) {
+    const part = parts[k]!
+    if (part.type === 'equal') {
+      pieces.push({ type: 'equal', text: part.text })
+      k++
+      continue
+    }
+    const deletes: DiffPart[] = []
+    while (k < parts.length && parts[k]!.type === 'delete') deletes.push(parts[k++]!)
+    const inserts: DiffPart[] = []
+    while (k < parts.length && parts[k]!.type === 'insert') inserts.push(parts[k++]!)
+    for (let p = 0; p < Math.max(deletes.length, inserts.length); p++) {
+      const deleted = deletes[p]
+      const inserted = inserts[p]
+      if (deleted) pieces.push({ type: 'delete', ...split(deleted.text) })
+      if (deleted && inserted) pieces.push({ type: 'arrow' })
+      if (inserted) pieces.push({ type: 'insert', ...split(inserted.text) })
     }
   }
+  return pieces
+}
 
-  const parts: DiffPart[] = []
-  const push = (type: DiffPart['type'], text: string): void => {
-    const last = parts[parts.length - 1]
-    if (last?.type === type) last.text += text
-    else parts.push({ type, text })
+/** For each character of `after`, whether it was inserted or changed since `before`. */
+export function insertedCharacters(before: string, after: string): boolean[] {
+  const mask = new Array<boolean>(after.length).fill(false)
+  let offset = 0
+  for (const part of diffWords(before, after)) {
+    if (part.type === 'delete') continue
+    if (part.type === 'insert') mask.fill(true, offset, offset + part.text.length)
+    offset += part.text.length
   }
-
-  for (const token of a.slice(0, start)) push('equal', token)
-  let i = 0
-  let j = 0
-  while (i < rows || j < cols) {
-    const tokenA = midA[i]
-    const tokenB = midB[j]
-    if (tokenA !== undefined && tokenA === tokenB) {
-      push('equal', tokenA)
-      i++
-      j++
-    } else if (tokenA !== undefined && (tokenB === undefined || lcs(i + 1, j) >= lcs(i, j + 1))) {
-      push('delete', tokenA)
-      i++
-    } else if (tokenB !== undefined) {
-      push('insert', tokenB)
-      j++
-    }
-  }
-  for (const token of a.slice(a.length - end)) push('equal', token)
-  return parts
+  return mask
 }

@@ -1,24 +1,34 @@
 import { Hono } from 'hono'
 import { describe, expect, it, vi } from 'vitest'
+import {
+  TRANSLATOR_DOCUMENT_ACTIVE_MAX,
+  TRANSLATOR_DOCUMENT_MAX_BYTES,
+  TRANSLATOR_DOCUMENT_TOO_LARGE
+} from '@justcampus/shared'
 
 import { ApiError } from '../../api.js'
 import type { AppEnvironment } from '../types.js'
 import { uploadDocument } from './deepl.js'
-import { documentQuotaCounts, findDocument } from './documents.js'
+import { activeDocumentCount, findDocument } from './documents.js'
 import { translatorApp } from './index.js'
 
 vi.mock('./documents.js', () => ({
   findDocument: vi.fn(),
-  documentQuotaCounts: vi.fn(),
+  activeDocumentCount: vi.fn(),
   findDocumentResult: vi.fn(),
   resultFilename: () => 'a_en.pdf',
   publicDocument: vi.fn(),
   documentExpiry: vi.fn(),
   listDocuments: vi.fn(),
   pollDocument: vi.fn(),
+  recoverErrorMessage: vi.fn(async (row: unknown) => row),
+  rememberJobGlossary: vi.fn(),
   startDocumentWorker: vi.fn()
 }))
-vi.mock('./deepl.js', () => ({ uploadDocument: vi.fn() }))
+vi.mock('./deepl.js', () => ({
+  uploadDocument: vi.fn(),
+  DeepLRefusedError: class extends Error {}
+}))
 
 const deleteState = vi.hoisted(() => ({ values: {} as Record<string, unknown> }))
 vi.mock('../../db/index.js', () => ({
@@ -40,10 +50,11 @@ function app(userId: string): Hono<AppEnvironment> {
       type: 'translator',
       componentId: '00000000-0000-0000-0000-000000000001',
       config: {
-        defaultTargetLanguage: 'en',
+        defaultTargetLanguage: 'en-gb',
         deeplApiUrl: null,
         llmBaseUrl: null,
         llmModels: [],
+        llmProviderName: null,
         defaultEngine: null,
         documentsEnabled: true
       },
@@ -53,7 +64,10 @@ function app(userId: string): Hono<AppEnvironment> {
   })
   testApp.onError((error, context) => {
     if (error instanceof ApiError)
-      return context.json({ error: { code: error.code } }, error.status)
+      return context.json(
+        { error: { code: error.code, ...(error.issues ? { issues: error.issues } : {}) } },
+        error.status
+      )
     throw error
   })
   testApp.route('/', translatorApp)
@@ -66,15 +80,12 @@ describe('document routes', () => {
   function uploadForm(): FormData {
     const body = new FormData()
     body.set('file', new File(['hello'], 'note.txt'))
-    body.set('target', 'en')
+    body.set('target', 'en-gb')
     return body
   }
 
-  it.each([
-    ['active', { active: 3, daily: 3 }],
-    ['daily', { active: 0, daily: 50 }]
-  ])('rejects the %s quota before DeepL', async (_limit, counts) => {
-    vi.mocked(documentQuotaCounts).mockResolvedValue(counts)
+  it('rejects a job over the guard before DeepL', async () => {
+    vi.mocked(activeDocumentCount).mockResolvedValue(TRANSLATOR_DOCUMENT_ACTIVE_MAX)
     vi.mocked(uploadDocument).mockClear()
     const response = await app('owner').request('http://test/documents', {
       method: 'POST',
@@ -85,8 +96,42 @@ describe('document routes', () => {
     expect(uploadDocument).not.toHaveBeenCalled()
   })
 
+  it('refuses a document far over 20 MB as one just over it', async () => {
+    vi.mocked(activeDocumentCount).mockResolvedValue(0)
+    vi.mocked(uploadDocument).mockClear()
+    const issue = {
+      error: {
+        code: 'validation',
+        issues: [{ path: ['file'], message: TRANSLATOR_DOCUMENT_TOO_LARGE }]
+      }
+    }
+    for (const size of [TRANSLATOR_DOCUMENT_MAX_BYTES + 1, 21 * 1024 * 1024]) {
+      const body = uploadForm()
+      body.set('file', new File([new Uint8Array(size)], 'large.txt'))
+      const response = await app('large').request('http://test/documents', {
+        method: 'POST',
+        body
+      })
+      expect(response.status).toBe(400)
+      await expect(response.json()).resolves.toEqual(issue)
+    }
+    expect(uploadDocument).not.toHaveBeenCalled()
+  })
+
+  it('takes a fourth parallel job, as HAWKI does', async () => {
+    vi.mocked(activeDocumentCount).mockResolvedValue(3)
+    vi.mocked(uploadDocument).mockClear()
+    vi.mocked(uploadDocument).mockRejectedValueOnce(new Error('upstream unavailable'))
+    const response = await app('owner').request('http://test/documents', {
+      method: 'POST',
+      body: uploadForm()
+    })
+    expect(response.status).toBe(502)
+    expect(uploadDocument).toHaveBeenCalledTimes(1)
+  })
+
   it('counts an upload in flight against a parallel request', async () => {
-    vi.mocked(documentQuotaCounts).mockResolvedValue({ active: 2, daily: 2 })
+    vi.mocked(activeDocumentCount).mockResolvedValue(TRANSLATOR_DOCUMENT_ACTIVE_MAX - 1)
     let release!: () => void
     const gate = new Promise<void>((resolve) => {
       release = resolve

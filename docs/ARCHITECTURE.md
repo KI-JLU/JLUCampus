@@ -214,6 +214,24 @@ download safely. Result storage retries three times; a missing DeepL result,
 or one over 50 MiB (checked by `Content-Length` and while streaming), ends
 the job with `failed`. Unavailable documents answer 404 before the body limit.
 
+Python code blocks of the AI editor run at `/execute-python`, as in HAWKI: each
+run starts a fresh container of the sandbox image (`infra/python-sandbox`,
+`bun run sandbox:build`) with `docker run --rm --network=none --read-only
+--cap-drop=ALL`, 256 MB memory, one CPU, 64 processes, a 64 MB `/tmp` and the
+code read-only at `/work/code.py`, as `sandboxuser`. The run ends after 10 s or
+512 KiB of stdout or stderr; the container is then removed. `PYTHON_SANDBOX_*`
+choose the CLI (Docker or Podman), the image and a runtime such as gVisor's
+`runsc`; `infra/python-sandbox/runsc-rootless` runs gVisor under rootless Podman,
+with the limits in a systemd user scope, and makes the container look as under
+Docker (memory, CPUs, files, mounts, loopback).
+
+HAWKI's throttle: translating, rewriting, detecting, suggestions, the AI editor,
+Python runs and document uploads add to one count per user and minute
+(`throttle.ts`). The first request opens the minute; text requests are refused
+once it reaches 60, uploads once it reaches 10, with 429 `Too Many Attempts.`
+and Laravel's `X-RateLimit-*` and `Retry-After` headers. Refused requests do
+not count; runs at once are not limited.
+
 Desktop components (`DESKTOP_COMPONENT_TYPES`, so far `files`) are built-in
 rows too (`singleton = true`, same rules), created **enabled** with the name
 and icon from `desktopComponentDefaults` and an empty config. They have no

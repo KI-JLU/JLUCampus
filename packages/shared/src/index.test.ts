@@ -13,6 +13,13 @@ import {
   translatorComponentConfigSchema,
   translatorEngineIdSchema,
   rephraseRequestSchema,
+  parseGlossaryCsv,
+  translatorGlossaryEntrySchema,
+  translatorGlossaryInputSchema,
+  translatorGlossaryPatchSchema,
+  toTranslatorLanguage,
+  TRANSLATE_TEXT_MAX,
+  TRANSLATOR_GLOSSARY_TOO_LONG,
   translatorDocumentExtension,
   translatorDocumentUploadSchema,
   externalUrlSchema,
@@ -217,7 +224,7 @@ describe('modules', () => {
     icon: 'languages',
     iconUrl: null,
     enabled: true,
-    config: { defaultTargetLanguage: 'en' }
+    config: { defaultTargetLanguage: 'en-gb' }
   }
 
   it('lists only known component types as singletons', () => {
@@ -278,32 +285,56 @@ describe('modules', () => {
 
   it('limits translation requests to known languages and a non-empty text', () => {
     expect(
-      translateRequestSchema.safeParse({ text: 'Hallo', source: null, target: 'en' }).success
+      translateRequestSchema.safeParse({
+        text: ['Hallo. ', 'Welt.'],
+        source: null,
+        target: 'en-gb'
+      }).success
     ).toBe(true)
     expect(
-      translateRequestSchema.safeParse({ text: ' ', source: null, target: 'en' }).success
+      translateRequestSchema.safeParse({ text: [' ', '\n'], source: null, target: 'en-gb' }).success
     ).toBe(false)
     expect(
-      translateRequestSchema.safeParse({ text: 'Hallo', source: 'de', target: 'xx' }).success
+      translateRequestSchema.safeParse({ text: ['Hallo'], source: 'de', target: 'en' }).success
     ).toBe(false)
+  })
+
+  it('takes texts up to TRANSLATE_TEXT_MAX characters in all', () => {
+    const half = 'a'.repeat(TRANSLATE_TEXT_MAX / 2)
+    const request = { source: null, target: 'de' }
+    expect(translateRequestSchema.safeParse({ ...request, text: [half, half] }).success).toBe(true)
+    expect(translateRequestSchema.safeParse({ ...request, text: [half, half, 'a'] }).success).toBe(
+      false
+    )
+  })
+
+  it('reads language codes as the translator offers them', () => {
+    expect(toTranslatorLanguage('EN')).toBe('en-gb')
+    expect(toTranslatorLanguage('en-US')).toBe('en-us')
+    expect(toTranslatorLanguage('pt-BR')).toBe('pt')
+    expect(toTranslatorLanguage('DE')).toBe('de')
+    expect(toTranslatorLanguage('tr')).toBeNull()
+    expect(toTranslatorLanguage(undefined)).toBeNull()
   })
 
   it('fills the engine settings of a config stored before they existed', () => {
     expect(translatorComponentConfigSchema.parse({ defaultTargetLanguage: 'en' })).toEqual({
-      defaultTargetLanguage: 'en',
+      defaultTargetLanguage: 'en-gb',
       deeplApiUrl: null,
       llmBaseUrl: null,
       llmModels: [],
+      llmProviderName: null,
       defaultEngine: null,
       documentsEnabled: false
     })
   })
 
   it('reads the document upload fields', () => {
-    expect(translatorDocumentUploadSchema.parse({ target: 'en' })).toEqual({
+    expect(translatorDocumentUploadSchema.parse({ target: 'en-gb' })).toEqual({
       source: null,
-      target: 'en',
-      formality: 'default'
+      target: 'en-gb',
+      formality: 'default',
+      glossaryIds: []
     })
     expect(translatorDocumentUploadSchema.parse({ source: '', target: 'de' }).source).toBeNull()
     expect(translatorDocumentUploadSchema.parse({ source: 'fr', target: 'de' }).source).toBe('fr')
@@ -312,10 +343,12 @@ describe('modules', () => {
     )
   })
 
-  it('takes only the document types DeepL translates', () => {
+  it('takes the document types DeepL translates, pictures too', () => {
     expect(translatorDocumentExtension('Bericht.DOCX')).toBe('docx')
     expect(translatorDocumentExtension('folien.v2.pptx')).toBe('pptx')
-    expect(translatorDocumentExtension('bild.png')).toBeNull()
+    expect(translatorDocumentExtension('untertitel.srt')).toBe('srt')
+    expect(translatorDocumentExtension('bild.png')).toBe('png')
+    expect(translatorDocumentExtension('archiv.zip')).toBeNull()
     expect(translatorDocumentExtension('pdf')).toBeNull()
   })
 
@@ -323,7 +356,7 @@ describe('modules', () => {
     const model = { id: 'llama', label: 'Llama' }
     expect(
       translatorComponentConfigSchema.safeParse({
-        defaultTargetLanguage: 'en',
+        defaultTargetLanguage: 'en-gb',
         llmModels: [model, { ...model, label: 'Other' }]
       }).success
     ).toBe(false)
@@ -336,16 +369,78 @@ describe('modules', () => {
     expect(translatorEngineIdSchema.safeParse('google').success).toBe(false)
   })
 
-  it('defaults formality, style and tone', () => {
+  it('defaults formality, style, tone and glossaries', () => {
     expect(
-      translateRequestSchema.parse({ text: 'Hallo', source: null, target: 'en' }).formality
+      translateRequestSchema.parse({ text: ['Hallo'], source: null, target: 'en-gb' }).formality
     ).toBe('default')
-    expect(rephraseRequestSchema.parse({ text: 'Hallo' })).toEqual({
-      text: 'Hallo',
+    expect(rephraseRequestSchema.parse({ text: ['Hallo'] })).toEqual({
+      text: ['Hallo'],
+      language: null,
+      formality: 'default',
       style: null,
-      tone: null
+      tone: null,
+      glossaryIds: []
     })
-    expect(rephraseRequestSchema.safeParse({ text: 'Hallo', style: 'poetic' }).success).toBe(false)
+    expect(rephraseRequestSchema.safeParse({ text: ['Hallo'], style: 'poetic' }).success).toBe(
+      false
+    )
+  })
+
+  it('reads glossary CSV files of two columns', () => {
+    expect(parseGlossaryCsv('Prüfung,exam\r\n"Amt, zentral",office\n\n')).toEqual([
+      { source: 'Prüfung', target: 'exam' },
+      { source: 'Amt, zentral', target: 'office' }
+    ])
+    expect(parseGlossaryCsv('Prüfung;exam\nAmt;office')).toEqual([
+      { source: 'Prüfung', target: 'exam' },
+      { source: 'Amt', target: 'office' }
+    ])
+    expect(parseGlossaryCsv('nur eine Spalte\nzweite')).toBeNull()
+    expect(parseGlossaryCsv('')).toBeNull()
+  })
+
+  it('limits glossary texts as HAWKI does: names by characters, descriptions by bytes', () => {
+    const entry = { sourceLanguage: 'de', sourceTerm: 'a', targetLanguage: 'en', targetTerm: 'b' }
+    const glossary = (name: string, description = '') =>
+      translatorGlossaryInputSchema.safeParse({ name, description, entries: [entry] }).success
+    expect(glossary('N'.repeat(255))).toBe(true)
+    expect(glossary('😀'.repeat(255))).toBe(true)
+    expect(
+      translatorGlossaryInputSchema.safeParse({ name: 'N'.repeat(256), entries: [entry] }).error
+        ?.issues[0]?.message
+    ).toBe(TRANSLATOR_GLOSSARY_TOO_LONG)
+    expect(translatorGlossaryPatchSchema.safeParse({ category: 'C'.repeat(256) }).success).toBe(
+      false
+    )
+    expect(glossary('n', 'D'.repeat(65_535))).toBe(true)
+    expect(glossary('n', 'ä'.repeat(32_768))).toBe(false)
+    expect(
+      translatorGlossaryEntrySchema.safeParse({ ...entry, sourceTerm: 'S'.repeat(5000) }).success
+    ).toBe(true)
+    expect(
+      translatorGlossaryInputSchema.safeParse({ name: 'n', entries: Array(5001).fill(entry) })
+        .success
+    ).toBe(true)
+  })
+
+  it('takes glossary changes of the category and the rights, but not none at all', () => {
+    expect(
+      translatorGlossaryPatchSchema.parse({
+        category: ' R8TEST ',
+        visibility: 'organization',
+        visibleTo: 'student',
+        editorRole: null
+      })
+    ).toEqual({
+      category: 'R8TEST',
+      visibility: 'organization',
+      visibleTo: 'student',
+      editorRole: null
+    })
+    expect(translatorGlossaryPatchSchema.safeParse({}).success).toBe(false)
+    expect(translatorGlossaryPatchSchema.safeParse({ visibleTo: 'Studierende' }).success).toBe(
+      false
+    )
   })
 })
 

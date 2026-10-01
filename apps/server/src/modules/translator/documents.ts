@@ -5,7 +5,19 @@ import {
   translatorDocumentSchema,
   type TranslatorDocument
 } from '@justcampus/shared'
-import { and, count, desc, eq, getTableColumns, gt, inArray, isNull, lt, or } from 'drizzle-orm'
+import {
+  and,
+  count,
+  desc,
+  eq,
+  getTableColumns,
+  gt,
+  inArray,
+  isNull,
+  lt,
+  or,
+  sql
+} from 'drizzle-orm'
 
 import { db } from '../../db/index.js'
 import { component, translatorDocument } from '../../db/schema.js'
@@ -14,54 +26,80 @@ import { decryptSecret } from '../../secrets.js'
 import {
   DeepLHttpError,
   DocumentResultTooLargeError,
+  deleteDeepLGlossary,
   documentError,
   documentStatus,
   downloadDocument
 } from './deepl.js'
 
 export type DocumentRow = typeof translatorDocument.$inferSelect
-/** A job without its translated file, which only the download reads. */
-export type DocumentSummary = Omit<DocumentRow, 'result'>
+/** A job without its translated file, which only the download reads; its size instead. */
+export type DocumentSummary = Omit<DocumentRow, 'result'> & { resultSize: number | null }
 const running = ['queued', 'translating']
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- taken out so lists never load the file
-const { result, ...summaryColumns } = getTableColumns(translatorDocument)
-
-export async function documentQuotaCounts(
-  userId: string
-): Promise<{ active: number; daily: number }> {
-  const now = new Date()
-  const [active, daily] = await Promise.all([
-    db
-      .select({ value: count() })
-      .from(translatorDocument)
-      .where(
-        and(
-          eq(translatorDocument.userId, userId),
-          inArray(translatorDocument.status, running),
-          isNull(translatorDocument.deletedAt),
-          gt(translatorDocument.expiresAt, now)
-        )
-      ),
-    db
-      .select({ value: count() })
-      .from(translatorDocument)
-      .where(
-        and(
-          eq(translatorDocument.userId, userId),
-          gt(translatorDocument.createdAt, new Date(now.getTime() - 24 * 60 * 60 * 1000))
-        )
-      )
-  ])
-  return { active: active[0]?.value ?? 0, daily: daily[0]?.value ?? 0 }
+const { result, ...tableColumns } = getTableColumns(translatorDocument)
+const summaryColumns = {
+  ...tableColumns,
+  resultSize: sql<number | null>`octet_length(${translatorDocument.result})`
 }
+
+/** The values `error` had before it kept DeepL's own message. */
+const LEGACY_ERRORS = new Set(['same_language', 'failed'])
+
+/**
+ * Temporary DeepL glossaries of running jobs (see `createDeepLGlossary`), removed once the job
+ * ends. Held in this process only: after a restart the sweep removes them.
+ */
+const jobGlossaries = new Map<
+  string,
+  { glossaryId: string; apiUrl: string | null; apiKey: string }
+>()
+
+export function rememberJobGlossary(
+  jobId: string,
+  glossaryId: string,
+  apiUrl: string | null,
+  apiKey: string
+): void {
+  jobGlossaries.set(jobId, { glossaryId, apiUrl, apiKey })
+}
+
+function releaseJobGlossary(jobId: string): void {
+  const glossary = jobGlossaries.get(jobId)
+  if (!glossary) return
+  jobGlossaries.delete(jobId)
+  void deleteDeepLGlossary(glossary.glossaryId, glossary.apiUrl, glossary.apiKey)
+}
+
+/** The user's jobs still queued or translating at DeepL. */
+export async function activeDocumentCount(userId: string): Promise<number> {
+  const [row] = await db
+    .select({ value: count() })
+    .from(translatorDocument)
+    .where(
+      and(
+        eq(translatorDocument.userId, userId),
+        inArray(translatorDocument.status, running),
+        isNull(translatorDocument.deletedAt),
+        gt(translatorDocument.expiresAt, new Date())
+      )
+    )
+  return row?.value ?? 0
+}
+
+/** DeepL returns an old Word file as DOCX, so its translation is named and marked that way. */
+const RESULT_EXTENSIONS: Partial<Record<string, string>> = { doc: 'docx' }
 
 export function resultFilename(filename: string, target: string): string {
   const extension = translatorDocumentExtension(filename)!
-  return `${filename.slice(0, -(extension.length + 1))}_${target}.${extension}`
+  const result = RESULT_EXTENSIONS[extension] ?? extension
+  return `${filename.slice(0, -(extension.length + 1))}_${target}.${result}`
 }
 
 export function publicDocument(row: DocumentSummary): TranslatorDocument {
+  const stored = row.error
+  const raw = stored && !LEGACY_ERRORS.has(stored) ? stored : null
   return translatorDocumentSchema.parse({
     id: row.id,
     filename: row.filename,
@@ -70,8 +108,10 @@ export function publicDocument(row: DocumentSummary): TranslatorDocument {
     target: row.target,
     status: row.status,
     secondsRemaining: row.secondsRemaining,
-    error: row.error,
+    error: stored === null ? null : raw ? documentError(raw) : stored,
+    errorMessage: raw,
     resultFilename: resultFilename(row.filename, row.target),
+    resultSize: row.resultSize === null ? null : Number(row.resultSize),
     createdAt: row.createdAt.toISOString(),
     expiresAt: row.expiresAt.toISOString()
   })
@@ -189,6 +229,8 @@ export async function pollDocument(
     )
     if (status.document_id !== row.deeplDocumentId)
       throw new Error('DeepL returned another document id')
+    // Its glossary is no longer needed once the job ends, however it ends.
+    if (status.status === 'done' || status.status === 'error') releaseJobGlossary(id)
     if (status.status === 'done') {
       let downloaded: Awaited<ReturnType<typeof downloadDocument>>
       try {
@@ -265,7 +307,8 @@ export async function pollDocument(
         .set({
           status: status.status,
           secondsRemaining: status.seconds_remaining ?? null,
-          error: status.status === 'error' ? documentError(status.error_message) : null,
+          // DeepL's own words, which the user sees; `failed` when it gave none.
+          error: status.status === 'error' ? status.error_message?.trim() || 'failed' : null,
           pollClaimedAt: null,
           polledAt: now,
           updatedAt: new Date()
@@ -292,6 +335,42 @@ export async function pollDocument(
         )
       )
     throw error
+  }
+}
+
+/**
+ * DeepL's own words for a failed job whose row only says `failed` or `same_language` (written by
+ * an older release): asked at DeepL once, while DeepL still knows the job, and stored.
+ */
+export async function recoverErrorMessage(
+  row: DocumentSummary,
+  apiUrl: string | null,
+  apiKey: string
+): Promise<DocumentSummary> {
+  if (row.status !== 'error' || !row.error || !LEGACY_ERRORS.has(row.error)) return row
+  try {
+    const key = decryptSecret(
+      row.deeplDocumentKey,
+      env.COMPONENT_SECRETS_KEY,
+      `translator_document:${row.id}`,
+      'document_key'
+    )
+    const status = await documentStatus(
+      row.deeplDocumentId,
+      key,
+      apiUrl,
+      apiKey,
+      AbortSignal.timeout(10_000)
+    )
+    const message = status.status === 'error' ? status.error_message?.trim() : undefined
+    if (!message || LEGACY_ERRORS.has(message)) return row
+    await db
+      .update(translatorDocument)
+      .set({ error: message })
+      .where(and(eq(translatorDocument.id, row.id), eq(translatorDocument.status, 'error')))
+    return { ...row, error: message }
+  } catch {
+    return row
   }
 }
 

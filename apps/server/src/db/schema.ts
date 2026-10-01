@@ -1,4 +1,9 @@
-import type { ComponentConfig, Dashboard, Sidebar } from '@justcampus/shared'
+import type {
+  ComponentConfig,
+  Dashboard,
+  Sidebar,
+  TranslatorGlossaryEntry
+} from '@justcampus/shared'
 import { sql } from 'drizzle-orm'
 import {
   boolean,
@@ -151,6 +156,37 @@ export const translatorDocument = pgTable(
     index('translator_document_user_created_idx').on(table.userId, table.createdAt),
     index('translator_document_status_expires_idx').on(table.status, table.expiresAt),
     index('translator_document_expires_idx').on(table.expiresAt)
+  ]
+)
+
+/**
+ * A translator glossary: its owner's term pairs (`TranslatorGlossaryEntry[]`), private to them,
+ * shared with the users of one role (`organization`, `visible_to`) or public for every user of the
+ * translator. The users of `editor_role` edit it too. Roles are `TranslatorGlossaryRole`s.
+ */
+export const translatorGlossary = pgTable(
+  'translator_glossary',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    componentId: uuid('component_id')
+      .notNull()
+      .references(() => component.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    description: text('description').notNull().default(''),
+    category: text('category').notNull().default('general'),
+    visibility: text('visibility').notNull().default('private'),
+    visibleTo: text('visible_to'),
+    editorRole: text('editor_role'),
+    entries: jsonb('entries').$type<TranslatorGlossaryEntry[]>().notNull().default([]),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow()
+  },
+  (table) => [
+    index('translator_glossary_user_idx').on(table.userId),
+    index('translator_glossary_component_visibility_idx').on(table.componentId, table.visibility)
   ]
 )
 

@@ -7,12 +7,12 @@ page in the sidebar and adds widgets, which users
 place as resizable tiles on a free-grid dashboard. Available as a web app (installable PWA) and as
 a desktop app for Windows, macOS and Linux that bundles the same web build.
 
-| Package           | Stack                                                                         |
-| ----------------- | ----------------------------------------------------------------------------- |
-| `apps/server`     | Hono on Node, Better-Auth (Keycloak via OIDC), Drizzle ORM, PostgreSQL        |
-| `apps/web`        | React 19, Vite, TanStack Router + Query, JLU Design System, i18next, PWA      |
-| `apps/desktop`    | Electron (electron-vite, electron-builder); bundles `apps/web/dist`           |
-| `packages/shared` | Zod schemas, types and API paths shared by all three                          |
+| Package           | Stack                                                                    |
+| ----------------- | ------------------------------------------------------------------------ |
+| `apps/server`     | Hono on Node, Better-Auth (Keycloak via OIDC), Drizzle ORM, PostgreSQL   |
+| `apps/web`        | React 19, Vite, TanStack Router + Query, JLU Design System, i18next, PWA |
+| `apps/desktop`    | Electron (electron-vite, electron-builder); bundles `apps/web/dist`      |
+| `packages/shared` | Zod schemas, types and API paths shared by all three                     |
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 
@@ -27,11 +27,16 @@ cp .env.example .env        # defaults match docker-compose
 bun run infra:up            # Postgres on :5433, Keycloak on :8080
 bun run db:migrate
 bun run db:seed             # two example components
+bun run sandbox:build       # image the translator editor's Python code blocks run in
 bun run dev                 # API on http://localhost:3000, web on http://localhost:5173
 ```
 
 The translator module needs a DeepL API key and/or an OpenAI-compatible
 endpoint with at least one model; admins set both under Admin → Components.
+Python code blocks in its editor run on the server, each in a fresh container
+of that image without network (Docker or Podman, best under gVisor as in HAWKI;
+without root `bun run sandbox:gvisor` sets it up for rootless Podman, see
+`.env.example`).
 
 `COMPONENT_SECRETS_KEY` encrypts module secrets such as API keys. Generate a
 production value with `openssl rand -base64 32`; changing it makes stored
@@ -76,11 +81,11 @@ GitHub release runs the same checks and build again (`release.yml`) and keeps
 
 ## Scripts
 
-| Command                 | Purpose                                     |
-| ----------------------- | ------------------------------------------- |
-| `bun run dev`           | Server and web app in watch mode            |
-| `bun run typecheck`     | TypeScript in every package                 |
-| `bun run lint`          | ESLint, including the design-system rules   |
-| `bun run test`          | Vitest in every package                     |
-| `bun run db:generate`   | Generate a Drizzle migration from the schema |
-| `bun run format`        | Prettier                                     |
+| Command               | Purpose                                      |
+| --------------------- | -------------------------------------------- |
+| `bun run dev`         | Server and web app in watch mode             |
+| `bun run typecheck`   | TypeScript in every package                  |
+| `bun run lint`        | ESLint, including the design-system rules    |
+| `bun run test`        | Vitest in every package                      |
+| `bun run db:generate` | Generate a Drizzle migration from the schema |
+| `bun run format`      | Prettier                                     |

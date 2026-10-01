@@ -6,6 +6,7 @@ export class ApiError extends Error {
     readonly status: ContentfulStatusCode,
     readonly code:
       | 'not_found'
+      | 'forbidden'
       | 'validation'
       | 'conflict'
       | 'rate_limited'

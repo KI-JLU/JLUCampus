@@ -1,44 +1,131 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  buildComposePrompt,
   buildRephrasePrompt,
+  buildSuggestPrompt,
   buildTranslationPrompt,
-  parseLlmResponse,
-  parseModelList
+  parseComposeResponse,
+  parseModelList,
+  parseSegmentsResponse,
+  parseSuggestions
 } from './llm.js'
 
+const adjustments = { formality: 'default', style: null, tone: null } as const
+
 describe('LLM translator prompts', () => {
-  it('includes formality in translation prompts', () => {
+  it('includes formality, style and glossary terms in translation prompts', () => {
     expect(
-      buildTranslationPrompt({ text: 'Hello', source: 'en', target: 'de', formality: 'formal' })
+      buildTranslationPrompt({ ...adjustments, source: 'en-gb', target: 'de', formality: 'formal' })
     ).toContain('formal and polite')
     expect(
-      buildTranslationPrompt({ text: 'Hello', source: 'en', target: 'de', formality: 'informal' })
+      buildTranslationPrompt({
+        ...adjustments,
+        source: 'en-gb',
+        target: 'de',
+        formality: 'informal'
+      })
     ).toContain('informal and casual')
+    expect(
+      buildTranslationPrompt({ ...adjustments, source: 'de', target: 'en-us', style: 'academic' })
+    ).toContain('academic, objective')
+    const withTerms = buildTranslationPrompt({ ...adjustments, source: 'de', target: 'en-gb' }, [
+      { source: 'Prüfungsamt', target: 'Examinations Office' }
+    ])
+    expect(withTerms).toContain('"Prüfungsamt" → "Examinations Office"')
+    expect(withTerms).toContain('British English')
   })
 
   it('includes style and tone in rephrase prompts', () => {
-    const prompt = buildRephrasePrompt({ text: 'Hi', style: 'business', tone: 'friendly' })
-    expect(prompt).toContain('professional, crisp, and business-like')
-    expect(prompt).toContain('friendly and warm')
+    expect(buildRephrasePrompt({ ...adjustments, language: null, style: 'business' })).toContain(
+      'professional, crisp, and business-like'
+    )
+    expect(buildRephrasePrompt({ ...adjustments, language: 'de', tone: 'friendly' })).toContain(
+      'friendly and warm'
+    )
+  })
+
+  it('asks for suggestions without the ones already shown', () => {
+    const prompt = buildSuggestPrompt({
+      ...adjustments,
+      kind: 'alternatives',
+      text: 'Die Prüfung ist am Montag.',
+      context: null,
+      language: 'de',
+      exclusions: ['Am Montag ist die Prüfung.']
+    })
+    expect(prompt).toContain('three alternative wordings')
+    expect(prompt).toContain('"Am Montag ist die Prüfung."')
+    expect(
+      buildSuggestPrompt({
+        ...adjustments,
+        kind: 'synonyms',
+        text: 'Prüfung',
+        context: 'Die [[TARGET]]Prüfung[[TARGET]] ist am Montag.',
+        language: 'de',
+        exclusions: []
+      })
+    ).toContain('[[TARGET]]Prüfung[[TARGET]]')
+  })
+
+  it('tells the editor what each action does', () => {
+    expect(
+      buildComposePrompt({
+        ...adjustments,
+        action: 'table',
+        text: 'a',
+        instruction: 'als übersichtliche Tabelle darstellen',
+        webSearch: false
+      })
+    ).toContain('Markdown table')
+  })
+
+  it('gives the editor the linked web pages to draw on', () => {
+    const prompt = buildComposePrompt(
+      {
+        ...adjustments,
+        action: 'compose',
+        text: '',
+        instruction: 'https://www.uni-giessen.de Ein Satz dazu',
+        webSearch: true
+      },
+      [{ url: 'https://www.uni-giessen.de/', text: 'Justus-Liebig-Universität Gießen' }]
+    )
+    expect(prompt).toContain('<page url="https://www.uni-giessen.de/">')
+    expect(prompt).toContain('Justus-Liebig-Universität Gießen')
   })
 })
 
 describe('LLM response parsing', () => {
-  it('reads JSON inside think blocks and code fences', () => {
+  it('reads one sentence per sentence inside think blocks and code fences', () => {
     expect(
-      parseLlmResponse(
-        '<think>reasoning</think>```json\n{"text":"Hallo","detected_source_language":"en-GB"}\n```',
+      parseSegmentsResponse(
+        '<think>reasoning</think>```json\n{"text":["Hallo. ","Welt."],"detected_source_language":"en-GB"}\n```',
+        2,
         'detected_source_language'
       )
-    ).toEqual({ text: 'Hallo', detectedLanguage: 'en' })
+    ).toEqual({ text: ['Hallo. ', 'Welt.'], detectedLanguage: 'en-gb' })
   })
 
-  it('keeps non-JSON content with an unknown language', () => {
-    expect(parseLlmResponse('plain answer', 'detected_language')).toEqual({
-      text: 'plain answer',
+  it('keeps an answer with the wrong number of sentences in the first one', () => {
+    expect(parseSegmentsResponse('{"text":["Hallo Welt."]}', 2, 'detected_language')).toEqual({
+      text: ['Hallo Welt.', ''],
       detectedLanguage: null
     })
+    expect(parseSegmentsResponse('plain answer', 1, 'detected_language')).toEqual({
+      text: ['plain answer'],
+      detectedLanguage: null
+    })
+  })
+
+  it('reads suggestions without blanks and repeats', () => {
+    expect(parseSuggestions('{"suggestions":["A", " A ", "", "B"]}')).toEqual(['A', 'B'])
+    expect(parseSuggestions('nothing')).toEqual([])
+  })
+
+  it('unwraps a Markdown answer fenced as a whole', () => {
+    expect(parseComposeResponse('```markdown\n# Titel\n\nText\n```')).toBe('# Titel\n\nText')
+    expect(parseComposeResponse('<think>x</think>- a\n- b')).toBe('- a\n- b')
   })
 })
 

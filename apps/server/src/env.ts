@@ -55,7 +55,12 @@ const envSchema = z
       .default('false')
       .transform((value) => value === 'true'),
     WEB_ORIGIN: z.url().optional(),
-    SERVE_WEB_DIR: z.string().min(1).optional()
+    SERVE_WEB_DIR: z.string().min(1).optional(),
+    // The translator editor's Python runs: container CLI, image (infra/python-sandbox) and an
+    // optional container runtime such as gVisor's `runsc`.
+    PYTHON_SANDBOX_DOCKER: z.string().min(1).default('docker'),
+    PYTHON_SANDBOX_IMAGE: z.string().min(1).default('justcampus-python-sandbox:latest'),
+    PYTHON_SANDBOX_RUNTIME: z.string().min(1).optional()
   })
   .transform((value) => ({
     ...value,

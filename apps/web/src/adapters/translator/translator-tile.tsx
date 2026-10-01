@@ -2,7 +2,7 @@ import { useId, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { Button, Label, Textarea } from '@ki4jlu/design-system'
-import { TRANSLATE_TEXT_MAX } from '@justcampus/shared'
+import { TRANSLATE_TEXT_MAX, toTranslatorLanguage } from '@justcampus/shared'
 import { ComponentIcon } from '@/components/component-icon'
 import type { ComponentViewProps } from '../types'
 import { CopyButton } from './copy-button'
@@ -22,8 +22,7 @@ export function TranslatorTile({ component }: ComponentViewProps<'translator'>):
   const [text, setText] = useState('')
   const translator = useTranslator({
     text,
-    setText,
-    defaultTarget: component.config.defaultTargetLanguage
+    defaultTarget: toTranslatorLanguage(component.config.defaultTargetLanguage) ?? 'en-gb'
   })
   const { result, pending, error } = translator
 
@@ -54,7 +53,7 @@ export function TranslatorTile({ component }: ComponentViewProps<'translator'>):
           </Link>
         </h2>
         <CopyButton
-          text={pending || error ? undefined : result?.response.translation}
+          text={pending || error ? undefined : result?.translation}
           className="-mr-2 group-data-editing/tile:invisible"
         />
       </div>
@@ -97,7 +96,7 @@ export function TranslatorTile({ component }: ComponentViewProps<'translator'>):
           label={t('component.translator.result')}
           pending={pending}
           error={error}
-          text={result?.response.translation}
+          text={result?.translation}
           language={result?.language}
           htmlFor={`${id}-text`}
           className="min-h-12 flex-1 px-3 py-2 text-sm"

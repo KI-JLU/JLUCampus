@@ -3,13 +3,14 @@ import { TRANSLATOR_LLM_MODELS_MAX, type TranslatorComponentConfig } from '@just
 import { applyFetchedModels } from './llm-models'
 
 const config: TranslatorComponentConfig = {
-  defaultTargetLanguage: 'en',
+  defaultTargetLanguage: 'en-gb',
   deeplApiUrl: null,
   llmBaseUrl: 'https://llm.example.test/v1',
   llmModels: [
     { id: 'qwen', label: 'Qwen (campus)' },
     { id: 'retired', label: 'Retired' }
   ],
+  llmProviderName: null,
   defaultEngine: 'llm:qwen',
   documentsEnabled: false
 }

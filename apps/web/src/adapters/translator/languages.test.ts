@@ -1,47 +1,37 @@
 import { describe, expect, it } from 'vitest'
+import type { TFunction } from 'i18next'
 import { TRANSLATOR_LANGUAGES } from '@justcampus/shared'
 import { ApiRequestError } from '@/lib/api'
-import { isTranslateShortcut, languageOptions, translateErrorKey } from './languages'
+import de from '@/i18n/de.json'
+import {
+  alternativeTarget,
+  isTranslateShortcut,
+  languageOptions,
+  textErrorMessage
+} from './languages'
+
+const t = ((key: string) => {
+  const code = key.split('.').pop() as keyof typeof de.component.translator.languages
+  return de.component.translator.languages[code]
+}) as unknown as TFunction
 
 describe('languageOptions', () => {
-  it('names every language in the UI language, sorted by name', () => {
-    const options = languageOptions('de')
-    expect(options.map((option) => option.code).sort()).toEqual([...TRANSLATOR_LANGUAGES].sort())
-    expect(options.find((option) => option.code === 'en')?.name).toBe('Englisch')
-    const names = options.map((option) => option.name)
-    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b, 'de')))
-  })
-
-  it('follows the locale', () => {
-    expect(languageOptions('en').find((option) => option.code === 'de')?.name).toBe('German')
+  it('lists every language in the fixed order, English variants first', () => {
+    const options = languageOptions(t)
+    expect(options.map((option) => option.code)).toEqual([...TRANSLATOR_LANGUAGES])
+    expect(options.slice(0, 3).map((option) => option.name)).toEqual([
+      'Englisch (UK)',
+      'Englisch (US)',
+      'Deutsch'
+    ])
   })
 })
 
-describe('translateErrorKey', () => {
-  const apiError = (
-    status: number,
-    code: 'module_unavailable' | 'not_found' | 'validation'
-  ): ApiRequestError => new ApiRequestError(status, { error: { code, message: code } })
-
-  it('explains an unavailable service, a disabled module and a rejected text', () => {
-    expect(translateErrorKey(apiError(502, 'module_unavailable'))).toBe(
-      'component.translator.errors.unavailable'
-    )
-    expect(translateErrorKey(apiError(404, 'not_found'))).toBe(
-      'component.translator.errors.disabled'
-    )
-    expect(translateErrorKey(apiError(400, 'validation'))).toBe(
-      'component.translator.errors.invalid'
-    )
-  })
-
-  it('falls back to a general message', () => {
-    expect(translateErrorKey(new TypeError('Failed to fetch'))).toBe(
-      'component.translator.errors.failed'
-    )
-    expect(translateErrorKey(new ApiRequestError(500, null))).toBe(
-      'component.translator.errors.failed'
-    )
+describe('alternativeTarget', () => {
+  it('replaces a target equal to the source with German, or British English for German', () => {
+    expect(alternativeTarget('en-gb')).toBe('de')
+    expect(alternativeTarget('fr')).toBe('de')
+    expect(alternativeTarget('de')).toBe('en-gb')
   })
 })
 
@@ -51,5 +41,36 @@ describe('isTranslateShortcut', () => {
     expect(isTranslateShortcut({ key: 'Enter', ctrlKey: false, metaKey: true })).toBe(true)
     expect(isTranslateShortcut({ key: 'Enter', ctrlKey: false, metaKey: false })).toBe(false)
     expect(isTranslateShortcut({ key: 'a', ctrlKey: true, metaKey: false })).toBe(false)
+  })
+})
+
+describe('textErrorMessage', () => {
+  it('words a failed request as HAWKI does', () => {
+    expect(textErrorMessage(new TypeError('Failed to fetch'), 'translate')).toEqual({
+      text: 'Failed to fetch'
+    })
+    const upstream = new ApiRequestError(502, {
+      error: { code: 'module_unavailable', message: 'down' }
+    })
+    expect(textErrorMessage(upstream, 'translate')).toEqual({
+      key: 'component.translator.errors.translateFailed'
+    })
+    expect(textErrorMessage(upstream, 'rephrase')).toEqual({
+      key: 'component.translator.errors.rephraseFailed'
+    })
+    expect(
+      textErrorMessage(
+        new ApiRequestError(404, { error: { code: 'not_found', message: 'gone' } }),
+        'translate'
+      )
+    ).toEqual({ key: 'component.translator.errors.disabled' })
+    expect(
+      textErrorMessage(
+        new ApiRequestError(429, {
+          error: { code: 'rate_limited', message: 'Too Many Attempts.' }
+        }),
+        'rephrase'
+      )
+    ).toEqual({ text: 'Too Many Attempts.' })
   })
 })

@@ -58,3 +58,20 @@ export function resolveEngine(
   if (id === 'deepl') return { id, kind: 'deepl' }
   return { id: id as `llm:${string}`, kind: 'llm', model: id.slice(4) }
 }
+
+/**
+ * The model that detects languages and suggests wordings: the chosen engine if it is a model,
+ * else the default engine if it is one, else the first model; `null` when there is no model.
+ */
+export function assistantModel(
+  requested: TranslatorEngineId | undefined,
+  config: TranslatorComponentConfig,
+  secrets: TranslatorSecrets
+): string | null {
+  const models = listEngines(config, secrets).filter((engine) => engine.kind === 'llm')
+  const pick =
+    models.find((engine) => engine.id === requested) ??
+    models.find((engine) => engine.id === config.defaultEngine) ??
+    models[0]
+  return pick ? pick.id.slice(4) : null
+}

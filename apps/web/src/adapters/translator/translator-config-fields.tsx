@@ -184,6 +184,27 @@ export function TranslatorConfigFields({
           />
         )}
       </Field>
+      <Field
+        id={`${idPrefix}-llm-provider`}
+        label={t('component.translator.llmProviderLabel')}
+        hint={t('component.translator.llmProviderHint')}
+        error={errors.llmProviderName}
+      >
+        {(control) => (
+          <Input
+            {...control}
+            maxLength={40}
+            placeholder="KI@JLU"
+            value={config.llmProviderName ?? ''}
+            onChange={(event) =>
+              onChange({
+                ...config,
+                llmProviderName: event.target.value.trim() ? event.target.value : null
+              })
+            }
+          />
+        )}
+      </Field>
       <fieldset
         aria-describedby={[errors.llmModels && `${modelsId}-error`, `${modelsId}-hint`]
           .filter(Boolean)

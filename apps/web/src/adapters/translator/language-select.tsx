@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Select,
@@ -44,9 +43,8 @@ type LanguageSelectProps = Partial<FieldControlProps> & {
 /** The translator's languages, named in the UI language. */
 export function LanguageSelect(props: LanguageSelectProps): React.JSX.Element {
   const { id, disabled, compact, inBar, className, value, detected } = props
-  const { t, i18n } = useTranslation()
-  const locale = i18n.resolvedLanguage ?? i18n.language
-  const options = useMemo(() => languageOptions(locale), [locale])
+  const { t } = useTranslation()
+  const options = languageOptions(t)
   const detectedName = detected ? options.find((option) => option.code === detected)?.name : null
 
   const handleChange = (next: string): void => {
