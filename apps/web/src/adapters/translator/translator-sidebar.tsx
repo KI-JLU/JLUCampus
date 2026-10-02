@@ -415,7 +415,7 @@ function ModelList({
     <>
       {groups.map((group) => (
         <PanelSection key={group.name} title={group.name}>
-          <ul className="m-0 grid list-none gap-1 p-0">
+          <ul className="m-0 grid list-none grid-cols-1 gap-1 p-0">
             {group.engines.map((engine) => {
               const active = engine.id === selected
               return (
@@ -454,7 +454,7 @@ function GlossaryChoice({
 }): React.JSX.Element {
   const { t } = useTranslation()
   return (
-    <ul className="m-0 grid list-none gap-1 p-0">
+    <ul className="m-0 grid list-none grid-cols-1 gap-1 p-0">
       {glossaries.map((glossary) => {
         const checkboxId = `${id}-glossary-${glossary.id}`
         return (

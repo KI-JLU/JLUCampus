@@ -136,8 +136,10 @@ export function GlossaryDialog({
       >
         <DialogContent
           closeLabel={t('common.close')}
-          // DS gap: DialogContent has no height cap of its own; a long form scrolls in it.
-          className="max-h-9/10 overflow-y-auto sm:max-w-2xl"
+          // DS gap: DialogContent has no height cap of its own; a long form scrolls in it. Its grid
+          // has no column, so an unbreakable glossary name would widen the content past the
+          // dialog; one shrinkable column keeps it inside and lets the name truncate.
+          className="max-h-9/10 grid-cols-1 overflow-y-auto sm:max-w-2xl"
           // Only the list explains itself, once, below its actions as in HAWKI.
           {...(view.name === 'list' ? {} : { 'aria-describedby': undefined })}
         >
