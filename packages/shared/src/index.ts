@@ -174,25 +174,50 @@ export type LinkComponentConfig = z.infer<typeof linkComponentConfigSchema>
 export const desktopComponentConfigSchema = z.strictObject({})
 export type DesktopComponentConfig = z.infer<typeof desktopComponentConfigSchema>
 
-/** Languages the translator offers, as ISO 639-1 codes. */
+/**
+ * Languages the translator offers, in the order its menus list them (after
+ * HAWKI's): English in its British and American variants, then German and the
+ * rest. Codes are ISO 639-1, English with its region as DeepL takes it.
+ */
 export const TRANSLATOR_LANGUAGES = [
+  'en-gb',
+  'en-us',
   'de',
-  'en',
+  'uk',
   'fr',
   'es',
   'it',
   'nl',
   'pl',
   'pt',
-  'tr',
-  'uk',
   'ru',
-  'ar',
   'zh',
   'ja'
 ] as const
 export const translatorLanguageSchema = z.enum(TRANSLATOR_LANGUAGES)
 export type TranslatorLanguage = z.infer<typeof translatorLanguageSchema>
+
+/**
+ * A language code as a service or an older release gave it, as one the translator offers:
+ * case and region are normalised, plain English is British English. Anything else is `null`.
+ */
+export function toTranslatorLanguage(value: unknown): TranslatorLanguage | null {
+  if (typeof value !== 'string') return null
+  const code = value.trim().toLowerCase().replace('_', '-')
+  if (code === 'en') return 'en-gb'
+  if ((TRANSLATOR_LANGUAGES as readonly string[]).includes(code)) return code as TranslatorLanguage
+  const base = code.split('-')[0]!
+  if (base === 'en') return 'en-gb'
+  return (TRANSLATOR_LANGUAGES as readonly string[]).includes(base)
+    ? (base as TranslatorLanguage)
+    : null
+}
+
+/** A stored language: `en` from before the regional variants reads as British English. */
+const storedTranslatorLanguageSchema = z.preprocess(
+  (value) => (value === 'en' ? 'en-gb' : value),
+  translatorLanguageSchema
+)
 
 /**
  * An engine the translator offers: `deepl`, or `llm:` followed by the id of
@@ -224,7 +249,7 @@ export const TRANSLATOR_LLM_MODELS_MAX = 20
  */
 export const translatorComponentConfigSchema = z.object({
   /** Target language a user starts with. */
-  defaultTargetLanguage: translatorLanguageSchema,
+  defaultTargetLanguage: storedTranslatorLanguageSchema,
   /**
    * DeepL API origin, e.g. `https://api.deepl.com`. `null` picks it from the
    * key: free keys (ending in `:fx`) use `https://api-free.deepl.com`.
@@ -239,6 +264,8 @@ export const translatorComponentConfigSchema = z.object({
       message: 'Model ids must be unique'
     })
     .default([]),
+  /** What the model picker calls the models' provider, e.g. `KI@JLU`; `null`: "AI models". */
+  llmProviderName: z.string().trim().max(40).nullable().default(null),
   /** Engine id (see `translatorEngineIdSchema`) users start with; `null` or unavailable: the first one. */
   defaultEngine: translatorEngineIdSchema.nullable().default(null),
   /** Offers document translation (DeepL only, so it also needs the DeepL key). */
@@ -754,7 +781,10 @@ export type FeedReadPut = z.infer<typeof feedReadPutSchema>
 // Translator module (`API.translator*`)
 // ---------------------------------------------------------------------------
 
-export const TRANSLATE_TEXT_MAX = 5000
+/** Characters a text may have in the translator (HAWKI's limit). */
+export const TRANSLATE_TEXT_MAX = 50_000
+/** Sentences one request may carry; the text is sent split into sentences. */
+export const TRANSLATE_SEGMENTS_MAX = 5000
 
 export const TRANSLATOR_ENGINE_KINDS = ['deepl', 'llm'] as const
 export type TranslatorEngineKind = (typeof TRANSLATOR_ENGINE_KINDS)[number]
@@ -770,12 +800,15 @@ export type TranslatorEngine = z.infer<typeof translatorEngineSchema>
  * The engines users may pick, DeepL first, then the models in admin order.
  * `defaultEngine` is the admin's choice if it is offered, else the first
  * engine; `null` only when there is none (the module lacks its settings).
+ * `llmProvider` names the group the models are listed under.
  */
 export const translatorEngineListSchema = z.object({
   engines: z.array(translatorEngineSchema),
   defaultEngine: translatorEngineIdSchema.nullable(),
   /** Whether documents can be translated: `documentsEnabled` and a DeepL key. */
-  documents: z.boolean()
+  documents: z.boolean(),
+  /** The provider of the AI models as the admin named it; `null`: unnamed. */
+  llmProvider: z.string().nullable().default(null)
 })
 export type TranslatorEngineList = z.infer<typeof translatorEngineListSchema>
 
@@ -800,39 +833,69 @@ export const translatorModelListSchema = z.object({
 export type TranslatorModelList = z.infer<typeof translatorModelListSchema>
 
 /**
- * Formal or informal address in the translation ("Sie" or "du"). DeepL
- * applies it where the target language has the distinction and ignores it
- * elsewhere.
+ * Formal or informal address ("Sie" or "du"). DeepL applies it where the
+ * target language has the distinction and ignores it elsewhere.
  */
 export const TRANSLATOR_FORMALITIES = ['default', 'formal', 'informal'] as const
 export const translatorFormalitySchema = z.enum(TRANSLATOR_FORMALITIES)
 export type TranslatorFormality = z.infer<typeof translatorFormalitySchema>
 
-/** Writing styles for rephrasing; DeepL Write's `writing_style` values. */
+/** Writing styles; DeepL Write's `writing_style` values. */
 export const REPHRASE_STYLES = ['business', 'academic', 'casual', 'simple'] as const
 export const rephraseStyleSchema = z.enum(REPHRASE_STYLES)
 export type RephraseStyle = z.infer<typeof rephraseStyleSchema>
 
-/** Tones for rephrasing; DeepL Write's `tone` values. */
+/** Tones; DeepL Write's `tone` values. */
 export const REPHRASE_TONES = ['confident', 'diplomatic', 'enthusiastic', 'friendly'] as const
 export const rephraseToneSchema = z.enum(REPHRASE_TONES)
 export type RephraseTone = z.infer<typeof rephraseToneSchema>
 
-const translatorTextSchema = z.string().trim().min(1).max(TRANSLATE_TEXT_MAX)
+/** Glossaries one request may apply. */
+export const TRANSLATOR_GLOSSARIES_PER_REQUEST_MAX = 20
+
+/**
+ * A text as its sentences, in order, each with the whitespace that follows it: joined they give
+ * the text back. Engines answer sentence by sentence, so a result lines up with its source.
+ */
+const translatorSegmentsSchema = z
+  .array(z.string().max(TRANSLATE_TEXT_MAX))
+  .min(1)
+  .max(TRANSLATE_SEGMENTS_MAX)
+  .refine((segments) => segments.some((segment) => segment.trim()), {
+    message: 'Enter a text'
+  })
+  .refine(
+    (segments) => segments.reduce((sum, segment) => sum + segment.length, 0) <= TRANSLATE_TEXT_MAX,
+    {
+      message: `At most ${TRANSLATE_TEXT_MAX} characters`
+    }
+  )
+
+/** Style, tone and formality: one of them at most, as the style panel chooses them. */
+const translatorAdjustmentFields = {
+  formality: translatorFormalitySchema.default('default'),
+  style: rephraseStyleSchema.nullable().default(null),
+  tone: rephraseToneSchema.nullable().default(null)
+}
+
+const glossaryIdsSchema = z.array(z.uuid()).max(TRANSLATOR_GLOSSARIES_PER_REQUEST_MAX).default([])
 
 export const translateRequestSchema = z.object({
-  text: translatorTextSchema,
+  text: translatorSegmentsSchema,
   /** `null` lets the service detect the language. */
   source: translatorLanguageSchema.nullable(),
   target: translatorLanguageSchema,
   /** Left out: the default engine. */
   engine: translatorEngineIdSchema.optional(),
-  formality: translatorFormalitySchema.default('default')
+  ...translatorAdjustmentFields,
+  /** Glossaries whose terms the translation keeps to (see `API.translatorGlossaries`). */
+  glossaryIds: glossaryIdsSchema
 })
 export type TranslateRequest = z.input<typeof translateRequestSchema>
 
 export const translateResponseSchema = z.object({
-  translation: z.string(),
+  /** One translation per sentence of the request, in its order. */
+  text: z.array(z.string()),
   /** The language the service detected when `source` was `null`, if it could tell. */
   detectedSource: translatorLanguageSchema.nullable()
 })
@@ -840,48 +903,409 @@ export type TranslateResponse = z.infer<typeof translateResponseSchema>
 
 /**
  * Rewrites a text in its own language: corrects it and, if asked, adapts it
- * to a style or a tone. DeepL Write takes a style or a tone, not both, so a
- * request with both for DeepL answers `400 validation`.
+ * to a style, a tone or a formality. `language` is the text's language when it is known.
  */
 export const rephraseRequestSchema = z.object({
-  text: translatorTextSchema,
+  text: translatorSegmentsSchema,
+  language: translatorLanguageSchema.nullable().default(null),
   engine: translatorEngineIdSchema.optional(),
-  style: rephraseStyleSchema.nullable().default(null),
-  tone: rephraseToneSchema.nullable().default(null)
+  ...translatorAdjustmentFields,
+  glossaryIds: glossaryIdsSchema
 })
 export type RephraseRequest = z.input<typeof rephraseRequestSchema>
 
 export const rephraseResponseSchema = z.object({
-  text: z.string(),
+  /** One sentence per sentence of the request, in its order. */
+  text: z.array(z.string()),
   /** The language of the text, if the service tells. */
   detectedLanguage: translatorLanguageSchema.nullable()
 })
 export type RephraseResponse = z.infer<typeof rephraseResponseSchema>
+
+/** Characters language detection looks at: the start of the text is enough. */
+export const TRANSLATOR_DETECT_SAMPLE_MAX = 500
+
+/** Detects the language of a text before it is translated. */
+export const translatorDetectRequestSchema = z.object({
+  text: z.string().trim().min(1).max(TRANSLATOR_DETECT_SAMPLE_MAX),
+  /** The engine chosen; an AI model detects with itself, DeepL with the first model, else DeepL. */
+  engine: translatorEngineIdSchema.optional()
+})
+export type TranslatorDetectRequest = z.input<typeof translatorDetectRequestSchema>
+
+export const translatorDetectResponseSchema = z.object({
+  /** `null`: not a language the translator offers, or not recognisable. */
+  language: translatorLanguageSchema.nullable()
+})
+export type TranslatorDetectResponse = z.infer<typeof translatorDetectResponseSchema>
+
+/**
+ * What a click on a result offers: other wordings of a sentence (`alternatives`), other words for
+ * one word in its sentence (`synonyms`, the word marked `[[TARGET]]` in `context`), or the sentence
+ * corrected after a word in it was replaced (`correction`, the old sentence in `context`).
+ */
+export const TRANSLATOR_SUGGESTION_KINDS = ['alternatives', 'synonyms', 'correction'] as const
+export type TranslatorSuggestionKind = (typeof TRANSLATOR_SUGGESTION_KINDS)[number]
+
+export const TRANSLATOR_SUGGESTION_TEXT_MAX = 2000
+
+export const translatorSuggestRequestSchema = z.object({
+  kind: z.enum(TRANSLATOR_SUGGESTION_KINDS),
+  text: z.string().trim().min(1).max(TRANSLATOR_SUGGESTION_TEXT_MAX),
+  context: z
+    .string()
+    .max(TRANSLATOR_SUGGESTION_TEXT_MAX * 2)
+    .nullable()
+    .default(null),
+  /** The language of `text`, if known. */
+  language: translatorLanguageSchema.nullable().default(null),
+  engine: translatorEngineIdSchema.optional(),
+  ...translatorAdjustmentFields,
+  /** Suggestions already shown, which the answer must not repeat. */
+  exclusions: z.array(z.string().max(TRANSLATOR_SUGGESTION_TEXT_MAX)).max(50).default([])
+})
+export type TranslatorSuggestRequest = z.input<typeof translatorSuggestRequestSchema>
+
+export const translatorSuggestResponseSchema = z.object({
+  suggestions: z.array(z.string())
+})
+export type TranslatorSuggestResponse = z.infer<typeof translatorSuggestResponseSchema>
+
+/**
+ * What the AI editor ("Text erstellen") does with the marked passage, or with the whole document
+ * when nothing is marked (`compose` then writes new text from `instruction`).
+ */
+export const TRANSLATOR_COMPOSE_ACTIONS = [
+  'proofread',
+  'rephrase',
+  'key_points',
+  'paraphrase',
+  'shorten',
+  'expand',
+  'list',
+  'table',
+  'compose'
+] as const
+export const translatorComposeActionSchema = z.enum(TRANSLATOR_COMPOSE_ACTIONS)
+export type TranslatorComposeAction = z.infer<typeof translatorComposeActionSchema>
+
+export const TRANSLATOR_COMPOSE_INSTRUCTION_MAX = 1000
+
+export const translatorComposeRequestSchema = z.object({
+  action: translatorComposeActionSchema,
+  /**
+   * The passage as Markdown; empty when composing into an empty document. As in HAWKI, there is
+   * no limit of its own: the editor sends whatever is selected.
+   */
+  text: z.string(),
+  /** What to do with it, as the menu or the user put it. */
+  instruction: z.string().trim().min(1).max(TRANSLATOR_COMPOSE_INSTRUCTION_MAX),
+  /** An AI model; DeepL cannot compose (`400 validation`). */
+  engine: translatorEngineIdSchema.optional(),
+  /**
+   * HAWKI's web search, on unless the user switched it off: the web pages the instruction links
+   * to are read and given to the model.
+   */
+  webSearch: z.boolean().default(false),
+  ...translatorAdjustmentFields
+})
+export type TranslatorComposeRequest = z.input<typeof translatorComposeRequestSchema>
+
+export const translatorComposeResponseSchema = z.object({
+  /** The new passage as Markdown. */
+  text: z.string()
+})
+export type TranslatorComposeResponse = z.infer<typeof translatorComposeResponseSchema>
+
+/**
+ * A Python code block of the AI editor to run ("Code ausführen"), as the block's text. Of any
+ * length, as HAWKI takes it: code over 256 KB is answered, not refused.
+ */
+export const translatorPythonRequestSchema = z.object({
+  code: z.string()
+})
+export type TranslatorPythonRequest = z.input<typeof translatorPythonRequestSchema>
+
+/**
+ * How the run ended, as HAWKI answers it. `success`: the code exited with 0; `output` is then what
+ * it printed. Otherwise `output` is the error output, `\n---\n` and what was printed (only the
+ * printed text when there was no error output), or the timeout message. Each of the two outputs
+ * ends after 512 KiB with `\n[truncated]`, which also stops the run.
+ */
+export const translatorPythonResponseSchema = z.object({
+  success: z.boolean(),
+  output: z.string()
+})
+export type TranslatorPythonResponse = z.infer<typeof translatorPythonResponseSchema>
+
+/** Languages glossary terms are in, as their codes in the glossary forms. */
+export const TRANSLATOR_GLOSSARY_LANGUAGES = ['de', 'en', 'uk', 'fr', 'es', 'it'] as const
+export const translatorGlossaryLanguageSchema = z.enum(TRANSLATOR_GLOSSARY_LANGUAGES)
+export type TranslatorGlossaryLanguage = z.infer<typeof translatorGlossaryLanguageSchema>
+
+/**
+ * Who sees a glossary: its owner, the users of one role (`organization`, HAWKI's "Organisation"),
+ * or everyone.
+ */
+export const TRANSLATOR_GLOSSARY_VISIBILITIES = ['private', 'organization', 'public'] as const
+export const translatorGlossaryVisibilitySchema = z.enum(TRANSLATOR_GLOSSARY_VISIBILITIES)
+export type TranslatorGlossaryVisibility = z.infer<typeof translatorGlossaryVisibilitySchema>
+
+/**
+ * The roles a glossary is shared with or edited by: HAWKI's, by their slugs, in its order. Which
+ * Campus users hold one is told by their Keycloak roles and groups (`glossaryRoles` on the server).
+ */
+export const TRANSLATOR_GLOSSARY_ROLES = [
+  'admin',
+  'student',
+  'lecturer',
+  'staff',
+  'guest',
+  'mod'
+] as const
+export const translatorGlossaryRoleSchema = z.enum(TRANSLATOR_GLOSSARY_ROLES)
+export type TranslatorGlossaryRole = z.infer<typeof translatorGlossaryRoleSchema>
+
+/** The names the roles show under, in either language, as HAWKI's role table has them. */
+export const TRANSLATOR_GLOSSARY_ROLE_NAMES: Record<TranslatorGlossaryRole, string> = {
+  admin: 'Administrator',
+  student: 'Studierende',
+  lecturer: 'Lehrende',
+  staff: 'Mitarbeiter',
+  guest: 'Gast',
+  mod: 'Moderator'
+}
+
+/** A new glossary's category, as in HAWKI. */
+export const TRANSLATOR_GLOSSARY_DEFAULT_CATEGORY = 'general'
+
+/**
+ * HAWKI's limits: a name and a category of up to 255 characters, a new glossary's name of up to
+ * 241 (with its 14-character suffix it fills 255). Description and terms are MySQL `TEXT`, which
+ * ends after 65,535 bytes of UTF-8.
+ */
+export const TRANSLATOR_GLOSSARY_NAME_MAX = 255
+export const TRANSLATOR_GLOSSARY_NEW_NAME_MAX = 241
+export const TRANSLATOR_GLOSSARY_CATEGORY_MAX = 255
+/** HAWKI's message for a name or a category over 255 characters, which its page shows as is. */
+export const TRANSLATOR_GLOSSARY_TOO_LONG = 'validation.max.string'
+export const TRANSLATOR_GLOSSARY_TEXT_MAX_BYTES = 65_535
+/** Size of a CSV file to import, as in HAWKI (5,120 KB); a file of any number of pairs fits. */
+export const TRANSLATOR_GLOSSARY_IMPORT_MAX_BYTES = 5 * 1024 * 1024
+/** HAWKI's message for a larger CSV file, which its page shows as it is. */
+export const TRANSLATOR_GLOSSARY_IMPORT_TOO_LARGE = 'The file must not exceed 5MB.'
+
+/** A name or a category: at most `max` characters, counted as HAWKI counts them (code points). */
+function glossaryField(max: number, min = 0) {
+  return z
+    .string()
+    .trim()
+    .min(min)
+    .refine((value) => [...value].length <= max, { message: TRANSLATOR_GLOSSARY_TOO_LONG })
+}
+
+/** A string of at least `min` characters and at most `TRANSLATOR_GLOSSARY_TEXT_MAX_BYTES` bytes. */
+function glossaryText(min = 0) {
+  return z
+    .string()
+    .trim()
+    .min(min)
+    .refine(
+      (value) => new TextEncoder().encode(value).length <= TRANSLATOR_GLOSSARY_TEXT_MAX_BYTES,
+      {
+        message: 'Too long'
+      }
+    )
+}
+
+/** One term and how it is translated. */
+export const translatorGlossaryEntrySchema = z.object({
+  sourceLanguage: translatorGlossaryLanguageSchema,
+  sourceTerm: glossaryText(1),
+  targetLanguage: translatorGlossaryLanguageSchema,
+  targetTerm: glossaryText(1)
+})
+export type TranslatorGlossaryEntry = z.infer<typeof translatorGlossaryEntrySchema>
+
+/**
+ * A glossary the current user can use: their own, a public one, or one shared with a role of
+ * theirs. Its owner and the users of its `editorRole` edit it and change who sees it, as in
+ * HAWKI; only the owner deletes it.
+ */
+export const translatorGlossarySchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  description: z.string(),
+  /** Free text, shown in capitals; `general` unless changed. */
+  category: z.string(),
+  visibility: translatorGlossaryVisibilitySchema,
+  /** The role that sees an `organization` glossary; none: only its owner. */
+  visibleTo: translatorGlossaryRoleSchema.nullable(),
+  /** The role whose users edit it besides the owner; none: the owner only. */
+  editorRole: translatorGlossaryRoleSchema.nullable(),
+  entryCount: z.number().int().nonnegative(),
+  /** Name of the user who created it. */
+  creatorName: z.string(),
+  canEdit: z.boolean(),
+  canDelete: z.boolean(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime()
+})
+export type TranslatorGlossary = z.infer<typeof translatorGlossarySchema>
+
+/** The glossaries the current user can use: public ones and their own, by name. */
+export const translatorGlossaryListSchema = z.object({
+  glossaries: z.array(translatorGlossarySchema),
+  /** The roles a glossary can be shared with or edited by: all of HAWKI's, in its order. */
+  roles: z.array(translatorGlossaryRoleSchema)
+})
+export type TranslatorGlossaryList = z.infer<typeof translatorGlossaryListSchema>
+
+export const translatorGlossaryDetailSchema = translatorGlossarySchema.extend({
+  entries: z.array(translatorGlossaryEntrySchema)
+})
+export type TranslatorGlossaryDetail = z.infer<typeof translatorGlossaryDetailSchema>
+
+/**
+ * A new glossary, or all of an edited one. An empty description leaves an edited glossary's as it
+ * was, as in HAWKI; its roles stay too. As in HAWKI, a glossary takes any number of terms.
+ */
+export const translatorGlossaryInputSchema = z.object({
+  name: glossaryField(TRANSLATOR_GLOSSARY_NAME_MAX, 1),
+  description: glossaryText().default(''),
+  visibility: translatorGlossaryVisibilitySchema.default('private'),
+  entries: z.array(translatorGlossaryEntrySchema).min(1)
+})
+export type TranslatorGlossaryInput = z.input<typeof translatorGlossaryInputSchema>
+
+/**
+ * Changes the details view makes: description and category, or who sees and edits the glossary.
+ * An empty description or category leaves it as it was, as in HAWKI. `visibleTo` counts for
+ * `organization` only and `editorRole` not for `private`; both are dropped otherwise.
+ */
+export const translatorGlossaryPatchSchema = z
+  .object({
+    description: glossaryText().optional(),
+    category: glossaryField(TRANSLATOR_GLOSSARY_CATEGORY_MAX).optional(),
+    visibility: translatorGlossaryVisibilitySchema.optional(),
+    visibleTo: translatorGlossaryRoleSchema.nullable().optional(),
+    editorRole: translatorGlossaryRoleSchema.nullable().optional()
+  })
+  .refine((patch) => Object.values(patch).some((value) => value !== undefined), {
+    message: 'Change the description, the category or the rights'
+  })
+export type TranslatorGlossaryPatch = z.infer<typeof translatorGlossaryPatchSchema>
+
+/**
+ * The fields of `POST API.translatorGlossaryImport` besides `file` (multipart form data): a CSV
+ * of two columns, the source term and the target term, one pair per line.
+ */
+export const translatorGlossaryImportSchema = z.object({
+  name: glossaryField(TRANSLATOR_GLOSSARY_NAME_MAX, 1),
+  description: glossaryText().default(''),
+  sourceLanguage: translatorGlossaryLanguageSchema,
+  targetLanguage: translatorGlossaryLanguageSchema
+})
+export type TranslatorGlossaryImport = z.input<typeof translatorGlossaryImportSchema>
+
+/**
+ * The term pairs of a CSV glossary: two columns, comma or semicolon separated, quotes as in
+ * RFC 4180. Blank lines are skipped; a line with fewer than two terms makes the file invalid
+ * (`null`), and so does a file without any pair.
+ */
+export function parseGlossaryCsv(
+  content: string
+): Array<{ source: string; target: string }> | null {
+  const text = content.replace(/^﻿/, '')
+  const rows: string[][] = []
+  let row: string[] = []
+  let field = ''
+  let quoted = false
+  const delimiter = /^[^\n]*;/.test(text) && !/^[^\n]*,/.test(text) ? ';' : ','
+  const endField = (): void => {
+    row.push(field)
+    field = ''
+  }
+  const endRow = (): void => {
+    endField()
+    rows.push(row)
+    row = []
+  }
+  for (let index = 0; index < text.length; index++) {
+    const character = text[index]!
+    if (quoted) {
+      if (character === '"' && text[index + 1] === '"') {
+        field += '"'
+        index++
+      } else if (character === '"') quoted = false
+      else field += character
+    } else if (character === '"' && field === '') quoted = true
+    else if (character === delimiter) endField()
+    else if (character === '\n') endRow()
+    else if (character !== '\r') field += character
+  }
+  if (field || row.length > 0) endRow()
+  const pairs: Array<{ source: string; target: string }> = []
+  for (const cells of rows) {
+    const values = cells.map((cell) => cell.trim())
+    if (values.every((value) => !value)) continue
+    const [source, target] = values
+    if (!source || !target) return null
+    pairs.push({ source, target })
+  }
+  return pairs.length > 0 ? pairs : null
+}
 
 /**
  * Document translation goes through DeepL's document API. The server uploads
  * the file straight to DeepL (it keeps no copy of the original), follows the
  * job until it is done, and keeps the translated file for
  * `TRANSLATOR_DOCUMENT_TTL_HOURS`, so a user can download it again, also
- * after closing the tab.
+ * after closing the tab. Pictures are translated too.
  */
 export const TRANSLATOR_DOCUMENT_EXTENSIONS = [
   'pdf',
+  'doc',
   'docx',
   'pptx',
+  'ppt',
   'xlsx',
+  'xls',
   'txt',
+  'htm',
   'html',
-  'htm'
+  'xlf',
+  'xliff',
+  'srt',
+  'jpg',
+  'jpeg',
+  'png'
 ] as const
 export type TranslatorDocumentExtension = (typeof TRANSLATOR_DOCUMENT_EXTENSIONS)[number]
 export const TRANSLATOR_DOCUMENT_MAX_BYTES = 20 * 1024 * 1024
+/** The issue on `file` for a document over `TRANSLATOR_DOCUMENT_MAX_BYTES`, however large. */
+export const TRANSLATOR_DOCUMENT_TOO_LARGE = 'File is too large'
 export const TRANSLATOR_DOCUMENT_TTL_HOURS = 24
 export const TRANSLATOR_DOCUMENT_FILENAME_MAX = 255
-/** Jobs one user may have queued or translating at once. */
-export const TRANSLATOR_DOCUMENT_ACTIVE_MAX = 3
-/** Uploads one user may start within 24 hours; deleted jobs count too. */
-export const TRANSLATOR_DOCUMENT_DAILY_MAX = 50
+/**
+ * Jobs one user may have queued or translating at once: a guard against runaway uploads only.
+ * HAWKI takes several parallel jobs (tabs) of one user, so normal use never meets it.
+ */
+export const TRANSLATOR_DOCUMENT_ACTIVE_MAX = 20
+
+/**
+ * HAWKI's throttle: one count of a user's requests per minute for translating, rewriting,
+ * detecting, the AI editor and Python runs as well as document uploads. The minute opens with
+ * the user's first request; a request is refused (`429 rate_limited` with
+ * `TRANSLATOR_THROTTLED_MESSAGE`) once the count reaches its route's limit, and refused requests
+ * do not count. The answers carry `X-RateLimit-Limit` and `X-RateLimit-Remaining`, refusals also
+ * `Retry-After` and `X-RateLimit-Reset`.
+ */
+export const TRANSLATOR_REQUESTS_PER_MINUTE = 60
+/** The limit of a document upload on the same count: ten requests of any kind in the minute. */
+export const TRANSLATOR_DOCUMENT_UPLOADS_PER_MINUTE = 10
+/** HAWKI's (Laravel's) message for a throttled request, which its pages show as it is. */
+export const TRANSLATOR_THROTTLED_MESSAGE = 'Too Many Attempts.'
 
 /** The file's extension if it is one the translator takes, else `null`. */
 export function translatorDocumentExtension(filename: string): TranslatorDocumentExtension | null {
@@ -904,7 +1328,8 @@ export type TranslatorDocumentError = z.infer<typeof translatorDocumentErrorSche
 
 /**
  * The fields of `POST API.translatorDocuments` besides `file` (multipart form
- * data, so every value is a string; `source` empty or absent: detect).
+ * data, so every value is a string; `source` empty or absent: detect;
+ * `glossaryId` once per glossary).
  */
 export const translatorDocumentUploadSchema = z.object({
   source: z
@@ -912,7 +1337,8 @@ export const translatorDocumentUploadSchema = z.object({
     .optional()
     .transform((value) => value || null),
   target: translatorLanguageSchema,
-  formality: translatorFormalitySchema.default('default')
+  formality: translatorFormalitySchema.default('default'),
+  glossaryIds: glossaryIdsSchema
 })
 export type TranslatorDocumentUpload = z.input<typeof translatorDocumentUploadSchema>
 
@@ -923,16 +1349,20 @@ export const translatorDocumentSchema = z.object({
   filename: z.string(),
   /** Size of the uploaded file in bytes. */
   size: z.number().int().nonnegative(),
-  /** `null`: DeepL detected it. */
-  source: translatorLanguageSchema.nullable(),
-  target: translatorLanguageSchema,
+  /** `null`: DeepL detected it. Codes as stored, also those of older releases. */
+  source: z.string().nullable(),
+  target: z.string(),
   status: translatorDocumentStatusSchema,
   /** DeepL's estimate while translating, if it gave one. */
   secondsRemaining: z.number().int().nonnegative().nullable(),
   /** Set when `status` is `error`. */
   error: translatorDocumentErrorSchema.nullable(),
-  /** The name the download gets, e.g. `Bericht_en.docx`. */
+  /** DeepL's own words for the error, if it gave any (in English). */
+  errorMessage: z.string().nullable().default(null),
+  /** The name the download gets, e.g. `Bericht_en-gb.docx`. */
   resultFilename: z.string(),
+  /** Size of the translated file in bytes once it is done. */
+  resultSize: z.number().int().nonnegative().nullable().default(null),
   createdAt: z.string().datetime(),
   /**
    * After this the server deletes the job and its file: `TRANSLATOR_DOCUMENT_TTL_HOURS` after
@@ -1037,7 +1467,8 @@ export const API = {
   /**
    * POST `translateRequestSchema` → `translateResponseSchema`. An engine that
    * is not offered answers `400 validation`; upstream failures and missing
-   * settings answer `502 module_unavailable`.
+   * settings answer `502 module_unavailable`; over `TRANSLATOR_REQUESTS_PER_MINUTE`
+   * `429 rate_limited`.
    */
   translate: '/api/modules/translator/translate',
   /** POST `rephraseRequestSchema` → `rephraseResponseSchema`. Errors as for `translate`. */
@@ -1048,9 +1479,9 @@ export const API = {
    * `file` and the fields of `translatorDocumentUploadSchema` → 201 with `translatorDocumentSchema`;
    * a missing file, a type outside `TRANSLATOR_DOCUMENT_EXTENSIONS` or more than
    * `TRANSLATOR_DOCUMENT_MAX_BYTES` answers `400 validation`, DeepL refusing it
-   * `502 module_unavailable`. `TRANSLATOR_DOCUMENT_ACTIVE_MAX` running jobs, or
-   * `TRANSLATOR_DOCUMENT_DAILY_MAX` uploads within 24 hours, answer `429 rate_limited`
-   * before anything goes to DeepL.
+   * `502 module_unavailable`. Over `TRANSLATOR_DOCUMENT_UPLOADS_PER_MINUTE`, or with
+   * `TRANSLATOR_DOCUMENT_ACTIVE_MAX` running jobs, it answers `429 rate_limited` before anything
+   * goes to DeepL.
    */
   translatorDocuments: '/api/modules/translator/documents',
   /**
@@ -1060,6 +1491,48 @@ export const API = {
   translatorDocument: (id: string) => `/api/modules/translator/documents/${id}`,
   /** GET: the translated file as an attachment named `resultFilename`; before `done`, `409 conflict`. */
   translatorDocumentDownload: (id: string) => `/api/modules/translator/documents/${id}/download`,
+  /** POST `translatorDetectRequestSchema` → `translatorDetectResponseSchema`. Errors as for `translate`. */
+  translatorDetect: '/api/modules/translator/detect',
+  /** POST `translatorSuggestRequestSchema` → `translatorSuggestResponseSchema`. Errors as for `translate`. */
+  translatorSuggest: '/api/modules/translator/suggest',
+  /**
+   * POST `translatorComposeRequestSchema` → `translatorComposeResponseSchema`, for the AI editor.
+   * DeepL, or no AI model at all, answers `400 validation`; otherwise errors as for `translate`.
+   */
+  translatorCompose: '/api/modules/translator/compose',
+  /**
+   * POST `translatorPythonRequestSchema` → `translatorPythonResponseSchema`: runs the code in a
+   * container without network for at most 10 s, trimmed at both ends as HAWKI (Laravel) trims it.
+   * Code over 256 KB (UTF-8) is not run: `success: false` with HAWKI's
+   * `code_exec: code too large (max 256 KB)`. Code that is empty or only spaces answers
+   * `400 validation` with the message `validation.required`, as HAWKI's does; over
+   * `TRANSLATOR_REQUESTS_PER_MINUTE` `429 rate_limited`; no sandbox to run in
+   * `502 module_unavailable`.
+   */
+  translatorExecutePython: '/api/modules/translator/execute-python',
+  /**
+   * GET: `translatorGlossaryListSchema`. POST: `translatorGlossaryInputSchema` → 201 with
+   * `translatorGlossaryDetailSchema`; a `visibility` other than `private` from a user who is no
+   * admin answers `403 forbidden`. A name over `TRANSLATOR_GLOSSARY_NEW_NAME_MAX` characters answers
+   * `400 validation` with HAWKI's database message, as message and as issue on `name`; one over
+   * `TRANSLATOR_GLOSSARY_NAME_MAX` the issue `TRANSLATOR_GLOSSARY_TOO_LONG`.
+   */
+  translatorGlossaries: '/api/modules/translator/glossaries',
+  /**
+   * POST multipart form data: `file` (CSV, at most `TRANSLATOR_GLOSSARY_IMPORT_MAX_BYTES`) and the
+   * fields of `translatorGlossaryImportSchema` → 201 with `translatorGlossaryDetailSchema`. A file
+   * that is not two columns of terms answers `400 validation` on `file`; names as for
+   * `translatorGlossaries`.
+   */
+  translatorGlossaryImport: '/api/modules/translator/glossaries/import',
+  /**
+   * One glossary the user can use (others answer `404 not_found`). GET:
+   * `translatorGlossaryDetailSchema`. PUT: `translatorGlossaryInputSchema`, PATCH:
+   * `translatorGlossaryPatchSchema` → `translatorGlossaryDetailSchema`; DELETE → 204. Changing a
+   * glossary the user may not edit, deleting one they do not own, or sharing it with a role or
+   * everyone from a user who is no admin answers `403 forbidden`.
+   */
+  translatorGlossary: (id: string) => `/api/modules/translator/glossaries/${id}`,
   /** GET: `folderTemplateListSchema`, enabled templates with widgets of enabled components. Any signed-in user. */
   folderTemplates: '/api/folder-templates',
   /** Admin only. GET: all templates. POST: `folderTemplateInputSchema` → 201 with `folderTemplateSchema`. */

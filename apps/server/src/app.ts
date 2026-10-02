@@ -223,7 +223,18 @@ export const app = new Hono<AppEnvironment>()
 app.use('*', logger())
 app.use(
   '/api/*',
-  cors({ origin: env.CORS_ORIGINS, credentials: true, allowHeaders: ['Content-Type'] })
+  cors({
+    origin: env.CORS_ORIGINS,
+    credentials: true,
+    allowHeaders: ['Content-Type'],
+    // The translator's throttle tells the page, as HAWKI's, how many requests are left.
+    exposeHeaders: [
+      'X-RateLimit-Limit',
+      'X-RateLimit-Remaining',
+      'Retry-After',
+      'X-RateLimit-Reset'
+    ]
+  })
 )
 
 /** The web app's origins, and the API's own when it serves the web app itself. */

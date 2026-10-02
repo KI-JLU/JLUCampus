@@ -7,8 +7,11 @@ import {
   deeplBaseUrl,
   DeepLHttpError,
   deeplDetectedLanguage,
+  deeplSourceLanguage,
   downloadDocument,
+  glossaryTsv,
   deeplTargetLanguage,
+  hasMarkup,
   translateWithDeepL
 } from './deepl.js'
 import { translatorApp } from './index.js'
@@ -22,33 +25,95 @@ describe('DeepL', () => {
     expect(deeplBaseUrl('https://custom.example.test/', 'free:fx')).toBe(
       'https://custom.example.test'
     )
-    expect(deeplTargetLanguage('en')).toBe('EN-GB')
+    expect(deeplTargetLanguage('en-gb')).toBe('EN-GB')
+    expect(deeplTargetLanguage('en-us')).toBe('EN-US')
     expect(deeplTargetLanguage('pt')).toBe('PT-PT')
     expect(deeplTargetLanguage('zh')).toBe('ZH-HANS')
-    expect(deeplDetectedLanguage('en-GB')).toBe('en')
+    expect(deeplSourceLanguage('en-us')).toBe('EN')
+    expect(deeplDetectedLanguage('EN')).toBe('en-gb')
+    expect(deeplDetectedLanguage('DE')).toBe('de')
   })
 
-  it('sends DeepL translation requests and reads their response', async () => {
+  it('sends the sentences with text and keeps blank ones', async () => {
     const fetch = vi.fn(async () =>
-      Response.json({ translations: [{ text: 'Hallo', detected_source_language: 'en' }] })
+      Response.json({
+        translations: [
+          { text: 'Hallo.', detected_source_language: 'EN' },
+          { text: 'Welt.', detected_source_language: 'EN' }
+        ]
+      })
     )
     vi.stubGlobal('fetch', fetch)
 
     await expect(
       translateWithDeepL(
-        { text: 'Hello', source: null, target: 'de', formality: 'formal' },
+        {
+          text: ['Hello. ', '\n', 'World.'],
+          source: null,
+          target: 'de',
+          formality: 'formal',
+          style: null,
+          tone: null,
+          glossaryIds: []
+        },
         null,
         'free:fx',
         new AbortController().signal
       )
-    ).resolves.toEqual({ translation: 'Hallo', detectedSource: 'en' })
+    ).resolves.toEqual({ text: ['Hallo.', '\n', 'Welt.'], detectedSource: 'en-gb' })
     expect(fetch).toHaveBeenCalledWith(
       'https://api-free.deepl.com/v2/translate',
       expect.objectContaining({
         redirect: 'error',
-        body: JSON.stringify({ text: ['Hello'], target_lang: 'DE', formality: 'prefer_more' })
+        body: JSON.stringify({
+          text: ['Hello. ', 'World.'],
+          target_lang: 'DE',
+          formality: 'prefer_more'
+        })
       })
     )
+  })
+
+  it('sends the source as HAWKI does and keeps markup as HTML', async () => {
+    const fetch = vi.fn(async () =>
+      Response.json({ translations: [{ text: 'Hi.' }, { text: '<b>World</b> &amp; you.' }] })
+    )
+    vi.stubGlobal('fetch', fetch)
+
+    await translateWithDeepL(
+      {
+        text: ['Hallo & tschüss. ', '<b>Welt</b> & du.'],
+        source: 'en-gb',
+        target: 'de',
+        formality: 'default',
+        style: null,
+        tone: null,
+        glossaryIds: []
+      },
+      null,
+      'free:fx',
+      new AbortController().signal
+    )
+    expect(
+      JSON.parse((fetch.mock.calls[0] as unknown as [string, { body: string }])[1].body)
+    ).toEqual({
+      text: ['Hallo & tschüss. ', '<b>Welt</b> & du.'],
+      target_lang: 'DE',
+      source_lang: 'EN-GB',
+      tag_handling: 'html'
+    })
+    expect(hasMarkup('3 < 5 und 6 > 4')).toBe(false)
+    expect(hasMarkup('Das ist <3 für dich')).toBe(false)
+  })
+
+  it('writes glossary terms as DeepL TSV', () => {
+    expect(
+      glossaryTsv([
+        { source: 'Prüfungs\tamt', target: 'Examinations Office' },
+        { source: 'Prüfungs amt', target: 'Other' },
+        { source: ' ', target: 'x' }
+      ])
+    ).toBe('Prüfungs amt\tExaminations Office')
   })
 
   it('maps malformed upstream responses to module_unavailable', async () => {
@@ -58,14 +123,16 @@ describe('DeepL', () => {
     )
     const app = new Hono<AppEnvironment>()
     app.use('*', async (context, next) => {
+      context.set('session', { user: { id: 'user' } } as AppEnvironment['Variables']['session'])
       context.set('module', {
         type: 'translator',
         componentId: 'component',
         config: {
-          defaultTargetLanguage: 'en',
+          defaultTargetLanguage: 'en-gb',
           deeplApiUrl: null,
           llmBaseUrl: null,
           llmModels: [],
+          llmProviderName: null,
           defaultEngine: null,
           documentsEnabled: false
         },
@@ -84,7 +151,7 @@ describe('DeepL', () => {
     const response = await app.request('http://test/translate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: 'Hello', source: null, target: 'de' })
+      body: JSON.stringify({ text: ['Hello'], source: null, target: 'de' })
     })
     expect(response.status).toBe(502)
     await expect(response.json()).resolves.toMatchObject({ error: { code: 'module_unavailable' } })

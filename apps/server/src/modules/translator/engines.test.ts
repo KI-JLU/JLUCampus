@@ -3,10 +3,11 @@ import { describe, expect, it } from 'vitest'
 import { listEngines, resolveDefaultEngine, resolveEngine } from './engines.js'
 
 const config = {
-  defaultTargetLanguage: 'en' as const,
+  defaultTargetLanguage: 'en-gb' as const,
   deeplApiUrl: null,
   llmBaseUrl: 'https://llm.example.test/v1',
   llmModels: [{ id: 'campus-1', label: 'Campus model' }],
+  llmProviderName: null,
   defaultEngine: 'llm:campus-1',
   documentsEnabled: false
 }

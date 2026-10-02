@@ -9,4 +9,5 @@ release/
 .eslintcache
 .DS_Store
 infra/postgres-data/
+infra/python-sandbox/.gvisor/
 apps/web/dev-dist/

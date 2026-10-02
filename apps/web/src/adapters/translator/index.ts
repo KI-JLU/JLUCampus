@@ -9,10 +9,11 @@ export const translatorAdapter: ComponentAdapter<'translator'> = {
   Page: TranslatorPage,
   ConfigFields: TranslatorConfigFields,
   defaultConfig: {
-    defaultTargetLanguage: 'en',
+    defaultTargetLanguage: 'en-gb',
     deeplApiUrl: null,
     llmBaseUrl: null,
     llmModels: [],
+    llmProviderName: null,
     defaultEngine: null,
     documentsEnabled: false
   },

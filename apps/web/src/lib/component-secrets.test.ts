@@ -24,10 +24,11 @@ const translator: AdminComponent = {
   ...stored,
   type: 'translator',
   config: {
-    defaultTargetLanguage: 'en',
+    defaultTargetLanguage: 'en-gb',
     deeplApiUrl: null,
     llmBaseUrl: null,
     llmModels: [],
+    llmProviderName: null,
     defaultEngine: null,
     documentsEnabled: false
   },

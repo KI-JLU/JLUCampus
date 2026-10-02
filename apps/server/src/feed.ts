@@ -372,10 +372,17 @@ function readBody(response: IncomingMessage): Promise<string> {
   })
 }
 
+const FEED_HEADERS = {
+  Accept:
+    'application/atom+xml, application/feed+json, application/json, application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.1',
+  'User-Agent': 'JLU-Campus-Feed/1.0'
+}
+
 async function requestOnce(
   url: URL,
   address: LookupAddress,
-  deadline: number
+  deadline: number,
+  headers: { Accept: string; 'User-Agent': string }
 ): Promise<{ response: IncomingMessage; body?: string }> {
   const remaining = deadline - Date.now()
   if (remaining <= 0) throw new FeedUnavailableError('Feed request timed out')
@@ -394,12 +401,7 @@ async function requestOnce(
         method: 'GET',
         lookup,
         servername: url.hostname.replace(/^\[|\]$/g, ''),
-        headers: {
-          Accept:
-            'application/atom+xml, application/feed+json, application/json, application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.1',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'User-Agent': 'JLU-Campus-Feed/1.0'
-        }
+        headers: { ...headers, 'Accept-Encoding': 'gzip, deflate, br' }
       },
       async (response) => {
         try {
@@ -469,16 +471,24 @@ async function beforeDeadline<T>(promise: Promise<T>, deadline: number): Promise
   }
 }
 
-export async function fetchFeed(urlValue: string, allowPrivateHosts: boolean): Promise<Feed> {
+/**
+ * A public web resource as text, fetched the careful way feeds are: only public hosts (unless
+ * allowed), a pinned address, at most three redirects, a deadline and a size limit.
+ */
+export async function fetchPublicText(
+  urlValue: string,
+  allowPrivateHosts: boolean,
+  headers: { Accept: string; 'User-Agent': string } = FEED_HEADERS
+): Promise<{ url: string; body: string; contentType: string | undefined }> {
   let url = checkedUrl(urlValue)
   const deadline = Date.now() + REQUEST_TIMEOUT_MS
   try {
     for (let redirects = 0; ; redirects += 1) {
       const address = await beforeDeadline(pinnedAddress(url, allowPrivateHosts), deadline)
-      const { response, body } = await requestOnce(url, address, deadline)
+      const { response, body } = await requestOnce(url, address, deadline, headers)
       if (body !== undefined) {
         if (Date.now() >= deadline) throw new FeedUnavailableError('Feed request timed out')
-        return normalizeFeed(body, url.toString())
+        return { url: url.toString(), body, contentType: response.headers['content-type'] }
       }
       response.resume()
       const location = response.headers.location
@@ -487,6 +497,16 @@ export async function fetchFeed(urlValue: string, allowPrivateHosts: boolean): P
       }
       url = checkedUrl(location, url)
     }
+  } catch (error) {
+    if (error instanceof FeedUnavailableError) throw error
+    throw new FeedUnavailableError('Feed could not be fetched')
+  }
+}
+
+export async function fetchFeed(urlValue: string, allowPrivateHosts: boolean): Promise<Feed> {
+  const { url, body } = await fetchPublicText(urlValue, allowPrivateHosts)
+  try {
+    return normalizeFeed(body, url)
   } catch (error) {
     if (error instanceof FeedUnavailableError) throw error
     throw new FeedUnavailableError('Feed could not be fetched')

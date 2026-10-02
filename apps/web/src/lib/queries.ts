@@ -15,10 +15,16 @@ import {
   API,
   rephraseResponseSchema,
   translateResponseSchema,
+  translatorComposeResponseSchema,
+  translatorPythonResponseSchema,
+  translatorDetectResponseSchema,
   translatorDocumentListSchema,
   translatorDocumentSchema,
   translatorEngineListSchema,
+  translatorGlossaryDetailSchema,
+  translatorGlossaryListSchema,
   translatorModelListSchema,
+  translatorSuggestResponseSchema,
   type AdminComponent,
   type AdminComponentList,
   type Component,
@@ -41,12 +47,22 @@ import {
   type Sidebar,
   type TranslateRequest,
   type TranslateResponse,
+  type TranslatorComposeRequest,
+  type TranslatorComposeResponse,
+  type TranslatorDetectRequest,
   type TranslatorDocument,
   type TranslatorEngineList,
   type TranslatorFormality,
+  type TranslatorGlossaryDetail,
+  type TranslatorGlossaryImport,
+  type TranslatorGlossaryInput,
+  type TranslatorGlossaryList,
+  type TranslatorGlossaryPatch,
   type TranslatorLanguage,
   type TranslatorLlmModel,
   type TranslatorModelsRequest,
+  type TranslatorPythonResponse,
+  type TranslatorSuggestRequest,
   type UserFeed,
   type WidgetList
 } from '@justcampus/shared'
@@ -91,7 +107,8 @@ export const queryKeys = {
   adminPresetAudiences: ['admin', 'preset-audiences'] as const,
   feed: (url: string) => ['feed', url] as const,
   translatorEngines: ['translator', 'engines'] as const,
-  translatorDocuments: ['translator', 'documents'] as const
+  translatorDocuments: ['translator', 'documents'] as const,
+  translatorGlossaries: ['translator', 'glossaries'] as const
 }
 
 export const meQuery = queryOptions({
@@ -193,7 +210,15 @@ export interface DocumentUploadRequest {
   source: TranslatorLanguage | null
   target: TranslatorLanguage
   formality: TranslatorFormality
+  glossaryIds: readonly string[]
 }
+
+/**
+ * The translator's requests go out even when the browser says it is offline, and fail at once
+ * then, as HAWKI's do: a request paused until the network is back would look like one still on
+ * its way.
+ */
+const TRANSLATOR_NETWORK_MODE = 'always' as const
 
 /** Uploads one document for translation; the new job heads the list right away. */
 export function useUploadTranslatorDocument(): UseMutationResult<
@@ -203,12 +228,14 @@ export function useUploadTranslatorDocument(): UseMutationResult<
 > {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: async ({ file, source, target, formality }) => {
+    networkMode: TRANSLATOR_NETWORK_MODE,
+    mutationFn: async ({ file, source, target, formality, glossaryIds }) => {
       const form = new FormData()
       form.set('file', file)
       form.set('source', source ?? '')
       form.set('target', target)
       form.set('formality', formality)
+      for (const id of glossaryIds) form.append('glossaryId', id)
       return translatorDocumentSchema.parse(
         await apiFetch<unknown>(API.translatorDocuments, { method: 'POST', form })
       )
@@ -227,6 +254,7 @@ export function useUploadTranslatorDocument(): UseMutationResult<
 export function useDeleteTranslatorDocument(): UseMutationResult<void, Error, string> {
   const client = useQueryClient()
   return useMutation({
+    networkMode: TRANSLATOR_NETWORK_MODE,
     mutationFn: (id: string) => apiFetch<void>(API.translatorDocument(id), { method: 'DELETE' }),
     onSuccess: (_, id) => {
       client.setQueryData<TranslatorDocument[]>(queryKeys.translatorDocuments, (jobs) =>
@@ -466,6 +494,7 @@ export function useTranslate(): UseMutationResult<
   TranslatorCall<TranslateRequest>
 > {
   return useMutation({
+    networkMode: TRANSLATOR_NETWORK_MODE,
     mutationFn: async ({ request, signal }: TranslatorCall<TranslateRequest>) =>
       translateResponseSchema.parse(
         await apiFetch<unknown>(API.translate, { method: 'POST', json: request, signal })
@@ -473,17 +502,147 @@ export function useTranslate(): UseMutationResult<
   })
 }
 
-/** Rephrases one text with the translator module; checked like `useTranslate`. */
-export function useRephrase(): UseMutationResult<
-  RephraseResponse,
+/** Translates a text sentence by sentence; checked like `useTranslate`. */
+export async function translateText(
+  request: TranslateRequest,
+  signal?: AbortSignal
+): Promise<TranslateResponse> {
+  return translateResponseSchema.parse(
+    await apiFetch<unknown>(API.translate, { method: 'POST', json: request, signal })
+  )
+}
+
+/** Rewrites a text sentence by sentence in its own language. */
+export async function rephraseText(
+  request: RephraseRequest,
+  signal?: AbortSignal
+): Promise<RephraseResponse> {
+  return rephraseResponseSchema.parse(
+    await apiFetch<unknown>(API.rephrase, { method: 'POST', json: request, signal })
+  )
+}
+
+/** The language of a text sample; `null` when it is not one the translator offers. */
+export async function detectLanguage(
+  request: TranslatorDetectRequest,
+  signal?: AbortSignal
+): Promise<TranslatorLanguage | null> {
+  return translatorDetectResponseSchema.parse(
+    await apiFetch<unknown>(API.translatorDetect, { method: 'POST', json: request, signal })
+  ).language
+}
+
+/** Other wordings of a sentence, other words for a word, or a corrected sentence. */
+export async function fetchSuggestions(
+  request: TranslatorSuggestRequest,
+  signal?: AbortSignal
+): Promise<string[]> {
+  return translatorSuggestResponseSchema.parse(
+    await apiFetch<unknown>(API.translatorSuggest, { method: 'POST', json: request, signal })
+  ).suggestions
+}
+
+/** One action of the AI editor on a passage. */
+export async function composeText(
+  request: TranslatorComposeRequest,
+  signal?: AbortSignal
+): Promise<TranslatorComposeResponse> {
+  return translatorComposeResponseSchema.parse(
+    await apiFetch<unknown>(API.translatorCompose, { method: 'POST', json: request, signal })
+  )
+}
+
+/** Runs a Python code block of the AI editor on the server. */
+export async function executePython(code: string): Promise<TranslatorPythonResponse> {
+  return translatorPythonResponseSchema.parse(
+    await apiFetch<unknown>(API.translatorExecutePython, { method: 'POST', json: { code } })
+  )
+}
+
+/** The glossaries the user can apply: public ones and their own. */
+export function useTranslatorGlossaries(): UseQueryResult<TranslatorGlossaryList> {
+  return useQuery({
+    queryKey: queryKeys.translatorGlossaries,
+    queryFn: async ({ signal }) =>
+      translatorGlossaryListSchema.parse(
+        await apiFetch<unknown>(API.translatorGlossaries, { signal })
+      ),
+    retry: (count, error) => !(error instanceof ApiRequestError) && count < 2
+  })
+}
+
+/** One glossary with its terms, for the edit form. */
+export async function fetchGlossary(id: string): Promise<TranslatorGlossaryDetail> {
+  return translatorGlossaryDetailSchema.parse(await apiFetch<unknown>(API.translatorGlossary(id)))
+}
+
+/** A new glossary (`id` left out) or all of an edited one. */
+export function useSaveGlossary(): UseMutationResult<
+  TranslatorGlossaryDetail,
   Error,
-  TranslatorCall<RephraseRequest>
+  { id?: string; input: TranslatorGlossaryInput }
 > {
+  const client = useQueryClient()
   return useMutation({
-    mutationFn: async ({ request, signal }: TranslatorCall<RephraseRequest>) =>
-      rephraseResponseSchema.parse(
-        await apiFetch<unknown>(API.rephrase, { method: 'POST', json: request, signal })
+    networkMode: TRANSLATOR_NETWORK_MODE,
+    mutationFn: async ({ id, input }) =>
+      translatorGlossaryDetailSchema.parse(
+        await apiFetch<unknown>(id ? API.translatorGlossary(id) : API.translatorGlossaries, {
+          method: id ? 'PUT' : 'POST',
+          json: input
+        })
+      ),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.translatorGlossaries })
+  })
+}
+
+/** Changes a glossary's description or visibility. */
+export function usePatchGlossary(): UseMutationResult<
+  TranslatorGlossaryDetail,
+  Error,
+  { id: string; patch: TranslatorGlossaryPatch }
+> {
+  const client = useQueryClient()
+  return useMutation({
+    networkMode: TRANSLATOR_NETWORK_MODE,
+    mutationFn: async ({ id, patch }) =>
+      translatorGlossaryDetailSchema.parse(
+        await apiFetch<unknown>(API.translatorGlossary(id), { method: 'PATCH', json: patch })
+      ),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.translatorGlossaries })
+  })
+}
+
+export function useDeleteGlossary(): UseMutationResult<void, Error, string> {
+  const client = useQueryClient()
+  return useMutation({
+    networkMode: TRANSLATOR_NETWORK_MODE,
+    mutationFn: (id: string) => apiFetch<void>(API.translatorGlossary(id), { method: 'DELETE' }),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.translatorGlossaries })
+  })
+}
+
+/** Creates a glossary from a CSV file of term pairs. */
+export function useImportGlossary(): UseMutationResult<
+  TranslatorGlossaryDetail,
+  Error,
+  TranslatorGlossaryImport & { file: File }
+> {
+  const client = useQueryClient()
+  return useMutation({
+    networkMode: TRANSLATOR_NETWORK_MODE,
+    mutationFn: async ({ file, name, description, sourceLanguage, targetLanguage }) => {
+      const form = new FormData()
+      form.set('file', file)
+      form.set('name', name)
+      form.set('description', description ?? '')
+      form.set('sourceLanguage', sourceLanguage)
+      form.set('targetLanguage', targetLanguage)
+      return translatorGlossaryDetailSchema.parse(
+        await apiFetch<unknown>(API.translatorGlossaryImport, { method: 'POST', form })
       )
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.translatorGlossaries })
   })
 }
 

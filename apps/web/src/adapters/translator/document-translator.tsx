@@ -1,563 +1,627 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import {
-  AlertCircleIcon,
   ArrowRightIcon,
-  CheckCircle2Icon,
+  ChevronDownIcon,
   DownloadIcon,
   FileTextIcon,
-  Trash2Icon
+  Trash2Icon,
+  XIcon
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Button, Card, FileDropzone, Label, Spinner } from '@ki4jlu/design-system'
+import { Badge, Button, Card, FileDropzone, Input, Spinner } from '@ki4jlu/design-system'
 import {
   API,
   TRANSLATOR_DOCUMENT_ACTIVE_MAX,
-  TRANSLATOR_DOCUMENT_DAILY_MAX,
+  TRANSLATOR_DOCUMENT_TOO_LARGE,
+  TRANSLATOR_THROTTLED_MESSAGE,
   TRANSLATOR_DOCUMENT_EXTENSIONS,
-  TRANSLATOR_DOCUMENT_MAX_BYTES,
-  TRANSLATOR_DOCUMENT_TTL_HOURS,
   translatorDocumentExtension,
+  translatorDocumentSchema,
   type TranslatorDocument,
   type TranslatorFormality,
   type TranslatorLanguage
 } from '@justcampus/shared'
-import { ApiRequestError, apiBase } from '@/lib/api'
+import { ApiRequestError, apiBase, apiFetch } from '@/lib/api'
 import {
-  type DocumentUploadRequest,
   useDeleteTranslatorDocument,
   useTranslatorDocuments,
   useUploadTranslatorDocument
 } from '@/lib/queries'
 import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
-import { LanguageSelect } from './language-select'
-import { languageOptions } from './languages'
+import { IconAction } from './copy-button'
+import { formatSize } from './format'
+import { LanguageMenu } from './language-menu'
 
 const ICON = { 'aria-hidden': true, className: 'size-4' } as const
 
 const ACCEPT = TRANSLATOR_DOCUMENT_EXTENSIONS.map((extension) => `.${extension}`).join(',')
 
-/** A file on its way to the server, until the server answers with its job. */
-interface Upload {
+/** How long to wait between looks at a running job: from 3 s, half a second more each time. */
+const POLL_START_MS = 3000
+const POLL_STEP_MS = 500
+const POLL_MAX_MS = 5000
+/** A job still running after this counts as failed. */
+const POLL_TIMEOUT_MS = 5 * 60 * 1000
+
+/** One selected file and where its translation stands. */
+interface Item {
   key: string
-  name: string
-  size: number
-  /** Waiting for a free slot (see `TRANSLATOR_DOCUMENT_ACTIVE_MAX`), uploading, or failed. */
-  state: 'waiting' | 'uploading' | 'error'
-  /** Why the upload failed. */
+  file: File
+  /** `selected` until the batch starts; then its way through upload and DeepL. */
+  state: 'selected' | 'waiting' | 'uploading' | 'queued' | 'translating' | 'done' | 'error'
+  progress: number
+  secondsRemaining: number | null
+  job: TranslatorDocument | null
   error: string | null
 }
 
-interface QueuedFile {
-  file: File
-  key: string
-  request: Omit<DocumentUploadRequest, 'file'>
+/**
+ * What the card shows, as in HAWKI three parts of their own: the drop zone, the selection (which
+ * turns into the progress list while it is translated), and the last batch's results. A new
+ * selection may stand above the results of the batch before.
+ */
+interface View {
+  upload: boolean
+  selection: boolean
+  /** The last batch's files with their downloads or errors; `null`: none shown. */
+  results: Item[] | null
+  /** The target language can be chosen, from choosing files until they are declined. */
+  languageActive: boolean
+}
+const START_VIEW: View = { upload: true, selection: false, results: null, languageActive: false }
+
+/** Files dropped anywhere on the page's work area land here. */
+export interface DocumentDropTarget {
+  addFiles: (files: File[]) => void
 }
 
-/** How long to wait before looking again whether a running job has finished. */
-const SLOT_POLL_MS = 3000
-
-const isRunning = (job: TranslatorDocument): boolean =>
-  job.status === 'queued' || job.status === 'translating'
-
 interface DocumentTranslatorProps {
-  id: string
-  defaultTarget: TranslatorLanguage
+  target: TranslatorLanguage
+  onTarget: (language: TranslatorLanguage) => void
   formality: TranslatorFormality
+  glossaryIds: readonly string[]
 }
 
 /**
- * Document translation (DeepL only): the language bar, a dropzone that also opens the file
- * picker, and the user's jobs. The server follows each job at DeepL and keeps the translated
- * file for `TRANSLATOR_DOCUMENT_TTL_HOURS`, so the list survives closing the tab. Several
- * files are uploaded one after another, each with the languages chosen when it was added.
+ * Document translation (DeepL), after HAWKI's: files are chosen first (a list with type, name,
+ * size and a way to remove each), then translated one after another with their progress, and
+ * finally listed with their downloads or errors. Earlier translations wait below in a list of
+ * their own, which survives closing the tab for `TRANSLATOR_DOCUMENT_TTL_HOURS`.
  */
-export function DocumentTranslator({
-  id,
-  defaultTarget,
-  formality
-}: DocumentTranslatorProps): React.JSX.Element {
-  const { t, i18n } = useTranslation()
-  const locale = i18n.resolvedLanguage ?? i18n.language
-  const languages = useMemo(() => languageOptions(locale), [locale])
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [source, setSource] = useState<TranslatorLanguage | null>(null)
-  const [target, setTarget] = useState<TranslatorLanguage>(defaultTarget)
-  const [uploads, setUploads] = useState<Upload[]>([])
-  /** Files waiting for their upload, in the order they were added. */
-  const queue = useRef<QueuedFile[]>([])
-  const draining = useRef(false)
-  // Leaving document mode unmounts this view: files not yet uploaded are dropped with it, so a
-  // queue of an earlier visit never competes with the next one for a free slot.
-  const unmounted = useRef(false)
-  const tRef = useRef(t)
-  tRef.current = t
-  useEffect(() => {
-    unmounted.current = false
-    return () => {
-      unmounted.current = true
-      const dropped = queue.current.length
-      queue.current = []
-      if (dropped > 0) {
-        toast({
-          variant: 'info',
-          title: tRef.current('component.translator.documents.dropped', { count: dropped })
+export const DocumentTranslator = forwardRef<DocumentDropTarget, DocumentTranslatorProps>(
+  function DocumentTranslator({ target, onTarget, formality, glossaryIds }, ref) {
+    const { t } = useTranslation()
+    const inputRef = useRef<HTMLInputElement>(null)
+    const [items, setItems] = useState<Item[]>([])
+    /**
+     * The list a selection showed when "Weitere Dokumente hochladen" emptied it. HAWKI leaves that
+     * list on screen below the drop zone, though nothing is selected any more: translating it does
+     * nothing, removing a file or declining closes it, new files replace it.
+     */
+    const [stale, setStale] = useState<Item[] | null>(null)
+    const [view, setView] = useState<View>(START_VIEW)
+    const [processing, setProcessing] = useState(false)
+    const [completed, setCompleted] = useState(0)
+    const upload = useUploadTranslatorDocument()
+    const jobs = useTranslatorDocuments(true)
+    const unmounted = useRef(false)
+    useEffect(() => {
+      unmounted.current = false
+      return () => {
+        unmounted.current = true
+      }
+    }, [])
+
+    /**
+     * Takes the files the translator can do (others are left out), each once. As in HAWKI, only
+     * "Ablehnen" and "Weitere Dokumente hochladen" empty the selection: files dropped after a
+     * finished batch join the files of that batch, and its results stay shown below.
+     */
+    const addFiles = (files: File[]): void => {
+      if (processing) return
+      const next = items.map((item) =>
+        item.state === 'selected'
+          ? item
+          : {
+              ...item,
+              state: 'selected' as const,
+              progress: 0,
+              secondsRemaining: null,
+              job: null,
+              error: null
+            }
+      )
+      for (const file of files) {
+        if (!translatorDocumentExtension(file.name)) continue
+        if (next.some((item) => item.file.name === file.name && item.file.size === file.size))
+          continue
+        next.push({
+          key: crypto.randomUUID(),
+          file,
+          state: 'selected',
+          progress: 0,
+          secondsRemaining: null,
+          job: null,
+          error: null
         })
       }
+      if (next.length === 0) return
+      setStale(null)
+      setItems(next)
+      setView((current) => ({ ...current, upload: false, selection: true, languageActive: true }))
     }
-  }, [])
-  const jobs = useTranslatorDocuments(true)
-  const upload = useUploadTranslatorDocument()
-  const remove = useDeleteTranslatorDocument()
-  const announcement = useJobAnnouncement(jobs.data)
-  const max = formatSize(TRANSLATOR_DOCUMENT_MAX_BYTES, locale)
+    useImperativeHandle(ref, () => ({ addFiles }))
 
-  const languageName = (code: TranslatorLanguage | null): string =>
-    code
-      ? (languages.find((option) => option.code === code)?.name ?? code)
-      : t('component.translator.detect')
-
-  const addFiles = async (files: File[]): Promise<void> => {
-    const accepted = files.filter((file) => {
-      if (!translatorDocumentExtension(file.name)) {
-        toast({
-          variant: 'error',
-          title: t('component.translator.documents.unsupported', { name: file.name })
-        })
-        return false
-      }
-      if (file.size > TRANSLATOR_DOCUMENT_MAX_BYTES) {
-        toast({
-          variant: 'error',
-          title: t('component.translator.documents.tooLarge', { name: file.name, max })
-        })
-        return false
-      }
-      return true
-    })
-    // The languages as they are now, even if they change while earlier files upload.
-    const request = { source, target, formality }
-    const queued = accepted.map((file) => ({ file, key: crypto.randomUUID(), request }))
-    queue.current.push(...queued)
-    setUploads((current) => [
-      ...current,
-      ...queued.map(({ file, key }) => ({
-        key,
-        name: file.name,
-        size: file.size,
-        state: 'waiting' as const,
-        error: null
-      }))
-    ])
-    void drain()
-  }
-
-  /**
-   * Uploads the queued files one after another. One run at a time, fed by every selection, so
-   * two quick selections cannot both take the same free slot.
-   */
-  const drain = async (): Promise<void> => {
-    if (draining.current) return
-    draining.current = true
-    const update = (key: string, patch: Partial<Upload>): void =>
-      setUploads((current) =>
+    const update = (key: string, patch: Partial<Item>): void =>
+      setItems((current) =>
         current.map((item) => (item.key === key ? { ...item, ...patch } : item))
       )
-    try {
-      for (let next = queue.current.shift(); next; next = queue.current.shift()) {
-        const { file, key, request } = next
+
+    /** "Ablehnen": the selection goes, the results of the batch before stay. */
+    const decline = (): void => {
+      setItems([])
+      setStale(null)
+      setView((current) => ({ ...current, upload: true, selection: false, languageActive: false }))
+    }
+
+    /** "Weitere Dokumente hochladen": back to the drop zone; a selection shown stays, stale. */
+    const uploadMore = (): void => {
+      if (view.selection && !processing) setStale(items)
+      setItems([])
+      setCompleted(0)
+      setView((current) => ({ ...START_VIEW, selection: current.selection && !processing }))
+    }
+
+    /** The files one after another: upload, then follow the job until DeepL is done. */
+    const translate = async (): Promise<void> => {
+      const batch = items
+      if (batch.length === 0) return
+      setProcessing(true)
+      setCompleted(0)
+      const finished = new Map<string, Item>()
+      const track = (key: string, patch: Partial<Item>): void => {
+        const item = finished.get(key)
+        if (item) finished.set(key, { ...item, ...patch })
+        update(key, patch)
+      }
+      for (const item of batch) finished.set(item.key, { ...item, state: 'waiting', progress: 0 })
+      setItems([...finished.values()])
+      let done = 0
+      for (const item of batch) {
+        if (unmounted.current) return
         try {
-          if (!(await waitForSlot())) return
-          update(key, { state: 'uploading' })
-          await upload.mutateAsync({ file, ...request })
-          setUploads((current) => current.filter((item) => item.key !== key))
+          track(item.key, { state: 'uploading', progress: 10 })
+          const job = await upload.mutateAsync({
+            file: item.file,
+            source: null,
+            target,
+            formality,
+            glossaryIds
+          })
+          const result = await follow(job, (patch) => track(item.key, patch))
+          track(item.key, { state: 'done', progress: 100, job: result })
+          done++
         } catch (error) {
-          update(key, {
-            state: 'error',
-            error: t(uploadErrorKey(error), {
-              active: TRANSLATOR_DOCUMENT_ACTIVE_MAX,
-              daily: TRANSLATOR_DOCUMENT_DAILY_MAX
-            })
+          track(item.key, { state: 'error', progress: 100, error: errorText(error) })
+        }
+        setCompleted(done)
+      }
+      void jobs.refetch()
+      if (unmounted.current) return
+      setProcessing(false)
+      setView((current) => ({ ...current, selection: false, results: [...finished.values()] }))
+    }
+
+    /** Looks at the job until it is done; its error ends the wait. */
+    const follow = async (
+      job: TranslatorDocument,
+      onProgress: (patch: Partial<Item>) => void
+    ): Promise<TranslatorDocument> => {
+      const start = Date.now()
+      let wait = POLL_START_MS
+      for (let current = job; ;) {
+        if (Date.now() - start > POLL_TIMEOUT_MS) throw new Error('timeout')
+        await new Promise((resolve) => setTimeout(resolve, wait))
+        current = translatorDocumentSchema.parse(
+          await apiFetch<unknown>(API.translatorDocument(current.id))
+        )
+        if (current.status === 'queued') onProgress({ state: 'queued', progress: 15 })
+        else if (current.status === 'translating') {
+          const seconds = current.secondsRemaining
+          onProgress({
+            state: 'translating',
+            secondsRemaining: seconds,
+            progress: seconds ? Math.min(85, Math.max(30, 90 - seconds * 2)) : 50
+          })
+        } else if (current.status === 'done') return current
+        else throw new JobError(current)
+        wait = Math.min(wait + POLL_STEP_MS, POLL_MAX_MS)
+      }
+    }
+
+    /**
+     * What a failed file's line says, as in HAWKI: DeepL's own words for a translation that
+     * failed there, HAWKI's general message for a file DeepL did not take at all.
+     */
+    const errorText = (error: unknown): string => {
+      if (error instanceof JobError) {
+        return (
+          error.job.errorMessage ??
+          t(
+            error.job.error === 'same_language'
+              ? 'component.translator.documents.sameLanguage'
+              : 'component.translator.documents.deeplError'
+          )
+        )
+      }
+      if (error instanceof Error && error.message === 'timeout') {
+        return t('component.translator.documents.timeout')
+      }
+      if (error instanceof ApiRequestError) {
+        // HAWKI's throttle answers with Laravel's message, which the line shows as it is.
+        if (error.code === 'rate_limited' && error.message === TRANSLATOR_THROTTLED_MESSAGE) {
+          return error.message
+        }
+        if (error.code === 'rate_limited') {
+          return t('component.translator.documents.rateLimited', {
+            active: TRANSLATOR_DOCUMENT_ACTIVE_MAX
           })
         }
+        if (
+          error.body?.error.issues?.some((issue) => issue.message === TRANSLATOR_DOCUMENT_TOO_LARGE)
+        ) {
+          return t('component.translator.documents.tooLarge')
+        }
       }
-    } finally {
-      draining.current = false
+      return t('component.translator.documents.failed')
     }
-  }
 
-  /**
-   * The server takes `TRANSLATOR_DOCUMENT_ACTIVE_MAX` running jobs per user; further files wait
-   * here until one of them is done instead of being turned away. `false`: the view is gone.
-   */
-  const waitForSlot = async (): Promise<boolean> => {
-    for (;;) {
-      if (unmounted.current) return false
-      const { data, error } = await jobs.refetch()
-      if (error) throw error
-      if (unmounted.current) return false
-      if ((data ?? []).filter(isRunning).length < TRANSLATOR_DOCUMENT_ACTIVE_MAX) return true
-      await new Promise((resolve) => setTimeout(resolve, SLOT_POLL_MS))
-    }
-  }
+    const active = view.languageActive
+    const listed = stale ?? items
 
-  const deleteJob = (job: TranslatorDocument): void => {
-    remove.mutate(job.id, {
-      onError: () =>
-        toast({
-          variant: 'error',
-          title: t('component.translator.documents.deleteFailed', { name: job.filename })
-        })
-    })
-  }
-
-  const list = jobs.data ?? []
-
-  return (
-    <div className="flex flex-col gap-stack-lg">
-      <Card className="@container overflow-hidden">
-        <div className="grid min-h-14 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 border-b border-outline-variant px-2 py-2 @xl:px-4">
-          <Label htmlFor={`${id}-doc-source`} className="sr-only">
-            {t('component.translator.source')}
-          </Label>
-          <LanguageSelect
-            id={`${id}-doc-source`}
-            inBar
-            allowDetect
-            value={source}
-            onChange={setSource}
-            className="@xl:justify-self-end"
-          />
-          <span className="flex size-9 items-center justify-center text-on-surface-variant">
+    return (
+      <div className="flex flex-col gap-stack-lg">
+        <Card className="@container overflow-hidden">
+          <div
+            className={cn(
+              'flex min-h-14 items-center justify-center gap-4 border-b border-outline-variant px-4 py-2',
+              !active && 'text-on-surface-variant'
+            )}
+          >
+            <span className="px-4 text-sm font-medium">{t('component.translator.detect')}</span>
             <ArrowRightIcon {...ICON} />
-          </span>
-          <Label htmlFor={`${id}-doc-target`} className="sr-only">
-            {t('component.translator.target')}
-          </Label>
-          <LanguageSelect
-            id={`${id}-doc-target`}
-            inBar
-            value={target}
-            onChange={setTarget}
-            className="@xl:justify-self-start"
-          />
-        </div>
-        <div className="p-4 @xl:p-6">
-          <FileDropzone
-            icon={<FileTextIcon />}
-            title={t('component.translator.documents.drop')}
-            hint={t('component.translator.documents.types', { max })}
-            onFiles={(files) => void addFiles(files)}
-            onBrowse={() => inputRef.current?.click()}
-            className="min-h-52"
-          />
-          {/* eslint-disable-next-line design-system/no-raw-ui-elements -- hidden file picker behind the dropzone, never rendered as a field */}
-          <input
+            <LanguageMenu
+              label={t('component.translator.target')}
+              value={target}
+              onChange={onTarget}
+              disabled={!active}
+            />
+          </div>
+          {view.upload ? (
+            <div className="p-4 @xl:p-6">
+              <FileDropzone
+                icon={<FileTextIcon />}
+                title={t('component.translator.documents.drop')}
+                hint={
+                  <span className="flex flex-col items-center gap-4 pt-2">
+                    <Button type="button" onClick={() => inputRef.current?.click()}>
+                      {t('component.translator.documents.browse')}
+                    </Button>
+                    <span className="flex flex-col gap-1">
+                      <span>{t('component.translator.documents.types')}</span>
+                      <span>{t('component.translator.documents.images')}</span>
+                    </span>
+                  </span>
+                }
+                onFiles={addFiles}
+                className="min-h-96"
+              />
+            </div>
+          ) : null}
+          {view.selection ? (
+            <div className="flex flex-col gap-6 p-6 @xl:p-10">
+              <ul className="m-0 flex list-none flex-col gap-3 p-0">
+                {listed.map((item) => (
+                  <FileRow
+                    key={item.key}
+                    item={item}
+                    onRemove={() => {
+                      const rest = items.filter((other) => other.key !== item.key)
+                      setItems(rest)
+                      if (rest.length === 0) decline()
+                    }}
+                  />
+                ))}
+              </ul>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant pt-5">
+                <p aria-live="polite" className="m-0 text-sm text-on-surface-variant">
+                  {processing
+                    ? t('component.translator.documents.progress', {
+                        done: completed,
+                        count: items.length
+                      })
+                    : t('component.translator.documents.selected', { count: listed.length })}
+                </p>
+                <div className="flex gap-3">
+                  <Button type="button" variant="outline" disabled={processing} onClick={decline}>
+                    {t('component.translator.documents.decline')}
+                  </Button>
+                  <Button type="button" disabled={processing} onClick={() => void translate()}>
+                    {processing ? <Spinner size="sm" /> : null}
+                    {t('component.translator.documents.translate')}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+          {view.results ? (
+            <div
+              className={cn(
+                'flex flex-col gap-6 p-6 @xl:p-10',
+                (view.upload || view.selection) && 'pt-0 @xl:pt-0'
+              )}
+            >
+              <ul className="m-0 flex list-none flex-col gap-3 p-0">
+                {view.results.map((item) => (
+                  <ResultRow key={item.key} item={item} />
+                ))}
+              </ul>
+              <div className="flex justify-end border-t border-outline-variant pt-5">
+                <Button type="button" onClick={uploadMore}>
+                  {t('component.translator.documents.uploadMore')}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          {/* The file picker behind the button, never shown itself. */}
+          <Input
             ref={inputRef}
             type="file"
             multiple
             accept={ACCEPT}
             hidden
+            tabIndex={-1}
+            aria-hidden="true"
             onChange={(event) => {
               const files = Array.from(event.target.files ?? [])
               event.target.value = ''
-              if (files.length > 0) void addFiles(files)
+              if (files.length > 0) addFiles(files)
             }}
           />
-        </div>
-      </Card>
-      <section aria-labelledby={`${id}-jobs-title`} className="flex flex-col gap-stack-sm">
-        <div className="flex flex-col gap-1">
-          <h2 id={`${id}-jobs-title`} className="m-0 text-base font-semibold text-on-surface">
-            {t('component.translator.documents.listTitle')}
-          </h2>
-          <p className="m-0 text-sm text-on-surface-variant">
-            {t('component.translator.documents.listHint', { hours: TRANSLATOR_DOCUMENT_TTL_HOURS })}
-          </p>
-        </div>
-        {jobs.isPending ? (
-          <Spinner label={t('component.translator.documents.loading')} />
-        ) : jobs.isError ? (
-          <p className="m-0 flex items-center gap-1.5 text-sm text-error">
-            <AlertCircleIcon {...ICON} />
-            {t('component.translator.documents.loadFailed')}
-          </p>
-        ) : uploads.length === 0 && list.length === 0 ? (
-          <p className="m-0 text-sm text-on-surface-variant">
-            {t('component.translator.documents.empty')}
-          </p>
-        ) : (
-          <ul className="m-0 list-none overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest p-0">
-            {uploads.map((item) => (
-              <JobRow
-                key={item.key}
-                name={item.name}
-                meta={formatSize(item.size, locale)}
-                status={
-                  item.state === 'error' ? (
-                    <StatusText tone="error">{item.error}</StatusText>
-                  ) : (
-                    <StatusText tone="busy">
-                      {t(
-                        item.state === 'waiting'
-                          ? 'component.translator.documents.waiting'
-                          : 'component.translator.documents.uploading'
-                      )}
-                    </StatusText>
-                  )
-                }
-                actions={
-                  item.state === 'error' ? (
-                    <IconButton
-                      label={t('component.translator.documents.dismiss', { name: item.name })}
-                      onClick={() =>
-                        setUploads((current) => current.filter((other) => other.key !== item.key))
-                      }
-                    >
-                      <Trash2Icon {...ICON} />
-                    </IconButton>
-                  ) : null
-                }
-              />
-            ))}
-            {list.map((job) => (
-              <JobRow
-                key={job.id}
-                name={job.filename}
-                meta={`${languageName(job.source)} → ${languageName(job.target)} · ${formatSize(job.size, locale)}`}
-                status={<JobStatus job={job} locale={locale} />}
-                actions={
-                  <>
-                    {job.status === 'done' ? (
-                      <Button asChild variant="secondary" size="sm">
-                        <a
-                          href={`${apiBase()}${API.translatorDocumentDownload(job.id)}`}
-                          download={job.resultFilename}
-                        >
-                          <DownloadIcon {...ICON} />
-                          {t('component.translator.documents.download')}
-                          <span className="sr-only">{` ${job.resultFilename}`}</span>
-                        </a>
-                      </Button>
-                    ) : null}
-                    <IconButton
-                      label={t('component.translator.documents.delete', { name: job.filename })}
-                      disabled={remove.isPending && remove.variables === job.id}
-                      onClick={() => deleteJob(job)}
-                    >
-                      <Trash2Icon {...ICON} />
-                    </IconButton>
-                  </>
-                }
-              />
-            ))}
-          </ul>
-        )}
-        <p aria-live="polite" className="sr-only">
-          {announcement}
-        </p>
-      </section>
-    </div>
-  )
-}
+        </Card>
+        <History jobs={jobs.data} loading={jobs.isPending} failed={jobs.isError} />
+      </div>
+    )
+  }
+)
 
-/** Where a job stands: waiting, translating (with DeepL's estimate), done until when, or why not. */
-function JobStatus({ job, locale }: { job: TranslatorDocument; locale: string }): React.ReactNode {
-  const { t } = useTranslation()
-  switch (job.status) {
-    case 'queued':
-      return <StatusText tone="busy">{t('component.translator.documents.queued')}</StatusText>
-    case 'translating':
-      return (
-        <StatusText tone="busy">
-          {job.secondsRemaining
-            ? t('component.translator.documents.translatingFor', {
-                seconds: job.secondsRemaining
-              })
-            : t('component.translator.documents.translating')}
-        </StatusText>
-      )
-    case 'done':
-      return (
-        <StatusText tone="done">
-          {t('component.translator.documents.done', {
-            until: new Date(job.expiresAt).toLocaleString(locale, {
-              dateStyle: 'short',
-              timeStyle: 'short'
-            })
-          })}
-        </StatusText>
-      )
-    case 'error':
-      return (
-        <StatusText tone="error">
-          {t(
-            job.error === 'same_language'
-              ? 'component.translator.documents.sameLanguage'
-              : 'component.translator.documents.failed'
-          )}
-        </StatusText>
-      )
+/** A job that ended with an error at DeepL. */
+class JobError extends Error {
+  constructor(readonly job: TranslatorDocument) {
+    super(job.errorMessage ?? job.error ?? 'failed')
   }
 }
 
-function StatusText({
-  tone,
-  children
-}: {
-  tone: 'busy' | 'done' | 'error'
-  children: React.ReactNode
-}): React.JSX.Element {
+/** The file's type as a short tag, e.g. `DOCX`. */
+function TypeTag({ name, error }: { name: string; error?: boolean }): React.JSX.Element {
+  const extension = name.includes('.') ? name.split('.').pop()!.toUpperCase() : '?'
   return (
     <span
+      aria-hidden="true"
       className={cn(
-        'flex items-center gap-1.5 text-xs',
-        tone === 'error' ? 'text-error' : 'text-on-surface-variant'
+        'flex h-8 min-w-10 shrink-0 items-center justify-center rounded-md border px-1 text-xs font-bold',
+        error ? 'border-error text-error' : 'border-outline-variant text-on-surface-variant'
       )}
     >
-      {tone === 'busy' ? (
-        <span aria-hidden="true" className="flex size-3.5 items-center">
-          <Spinner size="sm" />
-        </span>
-      ) : tone === 'done' ? (
-        <CheckCircle2Icon aria-hidden="true" className="size-3.5 text-success" />
-      ) : (
-        <AlertCircleIcon aria-hidden="true" className="size-3.5" />
-      )}
-      {children}
+      {extension}
     </span>
   )
 }
 
-interface JobRowProps {
-  name: string
-  meta: string
-  status: React.ReactNode
-  actions: React.ReactNode
-}
-
-/** One file in the list: icon, name, languages and size, status, then what can be done with it. */
-function JobRow({ name, meta, status, actions }: JobRowProps): React.JSX.Element {
+function FileRow({ item, onRemove }: { item: Item; onRemove: () => void }): React.JSX.Element {
+  const { t } = useTranslation()
+  const status =
+    item.state === 'waiting'
+      ? t('component.translator.documents.waiting')
+      : item.state === 'uploading'
+        ? t('component.translator.documents.uploading')
+        : item.state === 'queued'
+          ? t('component.translator.documents.translating')
+          : item.state === 'translating'
+            ? item.secondsRemaining
+              ? t('component.translator.documents.translatingFor', {
+                  seconds: item.secondsRemaining
+                })
+              : t('component.translator.documents.translating')
+            : item.state === 'done'
+              ? t('component.translator.documents.done')
+              : item.state === 'error'
+                ? t('component.translator.documents.error')
+                : null
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-2 border-outline-variant px-4 py-3 not-first:border-t">
-      <span
-        aria-hidden="true"
-        className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary-container text-on-secondary-container"
-      >
-        <FileTextIcon className="size-4" />
-      </span>
+    <li className="flex items-center gap-4 rounded-xl border border-outline-variant px-5 py-4">
+      <TypeTag name={item.file.name} />
       <div className="grid min-w-0 flex-1 gap-0.5">
-        <p className="m-0 truncate text-sm font-medium text-on-surface" title={name}>
-          {name}
+        <p className="m-0 truncate text-base font-semibold text-on-surface" title={item.file.name}>
+          {item.file.name}
         </p>
-        <p className="m-0 truncate text-xs text-on-surface-variant">{meta}</p>
-        {status}
+        <p className="m-0 text-xs text-on-surface-variant">{formatSize(item.file.size)}</p>
       </div>
-      <div className="flex shrink-0 items-center gap-1">{actions}</div>
+      {item.state === 'selected' ? (
+        <IconAction
+          label={t('component.translator.documents.remove', { name: item.file.name })}
+          onClick={onRemove}
+        >
+          <XIcon {...ICON} />
+        </IconAction>
+      ) : (
+        <div className="flex shrink-0 items-center gap-3">
+          <span
+            className={cn(
+              'text-sm',
+              item.state === 'error'
+                ? 'text-error'
+                : item.state === 'done'
+                  ? 'text-success'
+                  : 'text-primary'
+            )}
+          >
+            {status}
+          </span>
+          <span
+            role="progressbar"
+            aria-label={item.file.name}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={item.progress}
+            className="h-1 w-24 overflow-hidden rounded-full bg-surface-container-high"
+          >
+            <span
+              style={{ width: `${item.progress}%` }}
+              className={cn(
+                'block h-full rounded-full transition-[width] duration-500',
+                item.state === 'error'
+                  ? 'bg-error'
+                  : item.state === 'done'
+                    ? 'bg-success'
+                    : 'bg-primary'
+              )}
+            />
+          </span>
+        </div>
+      )}
     </li>
   )
 }
 
-function IconButton({
-  label,
-  disabled,
-  onClick,
-  children
-}: {
-  label: string
-  disabled?: boolean
-  onClick: () => void
-  children: React.ReactNode
-}): React.JSX.Element {
+/** A finished file: its translation to download, or why there is none. */
+function ResultRow({ item }: { item: Item }): React.JSX.Element {
+  const { t } = useTranslation()
+  if (item.state === 'done' && item.job) {
+    return (
+      <li className="flex items-center gap-4 rounded-xl border border-outline-variant px-5 py-4">
+        <TypeTag name={item.file.name} />
+        <p className="m-0 min-w-0 flex-1 truncate text-base font-semibold text-on-surface">
+          {item.job.resultFilename}
+        </p>
+        <Button asChild variant="outline" size="sm">
+          <a
+            href={`${apiBase()}${API.translatorDocumentDownload(item.job.id)}`}
+            download={item.job.resultFilename}
+          >
+            <DownloadIcon {...ICON} />
+            {t('component.translator.documents.download')}
+            <span className="sr-only">{` ${item.job.resultFilename}`}</span>
+          </a>
+        </Button>
+      </li>
+    )
+  }
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      {children}
-    </Button>
+    <li className="flex items-center gap-4 rounded-xl border border-error px-5 py-4">
+      <TypeTag name={item.file.name} error />
+      <div className="grid min-w-0 flex-1 gap-0.5">
+        <p className="m-0 truncate text-base font-semibold text-on-surface">{item.file.name}</p>
+        <p className="m-0 text-sm text-error">{item.error}</p>
+      </div>
+    </li>
   )
 }
 
-/**
- * What a screenreader hears when a job finishes: the list refreshes itself, so without this a
- * finished translation would go unnoticed.
- */
-function useJobAnnouncement(jobs: TranslatorDocument[] | undefined): string {
+/** "Übersetzte Dokumente": the finished translations, newest first, to download or delete. */
+function History({
+  jobs,
+  loading,
+  failed
+}: {
+  jobs: TranslatorDocument[] | undefined
+  loading: boolean
+  failed: boolean
+}): React.JSX.Element | null {
   const { t } = useTranslation()
-  const previous = useRef<Map<string, TranslatorDocument['status']> | null>(null)
-  const [message, setMessage] = useState('')
-
-  useEffect(() => {
-    if (!jobs) return
-    const before = previous.current
-    previous.current = new Map(jobs.map((job) => [job.id, job.status]))
-    // The first list is what was there before; only changes after it are news.
-    if (!before) return
-    const finished = jobs.filter((job) => {
-      const was = before.get(job.id)
-      return (
-        was !== undefined && was !== job.status && (job.status === 'done' || job.status === 'error')
-      )
-    })
-    if (finished.length === 0) return
-    setMessage(
-      finished
-        .map((job) =>
-          t(
-            job.status === 'done'
-              ? 'component.translator.documents.announceDone'
-              : 'component.translator.documents.announceFailed',
-            { name: job.filename }
-          )
-        )
-        .join(' ')
+  const [open, setOpen] = useState(true)
+  const remove = useDeleteTranslatorDocument()
+  const done = (jobs ?? []).filter((job) => job.status === 'done')
+  if (loading) return null
+  if (failed) {
+    return (
+      <p role="alert" className="m-0 text-sm text-error">
+        {t('component.translator.documents.loadFailed')}
+      </p>
     )
-  }, [jobs, t])
-
-  return message
-}
-
-function uploadErrorKey(
-  error: unknown
-):
-  | 'component.translator.documents.uploadInvalid'
-  | 'component.translator.documents.rateLimited'
-  | 'component.translator.errors.unavailable'
-  | 'component.translator.errors.disabled'
-  | 'component.translator.errors.failed' {
-  if (!(error instanceof ApiRequestError)) return 'component.translator.errors.failed'
-  switch (error.code) {
-    case 'validation':
-      return 'component.translator.documents.uploadInvalid'
-    case 'rate_limited':
-      return 'component.translator.documents.rateLimited'
-    case 'module_unavailable':
-      return 'component.translator.errors.unavailable'
-    case 'not_found':
-      return 'component.translator.errors.disabled'
-    default:
-      return 'component.translator.errors.failed'
   }
-}
-
-/** Bytes as kB or MB in the UI language. */
-function formatSize(bytes: number, locale: string): string {
-  const megabytes = bytes / (1024 * 1024)
-  return megabytes >= 1
-    ? new Intl.NumberFormat(locale, {
-        style: 'unit',
-        unit: 'megabyte',
-        maximumFractionDigits: 1
-      }).format(megabytes)
-    : new Intl.NumberFormat(locale, {
-        style: 'unit',
-        unit: 'kilobyte',
-        maximumFractionDigits: 0
-      }).format(Math.max(1, Math.round(bytes / 1024)))
+  if (done.length === 0) return null
+  const listId = 'translator-document-history'
+  return (
+    <Card className="overflow-hidden">
+      <Button
+        type="button"
+        variant="ghost"
+        aria-expanded={open}
+        aria-controls={listId}
+        onClick={() => setOpen((value) => !value)}
+        // eslint-disable-next-line design-system/layout-only-classname -- the whole head of the list opens and closes it, as in HAWKI
+        className="flex h-auto w-full justify-between rounded-none px-5 py-4"
+      >
+        <span className="flex items-center gap-2 text-base font-semibold text-on-surface">
+          {t('component.translator.documents.history')}
+          <Badge>{done.length}</Badge>
+        </span>
+        <ChevronDownIcon
+          {...ICON}
+          className={cn('size-4 transition-transform', !open && '-rotate-90')}
+        />
+      </Button>
+      {open ? (
+        <ul id={listId} className="m-0 list-none border-t border-outline-variant p-0">
+          {done.map((job) => (
+            <li
+              key={job.id}
+              className="flex items-center gap-3 border-outline-variant px-5 py-3 not-first:border-t"
+            >
+              <TypeTag name={job.resultFilename} />
+              <div className="grid min-w-0 flex-1 gap-0.5">
+                <p className="m-0 truncate text-sm text-on-surface" title={job.resultFilename}>
+                  {job.resultFilename}
+                </p>
+                <p className="m-0 text-xs text-on-surface-variant">
+                  {job.resultSize !== null ? formatSize(job.resultSize) : ''}
+                </p>
+              </div>
+              <Button asChild variant="ghost" size="icon">
+                <a
+                  href={`${apiBase()}${API.translatorDocumentDownload(job.id)}`}
+                  download={job.resultFilename}
+                  aria-label={t('component.translator.documents.downloadFile', {
+                    name: job.resultFilename
+                  })}
+                  title={t('component.translator.documents.downloadShort')}
+                >
+                  <DownloadIcon {...ICON} />
+                </a>
+              </Button>
+              <IconAction
+                label={t('component.translator.documents.delete', { name: job.resultFilename })}
+                disabled={remove.isPending && remove.variables === job.id}
+                onClick={() =>
+                  remove.mutate(job.id, {
+                    onError: () =>
+                      toast({
+                        variant: 'error',
+                        title: t('component.translator.documents.deleteFailed', {
+                          name: job.resultFilename
+                        })
+                      })
+                  })
+                }
+              >
+                <Trash2Icon {...ICON} />
+              </IconAction>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </Card>
+  )
 }

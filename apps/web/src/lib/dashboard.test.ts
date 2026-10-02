@@ -57,10 +57,11 @@ function component(id: string, type: Component['type']): Component {
         ...base,
         type,
         config: {
-          defaultTargetLanguage: 'en',
+          defaultTargetLanguage: 'en-gb',
           deeplApiUrl: null,
           llmBaseUrl: null,
           llmModels: [],
+          llmProviderName: null,
           defaultEngine: null,
           documentsEnabled: false
         }

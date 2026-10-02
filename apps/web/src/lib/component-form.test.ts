@@ -23,10 +23,11 @@ const translator: AdminComponent = {
   updatedAt: '2026-09-01T00:00:00.000Z',
   type: 'translator',
   config: {
-    defaultTargetLanguage: 'en',
+    defaultTargetLanguage: 'en-gb',
     deeplApiUrl: null,
     llmBaseUrl: null,
     llmModels: [],
+    llmProviderName: null,
     defaultEngine: null,
     documentsEnabled: false
   },
@@ -89,13 +90,14 @@ describe('validateComponentForm', () => {
       {
         ...initialFormState(translator),
         config: {
-          defaultTargetLanguage: 'en',
+          defaultTargetLanguage: 'en-gb',
           deeplApiUrl: 'http://api.deepl.com',
           llmBaseUrl: null,
           llmModels: [
             { id: 'llama', label: 'Llama' },
             { id: ' ', label: 'Mistral' }
           ],
+          llmProviderName: null,
           defaultEngine: null,
           documentsEnabled: false
         }
