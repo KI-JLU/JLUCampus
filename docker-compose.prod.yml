@@ -1,0 +1,36 @@
+# Production: Postgres and the published app image. Keycloak runs elsewhere.
+#   cp .env.production.example .env.production   # fill in the secrets
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+# The app applies database migrations on every start.
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-justcampus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-justcampus}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    image: ${JUSTCAMPUS_IMAGE:-ghcr.io/ki4jlu/jlucampus}:${JUSTCAMPUS_TAG:-latest}
+    restart: unless-stopped
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env.production
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-justcampus}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-justcampus}
+    # Put a TLS-terminating reverse proxy in front; it should reach this port.
+    ports:
+      - '${APP_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000'
+
+volumes:
+  postgres-data:
