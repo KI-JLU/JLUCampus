@@ -7,12 +7,12 @@ page in the sidebar and adds widgets, which users
 place as resizable tiles on a free-grid dashboard. Available as a web app (installable PWA) and as
 a desktop app for Windows, macOS and Linux that bundles the same web build.
 
-| Package           | Stack                                                                         |
-| ----------------- | ----------------------------------------------------------------------------- |
-| `apps/server`     | Hono on Node, Better-Auth (Keycloak via OIDC), Drizzle ORM, PostgreSQL        |
-| `apps/web`        | React 19, Vite, TanStack Router + Query, JLU Design System, i18next, PWA      |
-| `apps/desktop`    | Electron (electron-vite, electron-builder); bundles `apps/web/dist`           |
-| `packages/shared` | Zod schemas, types and API paths shared by all three                          |
+| Package           | Stack                                                                    |
+| ----------------- | ------------------------------------------------------------------------ |
+| `apps/server`     | Hono on Node, Better-Auth (Keycloak via OIDC), Drizzle ORM, PostgreSQL   |
+| `apps/web`        | React 19, Vite, TanStack Router + Query, JLU Design System, i18next, PWA |
+| `apps/desktop`    | Electron (electron-vite, electron-builder); bundles `apps/web/dist`      |
+| `packages/shared` | Zod schemas, types and API paths shared by all three                     |
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 
@@ -67,20 +67,42 @@ path) and the server serves the web app itself, so one origin hosts both. Run
 migrations with `node apps/server/dist/migrate.js` before starting
 `node apps/server/dist/index.js`.
 
+### Docker
+
+The `Dockerfile` packs the server and the web app into one image that runs
+migrations on start and serves both from port 3000. Publishing a GitHub release,
+or starting the **Docker** workflow by hand, pushes it to
+`ghcr.io/ki4jlu/jlucampus` (`.github/workflows/docker.yml`). Releases are
+tagged with their version and `latest`, manual runs with the branch name; every
+image also gets `sha-<short>`.
+
+`docker-compose.prod.yml` runs that image with Postgres. Keycloak and the
+TLS-terminating reverse proxy run outside it.
+
+```bash
+cp .env.production.example .env.production   # fill in secrets and URLs
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+```
+
+The app listens on `127.0.0.1:3000` by default (`APP_BIND`, `APP_PORT`). Pin
+a release with `JUSTCAMPUS_TAG=1.2.3`. If the GHCR package is private, run
+`docker login ghcr.io` on the host first.
+
 ## CI
 
 GitHub Actions run lint, typecheck, tests and `bun run build` on every pull
 request and every push to `master` (`.github/workflows/ci.yml`). Publishing a
 GitHub release runs the same checks and build again (`release.yml`) and keeps
-`web-<tag>` and `server-<tag>` as workflow artifacts for 90 days.
+`web-<tag>` and `server-<tag>` as workflow artifacts for 90 days; `docker.yml`
+pushes the production image (see [Docker](#docker)).
 
 ## Scripts
 
-| Command                 | Purpose                                     |
-| ----------------------- | ------------------------------------------- |
-| `bun run dev`           | Server and web app in watch mode            |
-| `bun run typecheck`     | TypeScript in every package                 |
-| `bun run lint`          | ESLint, including the design-system rules   |
-| `bun run test`          | Vitest in every package                     |
-| `bun run db:generate`   | Generate a Drizzle migration from the schema |
-| `bun run format`        | Prettier                                     |
+| Command               | Purpose                                      |
+| --------------------- | -------------------------------------------- |
+| `bun run dev`         | Server and web app in watch mode             |
+| `bun run typecheck`   | TypeScript in every package                  |
+| `bun run lint`        | ESLint, including the design-system rules    |
+| `bun run test`        | Vitest in every package                      |
+| `bun run db:generate` | Generate a Drizzle migration from the schema |
+| `bun run format`      | Prettier                                     |
