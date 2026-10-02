@@ -19,7 +19,6 @@ import { useTranslation } from 'react-i18next'
 import {
   Badge,
   Button,
-  Card,
   Dialog,
   DialogClose,
   DialogContent,
@@ -28,12 +27,15 @@ import {
   DialogHeader,
   DialogTitle,
   FileDropzone,
+  Grid,
   Input,
+  PanelSection,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SettingsRow,
   Spinner,
   Textarea
 } from '@ki4jlu/design-system'
@@ -134,7 +136,8 @@ export function GlossaryDialog({
       >
         <DialogContent
           closeLabel={t('common.close')}
-          className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl"
+          // DS gap: DialogContent has no height cap of its own; a long form scrolls in it.
+          className="max-h-9/10 overflow-y-auto sm:max-w-2xl"
           // Only the list explains itself, once, below its actions as in HAWKI.
           {...(view.name === 'list' ? {} : { 'aria-describedby': undefined })}
         >
@@ -142,11 +145,11 @@ export function GlossaryDialog({
             <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
           {view.name === 'list' ? (
-            <div className="grid gap-stack-md">
-              <h3 className="m-0 text-base font-semibold text-on-surface">
-                {t('component.translator.glossaries.choose')}
-              </h3>
-              <div className="flex flex-wrap gap-3">
+            <PanelSection
+              title={t('component.translator.glossaries.choose')}
+              className="gap-stack-md"
+            >
+              <div className="flex flex-wrap gap-stack-sm">
                 <Button type="button" onClick={() => setView({ name: 'form', glossary: null })}>
                   <PlusIcon {...ICON} />
                   {t('component.translator.glossaries.new')}
@@ -156,70 +159,71 @@ export function GlossaryDialog({
                   {t('component.translator.glossaries.import')}
                 </Button>
               </div>
-              <DialogDescription className="m-0 text-sm text-on-surface-variant">
-                {t('component.translator.glossaries.explain')}
-              </DialogDescription>
+              <DialogDescription>{t('component.translator.glossaries.explain')}</DialogDescription>
               {!list ? (
                 <Spinner label={t('component.translator.glossaries.loading')} />
               ) : list.glossaries.length === 0 ? (
-                <p className="m-0 py-4 text-sm text-on-surface-variant">
-                  {t('component.translator.glossaries.empty')}
-                </p>
+                // DS gap: no empty-state or muted body text; the line is plain text.
+                <p className="m-0">{t('component.translator.glossaries.empty')}</p>
               ) : (
-                <ul className="m-0 grid list-none gap-1 p-0">
+                <div role="list">
                   {list.glossaries.map((glossary) => (
-                    <li key={glossary.id} className="flex items-center gap-3 rounded-lg px-3 py-3">
-                      <BookOpenIcon {...ICON} />
-                      <div className="grid min-w-0 flex-1">
-                        <span className="truncate text-sm font-semibold text-on-surface">
-                          {glossary.name}
+                    <SettingsRow
+                      key={glossary.id}
+                      role="listitem"
+                      label={
+                        <span className="flex min-w-0 items-center gap-stack-sm">
+                          <BookOpenIcon {...ICON} />
+                          <span className="truncate">{glossary.name}</span>
                         </span>
-                        <span className="text-xs text-on-surface-variant">
-                          {t('component.translator.glossaries.terms', {
-                            count: glossary.entryCount
-                          })}
+                      }
+                      description={t('component.translator.glossaries.terms', {
+                        count: glossary.entryCount
+                      })}
+                      control={
+                        <span className="flex items-center">
+                          <IconAction
+                            label={t(
+                              `component.translator.glossaries.visibility.${glossary.visibility}`
+                            )}
+                            onClick={() => setView({ name: 'details', glossary })}
+                          >
+                            {glossary.visibility === 'public' ? (
+                              <GlobeIcon {...ICON} />
+                            ) : glossary.visibility === 'organization' ? (
+                              <HouseIcon {...ICON} />
+                            ) : (
+                              <LockIcon {...ICON} />
+                            )}
+                          </IconAction>
+                          {glossary.canEdit ? (
+                            <IconAction
+                              label={t('component.translator.glossaries.editOne', {
+                                name: glossary.name
+                              })}
+                              disabled={loadingEdit === glossary.id}
+                              onClick={() => void edit(glossary)}
+                            >
+                              <PencilIcon {...ICON} />
+                            </IconAction>
+                          ) : null}
+                          {glossary.canDelete ? (
+                            <IconAction
+                              label={t('component.translator.glossaries.deleteOne', {
+                                name: glossary.name
+                              })}
+                              onClick={() => setDeleting(glossary)}
+                            >
+                              <Trash2Icon {...ICON} />
+                            </IconAction>
+                          ) : null}
                         </span>
-                      </div>
-                      <IconAction
-                        label={t(
-                          `component.translator.glossaries.visibility.${glossary.visibility}`
-                        )}
-                        onClick={() => setView({ name: 'details', glossary })}
-                      >
-                        {glossary.visibility === 'public' ? (
-                          <GlobeIcon {...ICON} />
-                        ) : glossary.visibility === 'organization' ? (
-                          <HouseIcon {...ICON} />
-                        ) : (
-                          <LockIcon {...ICON} />
-                        )}
-                      </IconAction>
-                      {glossary.canEdit ? (
-                        <IconAction
-                          label={t('component.translator.glossaries.editOne', {
-                            name: glossary.name
-                          })}
-                          disabled={loadingEdit === glossary.id}
-                          onClick={() => void edit(glossary)}
-                        >
-                          <PencilIcon {...ICON} />
-                        </IconAction>
-                      ) : null}
-                      {glossary.canDelete ? (
-                        <IconAction
-                          label={t('component.translator.glossaries.deleteOne', {
-                            name: glossary.name
-                          })}
-                          onClick={() => setDeleting(glossary)}
-                        >
-                          <Trash2Icon {...ICON} />
-                        </IconAction>
-                      ) : null}
-                    </li>
+                      }
+                    />
                   ))}
-                </ul>
+                </div>
               )}
-            </div>
+            </PanelSection>
           ) : view.name === 'form' ? (
             <GlossaryForm glossary={view.glossary} onDone={toList} />
           ) : view.name === 'import' ? (
@@ -374,13 +378,13 @@ function GlossaryForm({
           />
         )}
       </Field>
-      <fieldset className="m-0 grid gap-3 border-0 p-0" aria-describedby={`${id}-terms-hint`}>
-        <legend className="mb-1 p-0 text-base font-semibold text-on-surface">
-          {t('component.translator.glossaries.termsLabel')}
-        </legend>
-        <p id={`${id}-terms-hint`} className="m-0 text-xs text-on-surface-variant">
-          {t('component.translator.glossaries.caseHint')}
-        </p>
+      {/* A group named by its title and described by its hint, as a fieldset would be. */}
+      <PanelSection
+        role="group"
+        title={t('component.translator.glossaries.termsLabel')}
+        hint={<span id={`${id}-terms-hint`}>{t('component.translator.glossaries.caseHint')}</span>}
+        aria-describedby={`${id}-terms-hint`}
+      >
         {rows.map((row, index) => (
           <div key={row.key} className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
             <TermLanguage
@@ -396,9 +400,7 @@ function GlossaryForm({
               onChange={(event) => patchRow(row.key, { sourceTerm: event.target.value })}
               className="min-w-0 flex-1"
             />
-            <span aria-hidden="true" className="text-on-surface-variant">
-              →
-            </span>
+            <span aria-hidden="true">→</span>
             <TermLanguage
               label={t('component.translator.glossaries.targetLanguageOf', { number: index + 1 })}
               options={TERM_LANGUAGES.target}
@@ -430,11 +432,11 @@ function GlossaryForm({
           variant="outline"
           size="sm"
           onClick={() => setRows((current) => [...current, newRow()])}
-          className="justify-self-start"
+          className="self-start"
         >
           {t('component.translator.glossaries.addPair')}
         </Button>
-      </fieldset>
+      </PanelSection>
       <DialogFooter>
         <Button type="button" variant="secondary" onClick={onDone}>
           {t('component.translator.back')}
@@ -561,9 +563,7 @@ function ImportForm({ onDone }: { onDone: () => void }): React.JSX.Element {
       }}
       className="grid gap-stack-md"
     >
-      <h3 className="m-0 text-base font-semibold text-on-surface">
-        {t('component.translator.glossaries.importTitle')}
-      </h3>
+      <PanelSection title={t('component.translator.glossaries.importTitle')} />
       <Field id={`${id}-name`} label={t('component.translator.glossaries.importName')}>
         {(props) => (
           <Input
@@ -585,7 +585,7 @@ function ImportForm({ onDone }: { onDone: () => void }): React.JSX.Element {
           />
         )}
       </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <Grid cols={2} gap="md">
         {(
           [
             ['source', sourceLanguage, setSourceLanguage],
@@ -623,7 +623,7 @@ function ImportForm({ onDone }: { onDone: () => void }): React.JSX.Element {
             )}
           </Field>
         ))}
-      </div>
+      </Grid>
       <FileDropzone
         icon={<UploadIcon />}
         title={t('component.translator.glossaries.csvDrop')}
@@ -707,10 +707,11 @@ function AlertMessage({
         onInteractOutside={(event) => event.preventDefault()}
       >
         <DialogHeader className="min-w-0">
-          {/* The message alone, as an alert has it, names the dialog. */}
-          <DialogTitle className="pe-8 text-base font-normal whitespace-pre-wrap wrap-anywhere">
-            {message}
-          </DialogTitle>
+          {/*
+           * The message alone, as an alert has it, names the dialog; its line breaks stay. DS gap:
+           * no alert dialog whose message is body text, so it takes the title's headline type.
+           */}
+          <DialogTitle className="pe-8 whitespace-pre-wrap wrap-anywhere">{message}</DialogTitle>
         </DialogHeader>
         <DialogFooter>
           <DialogClose asChild>
@@ -784,21 +785,17 @@ function Details({
 
   return (
     <div className="grid gap-stack-md">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="m-0 text-xl font-semibold wrap-anywhere text-on-surface">
-            {glossary.name}
-          </h3>
-          <p className="m-0 text-sm text-on-surface-variant">
-            {/* Unlike the list, the details say "1 Begriff", as in HAWKI. */}
-            {t('component.translator.glossaries.detailTerms', { count: glossary.entryCount })}
-          </p>
-        </div>
-        <Badge tone="primary" appearance="filled" className="shrink-0 uppercase">
-          {glossary.category || TRANSLATOR_GLOSSARY_DEFAULT_CATEGORY}
-        </Badge>
-      </div>
-      <DetailCard
+      <PanelSection
+        title={<span className="wrap-anywhere">{glossary.name}</span>}
+        aside={
+          <Badge tone="primary" appearance="filled">
+            {glossary.category || TRANSLATOR_GLOSSARY_DEFAULT_CATEGORY}
+          </Badge>
+        }
+        // Unlike the list, the details say "1 Begriff", as in HAWKI.
+        hint={t('component.translator.glossaries.detailTerms', { count: glossary.entryCount })}
+      />
+      <DetailSection
         title={t('component.translator.glossaries.descriptionLabel')}
         editLabel={
           glossary.canEdit && editing !== 'description'
@@ -812,36 +809,34 @@ function Details({
         }}
       >
         {editing === 'description' ? (
-          <div className="grid gap-3">
+          <div className="grid gap-stack-sm">
             <Textarea
               aria-label={t('component.translator.glossaries.descriptionLabel')}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               className="min-h-20"
             />
-            <dl className="m-0 text-sm">
-              <InfoRow
-                icon={<LayersIcon {...ICON} />}
-                label={t('component.translator.glossaries.category')}
-              >
-                <Input
-                  aria-label={t('component.translator.glossaries.category')}
-                  value={category}
-                  placeholder={t('component.translator.glossaries.categoryPlaceholder')}
-                  onChange={(event) => setCategory(event.target.value)}
-                  className="w-auto min-w-40 font-normal"
-                />
-              </InfoRow>
-            </dl>
+            <InfoRow
+              icon={<LayersIcon {...ICON} />}
+              label={t('component.translator.glossaries.category')}
+            >
+              <Input
+                aria-label={t('component.translator.glossaries.category')}
+                value={category}
+                placeholder={t('component.translator.glossaries.categoryPlaceholder')}
+                onChange={(event) => setCategory(event.target.value)}
+                className="w-auto min-w-40"
+              />
+            </InfoRow>
             {editActions(() =>
               saveChange({ description: description.trim(), category: category.trim() })
             )}
           </div>
         ) : (
-          <p className="m-0 text-sm text-on-surface">{glossary.description || '-'}</p>
+          <p className="m-0">{glossary.description || '-'}</p>
         )}
-      </DetailCard>
-      <DetailCard
+      </DetailSection>
+      <DetailSection
         title={t('component.translator.glossaries.permissions')}
         editLabel={
           glossary.canEdit && editing !== 'rights'
@@ -855,106 +850,100 @@ function Details({
           setEditing('rights')
         }}
       >
-        <div className="grid gap-3">
-          <dl className="m-0 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-            <div className="grid content-start gap-2">
-              <InfoRow
-                icon={<UserIcon {...ICON} />}
-                label={t('component.translator.glossaries.creator')}
+        <div>
+          <InfoRow
+            icon={<UserIcon {...ICON} />}
+            label={t('component.translator.glossaries.creator')}
+          >
+            {glossary.creatorName}
+          </InfoRow>
+          {editing !== 'rights' ? (
+            <InfoRow
+              icon={<SquarePenIcon {...ICON} />}
+              label={t('component.translator.glossaries.editRights')}
+            >
+              {glossary.editorRole
+                ? TRANSLATOR_GLOSSARY_ROLE_NAMES[glossary.editorRole]
+                : t('component.translator.glossaries.ownerOnly')}
+            </InfoRow>
+          ) : visibility !== 'private' ? (
+            <InfoRow
+              icon={<SquarePenIcon {...ICON} />}
+              label={t('component.translator.glossaries.editRights')}
+            >
+              <RoleSelect
+                label={t('component.translator.glossaries.editRights')}
+                value={editorRole ?? OWNER}
+                empty={{ value: OWNER, label: t('component.translator.glossaries.ownerOnly') }}
+                roles={roles}
+                onChange={(next) => setEditorRole(next === OWNER ? null : next)}
+              />
+            </InfoRow>
+          ) : null}
+          <InfoRow
+            icon={<GlobeIcon {...ICON} />}
+            label={t('component.translator.glossaries.visibilityLabel')}
+          >
+            {editing === 'rights' ? (
+              <Select
+                value={visibility}
+                onValueChange={(next) => {
+                  const parsed = translatorGlossaryVisibilitySchema.safeParse(next)
+                  if (!parsed.success) return
+                  setVisibility(parsed.data)
+                  // Private takes the edit rights back to the owner, as in HAWKI.
+                  if (parsed.data === 'private') setEditorRole(null)
+                }}
               >
-                {glossary.creatorName}
-              </InfoRow>
-              {editing !== 'rights' ? (
-                <InfoRow
-                  icon={<SquarePenIcon {...ICON} />}
-                  label={t('component.translator.glossaries.editRights')}
+                <SelectTrigger
+                  aria-label={t('component.translator.glossaries.visibilityLabel')}
+                  className="w-40"
                 >
-                  {glossary.editorRole
-                    ? TRANSLATOR_GLOSSARY_ROLE_NAMES[glossary.editorRole]
-                    : t('component.translator.glossaries.ownerOnly')}
-                </InfoRow>
-              ) : visibility !== 'private' ? (
-                <InfoRow
-                  icon={<SquarePenIcon {...ICON} />}
-                  label={t('component.translator.glossaries.editRights')}
-                >
-                  <RoleSelect
-                    label={t('component.translator.glossaries.editRights')}
-                    value={editorRole ?? OWNER}
-                    empty={{ value: OWNER, label: t('component.translator.glossaries.ownerOnly') }}
-                    roles={roles}
-                    onChange={(next) => setEditorRole(next === OWNER ? null : next)}
-                  />
-                </InfoRow>
-              ) : null}
-            </div>
-            <div className="grid content-start gap-2">
-              <InfoRow
-                icon={<GlobeIcon {...ICON} />}
-                label={t('component.translator.glossaries.visibilityLabel')}
-              >
-                {editing === 'rights' ? (
-                  <Select
-                    value={visibility}
-                    onValueChange={(next) => {
-                      const parsed = translatorGlossaryVisibilitySchema.safeParse(next)
-                      if (!parsed.success) return
-                      setVisibility(parsed.data)
-                      // Private takes the edit rights back to the owner, as in HAWKI.
-                      if (parsed.data === 'private') setEditorRole(null)
-                    }}
-                  >
-                    <SelectTrigger
-                      aria-label={t('component.translator.glossaries.visibilityLabel')}
-                      className="w-40"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TRANSLATOR_GLOSSARY_VISIBILITIES.map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {t(`component.translator.glossaries.visibility.${option}`)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  t(`component.translator.glossaries.visibility.${glossary.visibility}`)
-                )}
-              </InfoRow>
-              {editing !== 'rights' ? (
-                <InfoRow
-                  icon={<EyeIcon {...ICON} />}
-                  label={t('component.translator.glossaries.visibleFor')}
-                >
-                  {visibleFor}
-                </InfoRow>
-              ) : visibility === 'organization' ? (
-                <InfoRow
-                  icon={<EyeIcon {...ICON} />}
-                  label={t('component.translator.glossaries.visibleFor')}
-                >
-                  <RoleSelect
-                    label={t('component.translator.glossaries.visibleFor')}
-                    value={visibleTo ?? NO_ROLE}
-                    empty={{
-                      value: NO_ROLE,
-                      label: t('component.translator.glossaries.selectRole')
-                    }}
-                    roles={roles}
-                    onChange={(next) => setVisibleTo(next === NO_ROLE ? null : next)}
-                  />
-                </InfoRow>
-              ) : null}
-            </div>
-          </dl>
-          {editing === 'rights'
-            ? editActions(() => saveChange({ visibility, visibleTo, editorRole }))
-            : null}
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TRANSLATOR_GLOSSARY_VISIBILITIES.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {t(`component.translator.glossaries.visibility.${option}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              t(`component.translator.glossaries.visibility.${glossary.visibility}`)
+            )}
+          </InfoRow>
+          {editing !== 'rights' ? (
+            <InfoRow
+              icon={<EyeIcon {...ICON} />}
+              label={t('component.translator.glossaries.visibleFor')}
+            >
+              {visibleFor}
+            </InfoRow>
+          ) : visibility === 'organization' ? (
+            <InfoRow
+              icon={<EyeIcon {...ICON} />}
+              label={t('component.translator.glossaries.visibleFor')}
+            >
+              <RoleSelect
+                label={t('component.translator.glossaries.visibleFor')}
+                value={visibleTo ?? NO_ROLE}
+                empty={{
+                  value: NO_ROLE,
+                  label: t('component.translator.glossaries.selectRole')
+                }}
+                roles={roles}
+                onChange={(next) => setVisibleTo(next === NO_ROLE ? null : next)}
+              />
+            </InfoRow>
+          ) : null}
         </div>
-      </DetailCard>
-      <DetailCard title={t('component.translator.glossaries.meta')}>
-        <dl className="m-0 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+        {editing === 'rights'
+          ? editActions(() => saveChange({ visibility, visibleTo, editorRole }))
+          : null}
+      </DetailSection>
+      <DetailSection title={t('component.translator.glossaries.meta')}>
+        <div>
           <InfoRow
             icon={<ClockIcon {...ICON} />}
             label={t('component.translator.glossaries.createdAt')}
@@ -967,8 +956,8 @@ function Details({
           >
             {formatGlossaryDate(glossary.updatedAt)}
           </InfoRow>
-        </dl>
-      </DetailCard>
+        </div>
+      </DetailSection>
       <DialogFooter>
         <Button type="button" variant="secondary" onClick={onBack}>
           {t('component.translator.back')}
@@ -1019,7 +1008,8 @@ function RoleSelect<Empty extends string>({
   )
 }
 
-function DetailCard({
+/** One titled part of the details, with its edit button beside the title. */
+function DetailSection({
   title,
   editLabel,
   onEdit,
@@ -1031,17 +1021,18 @@ function DetailCard({
   children: React.ReactNode
 }): React.JSX.Element {
   return (
-    <Card className="grid gap-2 p-4">
-      <div className="flex min-h-8 items-center justify-between">
-        <h4 className="m-0 text-sm font-semibold text-on-surface">{title}</h4>
-        {editLabel && onEdit ? (
+    <PanelSection
+      title={title}
+      aside={
+        editLabel && onEdit ? (
           <IconAction label={editLabel} onClick={onEdit}>
             <SquarePenIcon {...ICON} />
           </IconAction>
-        ) : null}
-      </div>
+        ) : undefined
+      }
+    >
       {children}
-    </Card>
+    </PanelSection>
   )
 }
 
@@ -1056,11 +1047,15 @@ function InfoRow({
   children: React.ReactNode
 }): React.JSX.Element {
   return (
-    <div className="flex min-h-9 flex-wrap items-center gap-2">
-      <span className="text-on-surface-variant">{icon}</span>
-      <dt className="text-on-surface-variant">{label}</dt>
-      <dd className="m-0 ml-auto font-semibold text-on-surface">{children}</dd>
-    </div>
+    <SettingsRow
+      label={
+        <span className="flex items-center gap-stack-sm">
+          {icon}
+          {label}
+        </span>
+      }
+      control={children}
+    />
   )
 }
 

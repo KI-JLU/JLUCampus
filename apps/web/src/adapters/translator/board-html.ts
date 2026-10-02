@@ -16,21 +16,41 @@ export function escapeHtml(text: string): string {
     .replace(/"/g, '&quot;')
 }
 
-/** Classes of the board's pieces; tokens only, so both themes work. */
+/**
+ * Classes of the board's pieces; tokens only, so both themes work.
+ *
+ * DS gap: the design system has no inline text highlight (a `mark` that stays in the line's
+ * flow; Badge is an inline-flex chip and would break the text's wrapping), no skeleton and no
+ * diff insert/delete style. So the pieces take the tokens the DS itself uses for those states:
+ * the menu rows' hover fill (`surface-container-high`), the selected row's
+ * `secondary-container`, the success/error container pairs of Badge, and the smallest radius
+ * token (`radius-DEFAULT`).
+ */
 export const BOARD_CLASSES = {
   sentence:
-    'sentence-item cursor-pointer rounded-sm transition-colors hover:bg-surface-container-high data-[active=true]:bg-secondary-container data-[active=true]:text-on-secondary-container',
-  loading: 'animate-pulse rounded-sm bg-surface-container-high text-transparent',
+    'sentence-item cursor-pointer rounded-DEFAULT transition-colors hover:bg-surface-container-high data-active:bg-secondary-container data-active:text-on-secondary-container',
+  loading: 'animate-pulse rounded-DEFAULT bg-surface-container-high text-transparent',
   word: 'word-item',
   tag: 'word-item font-mono text-on-surface-variant',
   highlight: 'word-item border-b-2 border-success',
-  inserted: 'rounded-sm bg-success-container px-0.5 text-on-success-container',
-  deleted: 'rounded-sm bg-error-container px-0.5 text-on-error-container line-through',
+  inserted: 'rounded-DEFAULT bg-success-container px-0.5 text-on-success-container',
+  deleted: 'rounded-DEFAULT bg-error-container px-0.5 text-on-error-container line-through',
   arrow: 'text-on-surface-variant',
-  sourceSentence: 'rounded-sm',
-  sourceActive: 'rounded-sm bg-secondary-container text-on-secondary-container',
-  sourceHover: 'rounded-sm bg-surface-container-high'
+  sourceSentence: 'rounded-DEFAULT',
+  sourceActive: 'rounded-DEFAULT bg-secondary-container text-on-secondary-container',
+  sourceHover: 'rounded-DEFAULT bg-surface-container-high'
 } as const
+
+/**
+ * The insets and text size the source field, its overlays and the result board share, so they
+ * lie exactly over each other: room for the clear button at the end, and HAWKI's large text
+ * while both texts are short.
+ *
+ * DS gap: Textarea's `inline` variant leaves the insets to the call site and has no large text
+ * size; 20 px has no type token (`body-base` is 16 px, `headline-md-mobile` is 20 px but bold).
+ */
+export const BOARD_INSET = 'py-5 ps-6 pe-14'
+export const boardTextSize = (small: boolean): string => (small ? 'text-body-base' : 'text-xl')
 
 interface BoardOptions {
   sentences: readonly string[]

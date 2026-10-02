@@ -1,9 +1,23 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { LockIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@ki4jlu/design-system'
+import {
+  Badge,
+  fieldVariants,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from '@ki4jlu/design-system'
 import { cn } from '@/lib/utils'
-import { boardHtml, caretOffset, changesHtml, restoreCaret } from './board-html'
+import {
+  BOARD_CLASSES,
+  BOARD_INSET,
+  boardHtml,
+  boardTextSize,
+  caretOffset,
+  changesHtml,
+  restoreCaret
+} from './board-html'
 import { SentenceMenu, type MenuAnchor } from './sentence-menu'
 import type { TranslatorStore } from './translator-store'
 import { TYPING_PAUSE_MS } from './translator-store'
@@ -149,13 +163,15 @@ export function OutputBoard({
       {locked ? (
         <Tooltip>
           <TooltipTrigger asChild>
-            <span
+            <Badge
+              appearance="text"
+              tone="neutral"
               tabIndex={0}
               aria-label={t('component.translator.locked')}
-              className="absolute end-4 top-4 z-10 flex size-8 items-center justify-center text-on-surface-variant"
+              className="absolute end-5 top-5 z-10"
             >
               <LockIcon aria-hidden="true" className="size-4" />
-            </span>
+            </Badge>
           </TooltipTrigger>
           <TooltipContent>{t('component.translator.locked')}</TooltipContent>
         </Tooltip>
@@ -207,11 +223,16 @@ export function OutputBoard({
           event.preventDefault()
           document.execCommand('insertText', false, event.clipboardData.getData('text/plain'))
         }}
+        // An editable field like the source beside it: the DS's inline field, with the insets
+        // the two share. While sentences are redone it cannot be typed in, and shows the
+        // fields' disabled look (a div takes no `:disabled`).
         className={cn(
-          'min-h-72 flex-1 overflow-y-auto py-5 ps-6 pe-14 whitespace-pre-wrap break-words text-on-surface outline-none',
-          small ? 'text-base' : 'text-xl',
+          fieldVariants({ variant: 'inline' }),
+          'min-h-72 flex-1 overflow-y-auto whitespace-pre-wrap break-words',
+          BOARD_INSET,
+          boardTextSize(small),
           fullSkeleton && 'hidden',
-          state.pendingSentences && 'opacity-70'
+          state.pendingSentences && 'opacity-60'
         )}
       />
       {anchor ? (
@@ -228,7 +249,12 @@ export function OutputBoard({
   )
 }
 
-/** Lines standing in for the result while it is made, one per line of the source. */
+/**
+ * Lines standing in for the result while it is made, one per line of the source. Each line's
+ * width follows its text, so it is set inline.
+ *
+ * DS gap: there is no Skeleton; the lines take the board's loading look.
+ */
 function Skeleton({ source, label }: { source: string; label: string }): React.JSX.Element {
   const small = source.length > 50
   const perLine = small ? 100 : 70
@@ -237,7 +263,7 @@ function Skeleton({ source, label }: { source: string; label: string }): React.J
     <div
       role="status"
       aria-label={label}
-      className="flex min-h-72 flex-1 flex-col gap-3 overflow-hidden px-6 py-5"
+      className={cn('flex min-h-72 flex-1 flex-col gap-3 overflow-hidden', BOARD_INSET)}
     >
       {lines.flatMap((line, lineIndex) => {
         const text = line.trim()
@@ -255,7 +281,7 @@ function Skeleton({ source, label }: { source: string; label: string }): React.J
             <div
               key={`${lineIndex}-${index}`}
               style={{ width: `${width}%` }}
-              className="h-4 animate-pulse rounded-full bg-surface-container-high"
+              className={cn('h-4', BOARD_CLASSES.loading)}
             />
           )
         })

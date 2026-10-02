@@ -132,6 +132,9 @@ export function LanguageMenu(props: LanguageMenuProps): React.JSX.Element {
           }}
           onMouseDown={(event) => event.preventDefault()}
         >
+          {/* Against the DS's "never shrink a control" rule, as a picker's label cannot become
+              an icon: a long language name is cut off in a narrow card rather than pushing the
+              bar out of it. */}
           <span className="truncate">{name}</span>
           <ChevronDownIcon aria-hidden="true" className="size-4" />
         </Button>
@@ -166,8 +169,9 @@ export function LanguageMenu(props: LanguageMenuProps): React.JSX.Element {
           ref={list}
           role="group"
           // Out of the page's tab order (the menu lies at its end): only the stop focuses it.
+          // Scrolls at SelectContent's height; the app's focus outline marks it when focused.
           tabIndex={-1}
-          className="max-h-[min(28rem,70vh)] overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring"
+          className="max-h-96 overflow-y-auto"
         >
           {items.map((item) => {
             const selected = item.code === props.value

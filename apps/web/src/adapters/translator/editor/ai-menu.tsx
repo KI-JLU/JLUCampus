@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import type { Editor, JSONContent } from '@tiptap/react'
 import {
@@ -23,9 +23,17 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
+  Badge,
   Button,
-  Input,
+  DropdownMenuSeparator,
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
   MenuItem,
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
   Spinner,
   Tooltip,
   TooltipContent,
@@ -33,7 +41,6 @@ import {
 } from '@ki4jlu/design-system'
 import type { TranslatorComposeAction } from '@justcampus/shared'
 import { composeText } from '@/lib/queries'
-import { cn } from '@/lib/utils'
 import { IconAction } from '../copy-button'
 import {
   ACTION_INSTRUCTION_KEYS,
@@ -47,12 +54,12 @@ import type { TranslatorStore } from '../translator-store'
 
 const ICON = { 'aria-hidden': true, className: 'size-4' } as const
 
-/** The menu's actions: two up top, the rest listed, in HAWKI's order and groups. */
-const PRIMARY: Array<{ action: TranslatorComposeAction; icon: React.ReactNode }> = [
-  { action: 'proofread', icon: <SearchCheckIcon {...ICON} /> },
-  { action: 'rephrase', icon: <RefreshCwIcon {...ICON} /> }
-]
-const LISTED: Array<Array<{ action: TranslatorComposeAction; icon: React.ReactNode }>> = [
+/** The menu's actions, in HAWKI's order and groups. */
+const GROUPS: Array<Array<{ action: TranslatorComposeAction; icon: React.ReactNode }>> = [
+  [
+    { action: 'proofread', icon: <SearchCheckIcon {...ICON} /> },
+    { action: 'rephrase', icon: <RefreshCwIcon {...ICON} /> }
+  ],
   [
     { action: 'key_points', icon: <MegaphoneIcon {...ICON} /> },
     { action: 'paraphrase', icon: <MessageSquareQuoteIcon {...ICON} /> },
@@ -135,7 +142,6 @@ function AiMenuPanel({
   const textarea = (): HTMLTextAreaElement | null =>
     container.current?.querySelector<HTMLTextAreaElement>('textarea') ?? null
 
-  /** Where the marked passage is, relative to the scrolling container. */
   /** Where the marked passage is on screen; the menus float over the page, fixed. */
   const measure = (): void => {
     const box = container.current
@@ -223,18 +229,6 @@ function AiMenuPanel({
     setPassage(null)
     setInstruction('')
   }
-
-  // A click outside ends the menu; a result stays as it is.
-  useEffect(() => {
-    if (phase === 'hidden' || phase === 'trigger') return
-    const onPointer = (event: PointerEvent): void => {
-      if (panel.current?.contains(event.target as Node)) return
-      if (loading) return
-      close()
-    }
-    document.addEventListener('pointerdown', onPointer)
-    return () => document.removeEventListener('pointerdown', onPointer)
-  })
 
   /** Remembers the marked passage (or the whole empty document) before the menu takes focus. */
   const capture = (compose: boolean): Passage => {
@@ -416,11 +410,13 @@ function AiMenuPanel({
     setPhase(empty() ? 'compose' : 'menu')
   }
 
-  useLayoutEffect(() => {
+  /** The field of the menu or the instruction bar, which takes the focus when it opens. */
+  const focusField = (): void => {
     if (phase === 'menu' || phase === 'compose' || phase === 'prompt') {
       panel.current?.querySelector<HTMLInputElement>('input')?.focus()
     }
-  }, [phase])
+  }
+  useLayoutEffect(focusField, [phase])
 
   // Scrolling moves the passage; the floating parts follow it.
   const measureRef = useRef(measure)
@@ -441,27 +437,28 @@ function AiMenuPanel({
     }
   }, [phase, container])
 
-  // A panel that would reach past the bottom of the window opens above the passage instead.
-  const [lift, setLift] = useState(0)
-  useLayoutEffect(() => {
-    const element = panel.current
-    if (!element) {
-      setLift(0)
-      return
-    }
-    const height = element.offsetHeight
-    const bottom = position.below + height
-    setLift(
-      bottom > window.innerHeight - 8
-        ? Math.min(bottom - (window.innerHeight - 8), position.below - 8)
-        : 0
-    )
-  }, [phase, position, loading])
+  // The panels hang at the marked passage: from its first line's top to its last line's bottom.
+  // The popover puts them below or above it and turns them round where the window ends.
+  const anchor = useMemo(
+    () => ({
+      current: {
+        getBoundingClientRect: (): DOMRect =>
+          new DOMRect(
+            position.left,
+            position.top,
+            0,
+            Math.max(0, position.below - 8 - position.top)
+          )
+      }
+    }),
+    [position]
+  )
 
   if (phase === 'hidden') return null
 
   if (phase === 'trigger') {
     return (
+      // At the passage, wherever the editor has scrolled it to: a position worked out at runtime.
       <div style={{ top: position.top, left: position.left }} className="fixed z-30">
         <Tooltip>
           <TooltipTrigger asChild>
@@ -470,7 +467,7 @@ function AiMenuPanel({
               variant="outline"
               size="icon"
               aria-label={t('component.translator.editor.aiActions')}
-              aria-haspopup="menu"
+              aria-haspopup="dialog"
               onMouseDown={(event) => event.preventDefault()}
               onClick={openMenu}
             >
@@ -483,31 +480,26 @@ function AiMenuPanel({
     )
   }
 
-  const floating =
-    'fixed z-30 rounded-xl border border-outline-variant bg-surface-container-lowest shadow-overlay'
+  const below = phase === 'menu' || phase === 'compose'
+  const label = t(
+    phase === 'menu'
+      ? 'component.translator.editor.aiActions'
+      : phase === 'compose'
+        ? 'component.translator.editor.composeTo'
+        : phase === 'prompt'
+          ? 'component.translator.editor.describe'
+          : 'component.translator.editor.resultBar'
+  )
 
+  let content: React.JSX.Element
   if (phase === 'menu') {
-    return (
-      <div
-        ref={panel}
-        role="menu"
-        aria-label={t('component.translator.editor.aiActions')}
-        style={{ top: position.below - lift, left: Math.max(4, position.left) }}
-        className={cn(floating, 'flex w-60 flex-col gap-1 p-1.5')}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            event.preventDefault()
-            close()
-            editor.commands.focus()
-          }
-        }}
-      >
-        <div className="relative">
-          <SparklesIcon
-            aria-hidden="true"
-            className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-on-surface-variant"
-          />
-          <Input
+    content = (
+      <div className="grid gap-2">
+        <InputGroup>
+          <InputGroupAddon>
+            <SparklesIcon {...ICON} />
+          </InputGroupAddon>
+          <InputGroupInput
             aria-label={t('component.translator.editor.describe')}
             placeholder={t('component.translator.editor.describe')}
             value={draft}
@@ -518,42 +510,26 @@ function AiMenuPanel({
                 runInstruction(draft)
               }
             }}
-            className="ps-9"
           />
-        </div>
-        <div className="grid grid-cols-2 gap-1">
-          {PRIMARY.map(({ action, icon }) => (
-            <Button
-              key={action}
-              type="button"
-              variant="outline"
-              size="sm"
-              role="menuitem"
-              onClick={() => runAction(action)}
-              // eslint-disable-next-line design-system/layout-only-classname -- the two main actions stack icon over label, as in HAWKI
-              className="h-auto flex-col gap-1 py-2"
-            >
-              {icon}
-              <span className="text-xs font-semibold">{titleOf(action)}</span>
-            </Button>
+        </InputGroup>
+        <div role="menu" aria-label={t('component.translator.editor.aiActions')} className="grid">
+          {GROUPS.map((group, index) => (
+            <div key={index} role="group" className="grid">
+              {index > 0 ? <DropdownMenuSeparator /> : null}
+              {group.map(({ action, icon }) => (
+                <MenuItem
+                  key={action}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => runAction(action)}
+                >
+                  {icon}
+                  {titleOf(action)}
+                </MenuItem>
+              ))}
+            </div>
           ))}
-        </div>
-        {LISTED.map((group, index) => (
-          <div key={index} className="grid border-t border-outline-variant pt-1">
-            {group.map(({ action, icon }) => (
-              <MenuItem
-                key={action}
-                type="button"
-                role="menuitem"
-                onClick={() => runAction(action)}
-              >
-                {icon}
-                <span className="font-semibold">{titleOf(action)}</span>
-              </MenuItem>
-            ))}
-          </div>
-        ))}
-        <div className="grid border-t border-outline-variant pt-1">
+          <DropdownMenuSeparator />
           <MenuItem
             type="button"
             role="menuitem"
@@ -564,54 +540,39 @@ function AiMenuPanel({
             }}
           >
             <PenLineIcon {...ICON} />
-            <span className="font-semibold">{t('component.translator.editor.composeMenu')}</span>
+            {t('component.translator.editor.composeMenu')}
           </MenuItem>
         </div>
       </div>
     )
-  }
-
-  if (phase === 'compose' || phase === 'prompt') {
+  } else if (phase === 'compose' || phase === 'prompt') {
+    // The instruction bar: what to write ("Verfassen"), or a new instruction for the result.
     const composing = phase === 'compose'
     const trigger = webSearchTrigger(draft)
     const webSearch = store.getState().webSearch
-    return (
-      <div
-        ref={panel}
-        role="dialog"
-        aria-label={t(
-          composing
-            ? 'component.translator.editor.composeTo'
-            : 'component.translator.editor.describe'
-        )}
-        style={{
-          top: composing ? position.below : Math.max(4, position.top - 56),
-          left: Math.max(4, position.left)
-        }}
-        className={cn(floating, 'flex w-[min(30rem,calc(100%-1rem))] items-center gap-1 p-1.5')}
-      >
-        <IconAction
-          label={t('component.translator.back')}
-          onClick={() => {
-            if (composing && (empty() || !history)) {
-              if (empty()) close()
-              else setPhase('menu')
-            } else setPhase('result')
-          }}
-        >
-          <ArrowLeftIcon {...ICON} />
-        </IconAction>
-        <Input
-          aria-label={t(
-            composing
-              ? 'component.translator.editor.composeTo'
-              : 'component.translator.editor.describe'
-          )}
-          placeholder={t(
-            composing
-              ? 'component.translator.editor.composeTo'
-              : 'component.translator.editor.describe'
-          )}
+    const webSearchLabel = t(
+      webSearch
+        ? 'component.translator.editor.webSearchOn'
+        : 'component.translator.editor.webSearchOff'
+    )
+    content = (
+      <InputGroup>
+        <InputGroupAddon>
+          <BarButton
+            label={t('component.translator.back')}
+            onClick={() => {
+              if (composing && (empty() || !history)) {
+                if (empty()) close()
+                else setPhase('menu')
+              } else setPhase('result')
+            }}
+          >
+            <ArrowLeftIcon {...ICON} />
+          </BarButton>
+        </InputGroupAddon>
+        <InputGroupInput
+          aria-label={label}
+          placeholder={label}
           value={draft}
           disabled={loading}
           onChange={(event) => {
@@ -632,152 +593,197 @@ function AiMenuPanel({
               else setPhase(history ? 'result' : 'menu')
             }
           }}
-          className="flex-1"
         />
-        {composing && trigger.shown ? (
-          // A link or "/suche" brings up HAWKI's web search switch: on unless switched off.
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-pressed={webSearch}
-                aria-label={t(
-                  webSearch
-                    ? 'component.translator.editor.webSearchOn'
-                    : 'component.translator.editor.webSearchOff'
-                )}
-                disabled={loading}
-                onClick={() => store.setWebSearch(!webSearch)}
-                className={cn(
-                  'shrink-0 rounded-full border',
-                  webSearch ? 'border-primary text-primary' : 'border-error text-error'
-                )}
-              >
-                {webSearch ? <GlobeIcon {...ICON} /> : <GlobeOffIcon {...ICON} />}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {t(
-                webSearch
-                  ? 'component.translator.editor.webSearchOn'
-                  : 'component.translator.editor.webSearchOff'
-              )}
-            </TooltipContent>
-          </Tooltip>
-        ) : null}
-        <IconAction
-          label={t('component.translator.editor.submit')}
-          disabled={!draft.trim() || loading}
+        <InputGroupAddon align="inline-end">
+          {composing && trigger.shown ? (
+            // A link or "/suche" brings up HAWKI's web search switch: on unless switched off.
+            <BarButton
+              label={webSearchLabel}
+              variant={webSearch ? 'outline' : 'destructive-outline'}
+              pressed={webSearch}
+              disabled={loading}
+              onClick={() => store.setWebSearch(!webSearch)}
+            >
+              {webSearch ? <GlobeIcon {...ICON} /> : <GlobeOffIcon {...ICON} />}
+            </BarButton>
+          ) : null}
+          <BarButton
+            label={t('component.translator.editor.submit')}
+            disabled={!draft.trim() || loading}
+            onClick={() => {
+              if (composing) compose(draft)
+              else runInstruction(draft)
+            }}
+          >
+            <SendIcon {...ICON} />
+          </BarButton>
+        </InputGroupAddon>
+      </InputGroup>
+    )
+  } else {
+    // The result bar over the passage.
+    const count = history?.versions.length ?? 0
+    const index = history?.index ?? 0
+    const title = loading
+      ? t('component.translator.editor.working')
+      : index === 0
+        ? t('component.translator.editor.originalText')
+        : (history?.titles[index] ?? titleOf('rephrase'))
+    content = (
+      <div
+        role="toolbar"
+        aria-label={label}
+        aria-busy={loading}
+        className="flex flex-wrap items-center gap-1"
+      >
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={loading}
           onClick={() => {
-            if (composing) compose(draft)
-            else runInstruction(draft)
+            show(0)
+            close()
           }}
         >
-          <SendIcon {...ICON} />
+          {t('component.translator.editor.reset')}
+        </Button>
+        {passage?.compose ? null : (
+          <IconAction
+            label={t('component.translator.editor.showOriginal')}
+            disabled={loading || count < 2}
+            onClick={() => show(index === 0 ? Math.max(1, history?.lastActive ?? count - 1) : 0)}
+          >
+            <EyeIcon {...ICON} />
+          </IconAction>
+        )}
+        <IconAction
+          label={t('component.translator.editor.editPrompt')}
+          disabled={loading}
+          onClick={() => {
+            setDraft(instruction)
+            setPhase('prompt')
+          }}
+        >
+          <PencilIcon {...ICON} />
         </IconAction>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge tabIndex={0}>
+              {loading ? <Spinner size="sm" /> : null}
+              {title}
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent>
+            {instruction || t('component.translator.editor.originalText')}
+          </TooltipContent>
+        </Tooltip>
+        <div role="group" className="flex items-center">
+          <IconAction
+            label={t('component.translator.editor.previous')}
+            disabled={loading || index <= 0}
+            onClick={() => show(index - 1)}
+          >
+            <UndoIcon {...ICON} />
+          </IconAction>
+          <Badge appearance="text" aria-live="polite">
+            {`${count > 0 ? index + 1 : 0}/${count}`}
+          </Badge>
+          <IconAction
+            label={t('component.translator.editor.next')}
+            disabled={loading || index >= count - 1}
+            onClick={() => show(index + 1)}
+          >
+            <RedoIcon {...ICON} />
+          </IconAction>
+        </div>
+        <IconAction
+          label={t('component.translator.editor.regenerate')}
+          disabled={loading}
+          onClick={() => {
+            // From the original, the instruction of the last version is asked again.
+            const active = history?.lastActive ?? 0
+            const text = instruction || history?.instructions[active] || titleOf('rephrase')
+            const action = passage?.compose ? 'compose' : agentFor(text).action
+            void process(action, text, history?.titles[index || active] ?? titleOf(action))
+          }}
+        >
+          <RefreshCwIcon {...ICON} />
+        </IconAction>
+        <Button type="button" size="sm" disabled={loading} onClick={close}>
+          {t('component.translator.editor.done')}
+        </Button>
       </div>
     )
   }
 
-  // The result bar over the passage.
-  const count = history?.versions.length ?? 0
-  const index = history?.index ?? 0
-  const title = loading
-    ? t('component.translator.editor.working')
-    : index === 0
-      ? t('component.translator.editor.originalText')
-      : (history?.titles[index] ?? titleOf('rephrase'))
   return (
-    <div
-      ref={panel}
-      role="toolbar"
-      aria-label={t('component.translator.editor.resultBar')}
-      aria-busy={loading}
-      style={{ top: Math.max(4, position.top - 56), left: Math.max(4, position.left) }}
-      className={cn(floating, 'flex flex-wrap items-center gap-1 p-1.5')}
-    >
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        disabled={loading}
-        onClick={() => {
-          show(0)
-          close()
+    // A click outside ends the menu (not while the model works); a result stays as it is. The
+    // focus moving to the document does not: the result is put there.
+    <Popover open onOpenChange={(open) => (open ? undefined : close())}>
+      <PopoverAnchor virtualRef={anchor} />
+      <PopoverContent
+        ref={panel}
+        aria-label={label}
+        side={below ? 'bottom' : 'top'}
+        align="start"
+        sideOffset={8}
+        collisionPadding={8}
+        className={phase === 'menu' ? undefined : phase === 'result' ? 'w-auto' : 'w-120 max-w-dvw'}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+          focusField()
+        }}
+        onCloseAutoFocus={(event) => event.preventDefault()}
+        onFocusOutside={(event) => event.preventDefault()}
+        onInteractOutside={(event) => (loading ? event.preventDefault() : undefined)}
+        // Escape is each phase's own: the fields handle it, the menu closes.
+        onEscapeKeyDown={(event) => event.preventDefault()}
+        onKeyDown={(event) => {
+          if (phase === 'menu' && event.key === 'Escape') {
+            event.preventDefault()
+            close()
+            editor.commands.focus()
+          }
         }}
       >
-        {t('component.translator.editor.reset')}
-      </Button>
-      {passage?.compose ? null : (
-        <IconAction
-          label={t('component.translator.editor.showOriginal')}
-          disabled={loading || count < 2}
-          onClick={() => show(index === 0 ? Math.max(1, history?.lastActive ?? count - 1) : 0)}
+        {content}
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+/** An icon button in the instruction field, with its name as tooltip. */
+function BarButton({
+  label,
+  onClick,
+  disabled,
+  pressed,
+  variant = 'ghost',
+  children
+}: {
+  label: string
+  onClick: () => void
+  disabled?: boolean
+  pressed?: boolean
+  variant?: 'ghost' | 'outline' | 'destructive-outline'
+  children: React.ReactNode
+}): React.JSX.Element {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <InputGroupButton
+          size="icon-xs"
+          variant={variant}
+          aria-label={label}
+          aria-pressed={pressed}
+          disabled={disabled}
+          onClick={onClick}
         >
-          <EyeIcon {...ICON} />
-        </IconAction>
-      )}
-      <IconAction
-        label={t('component.translator.editor.editPrompt')}
-        disabled={loading}
-        onClick={() => {
-          setDraft(instruction)
-          setPhase('prompt')
-        }}
-      >
-        <PencilIcon {...ICON} />
-      </IconAction>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span
-            tabIndex={0}
-            className="flex items-center gap-2 px-2 text-sm font-semibold text-on-surface"
-          >
-            {loading ? <Spinner size="sm" /> : null}
-            {title}
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>
-          {instruction || t('component.translator.editor.originalText')}
-        </TooltipContent>
-      </Tooltip>
-      <span className="flex items-center rounded-lg border border-outline-variant">
-        <IconAction
-          label={t('component.translator.editor.previous')}
-          disabled={loading || index <= 0}
-          onClick={() => show(index - 1)}
-        >
-          <UndoIcon {...ICON} />
-        </IconAction>
-        <span aria-live="polite" className="px-1 text-xs text-on-surface-variant">
-          {`${count > 0 ? index + 1 : 0}/${count}`}
-        </span>
-        <IconAction
-          label={t('component.translator.editor.next')}
-          disabled={loading || index >= count - 1}
-          onClick={() => show(index + 1)}
-        >
-          <RedoIcon {...ICON} />
-        </IconAction>
-      </span>
-      <IconAction
-        label={t('component.translator.editor.regenerate')}
-        disabled={loading}
-        onClick={() => {
-          // From the original, the instruction of the last version is asked again.
-          const active = history?.lastActive ?? 0
-          const text = instruction || history?.instructions[active] || titleOf('rephrase')
-          const action = passage?.compose ? 'compose' : agentFor(text).action
-          void process(action, text, history?.titles[index || active] ?? titleOf(action))
-        }}
-      >
-        <RefreshCwIcon {...ICON} />
-      </IconAction>
-      <Button type="button" size="sm" disabled={loading} onClick={close}>
-        {t('component.translator.editor.done')}
-      </Button>
-    </div>
+          {children}
+        </InputGroupButton>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   )
 }

@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import {
+  AlertCircleIcon,
   ArrowRightIcon,
   ChevronDownIcon,
   DownloadIcon,
@@ -8,7 +9,23 @@ import {
   XIcon
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Badge, Button, Card, FileDropzone, Input, Spinner } from '@ki4jlu/design-system'
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  FileDropzone,
+  Input,
+  SettingsRow,
+  Spinner,
+  Stack,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from '@ki4jlu/design-system'
 import {
   API,
   TRANSLATOR_DOCUMENT_ACTIVE_MAX,
@@ -281,15 +298,11 @@ export const DocumentTranslator = forwardRef<DocumentDropTarget, DocumentTransla
     const listed = stale ?? items
 
     return (
-      <div className="flex flex-col gap-stack-lg">
-        <Card className="@container overflow-hidden">
-          <div
-            className={cn(
-              'flex min-h-14 items-center justify-center gap-4 border-b border-outline-variant px-4 py-2',
-              !active && 'text-on-surface-variant'
-            )}
-          >
-            <span className="px-4 text-sm font-medium">{t('component.translator.detect')}</span>
+      <Stack gap="lg">
+        <Card>
+          <CardHeader className="flex-row items-center justify-center gap-stack-md">
+            {/* The source is always detected: shown as the card's muted line, not a control. */}
+            <CardDescription>{t('component.translator.detect')}</CardDescription>
             <ArrowRightIcon {...ICON} />
             <LanguageMenu
               label={t('component.translator.target')}
@@ -297,14 +310,14 @@ export const DocumentTranslator = forwardRef<DocumentDropTarget, DocumentTransla
               onChange={onTarget}
               disabled={!active}
             />
-          </div>
+          </CardHeader>
           {view.upload ? (
-            <div className="p-4 @xl:p-6">
+            <CardContent>
               <FileDropzone
                 icon={<FileTextIcon />}
                 title={t('component.translator.documents.drop')}
                 hint={
-                  <span className="flex flex-col items-center gap-4 pt-2">
+                  <span className="flex flex-col items-center gap-stack-md">
                     <Button type="button" onClick={() => inputRef.current?.click()}>
                       {t('component.translator.documents.browse')}
                     </Button>
@@ -317,11 +330,11 @@ export const DocumentTranslator = forwardRef<DocumentDropTarget, DocumentTransla
                 onFiles={addFiles}
                 className="min-h-96"
               />
-            </div>
+            </CardContent>
           ) : null}
           {view.selection ? (
-            <div className="flex flex-col gap-6 p-6 @xl:p-10">
-              <ul className="m-0 flex list-none flex-col gap-3 p-0">
+            <>
+              <CardContent role="list">
                 {listed.map((item) => (
                   <FileRow
                     key={item.key}
@@ -333,17 +346,17 @@ export const DocumentTranslator = forwardRef<DocumentDropTarget, DocumentTransla
                     }}
                   />
                 ))}
-              </ul>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant pt-5">
-                <p aria-live="polite" className="m-0 text-sm text-on-surface-variant">
+              </CardContent>
+              <CardFooter className="flex-wrap justify-between gap-stack-sm">
+                <CardDescription aria-live="polite">
                   {processing
                     ? t('component.translator.documents.progress', {
                         done: completed,
                         count: items.length
                       })
                     : t('component.translator.documents.selected', { count: listed.length })}
-                </p>
-                <div className="flex gap-3">
+                </CardDescription>
+                <div className="flex gap-stack-sm">
                   <Button type="button" variant="outline" disabled={processing} onClick={decline}>
                     {t('component.translator.documents.decline')}
                   </Button>
@@ -352,27 +365,22 @@ export const DocumentTranslator = forwardRef<DocumentDropTarget, DocumentTransla
                     {t('component.translator.documents.translate')}
                   </Button>
                 </div>
-              </div>
-            </div>
+              </CardFooter>
+            </>
           ) : null}
           {view.results ? (
-            <div
-              className={cn(
-                'flex flex-col gap-6 p-6 @xl:p-10',
-                (view.upload || view.selection) && 'pt-0 @xl:pt-0'
-              )}
-            >
-              <ul className="m-0 flex list-none flex-col gap-3 p-0">
+            <>
+              <CardContent role="list">
                 {view.results.map((item) => (
                   <ResultRow key={item.key} item={item} />
                 ))}
-              </ul>
-              <div className="flex justify-end border-t border-outline-variant pt-5">
+              </CardContent>
+              <CardFooter className="justify-end">
                 <Button type="button" onClick={uploadMore}>
                   {t('component.translator.documents.uploadMore')}
                 </Button>
-              </div>
-            </div>
+              </CardFooter>
+            </>
           ) : null}
           {/* The file picker behind the button, never shown itself. */}
           <Input
@@ -391,7 +399,7 @@ export const DocumentTranslator = forwardRef<DocumentDropTarget, DocumentTransla
           />
         </Card>
         <History jobs={jobs.data} loading={jobs.isPending} failed={jobs.isError} />
-      </div>
+      </Stack>
     )
   }
 )
@@ -403,19 +411,46 @@ class JobError extends Error {
   }
 }
 
-/** The file's type as a short tag, e.g. `DOCX`. */
+/** The file's type as a short tag, e.g. `DOCX`, as `FilePreview` tags it. */
 function TypeTag({ name, error }: { name: string; error?: boolean }): React.JSX.Element {
   const extension = name.includes('.') ? name.split('.').pop()!.toUpperCase() : '?'
   return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        'flex h-8 min-w-10 shrink-0 items-center justify-center rounded-md border px-1 text-xs font-bold',
-        error ? 'border-error text-error' : 'border-outline-variant text-on-surface-variant'
-      )}
-    >
+    <Badge aria-hidden="true" tone={error ? 'error' : 'neutral'} className="shrink-0">
       {extension}
+    </Badge>
+  )
+}
+
+/** A file's line: its type tag and its name, cut short when it does not fit. */
+function FileLabel({ name, error }: { name: string; error?: boolean }): React.JSX.Element {
+  return (
+    <span className="flex min-w-0 items-center gap-stack-sm">
+      <TypeTag name={name} error={error} />
+      <span className="truncate" title={name}>
+        {name}
+      </span>
     </span>
+  )
+}
+
+/** The bar of a file on its way, colored by how it stands. */
+function ProgressBar({ item }: { item: Item }): React.JSX.Element {
+  // DS gap: no Progress component. The native bar (role progressbar, its value announced) takes
+  // the state's token as its accent color.
+  return (
+    <progress
+      aria-label={item.file.name}
+      max={100}
+      value={item.progress}
+      className={cn(
+        'w-24',
+        item.state === 'error'
+          ? 'accent-error'
+          : item.state === 'done'
+            ? 'accent-success'
+            : 'accent-primary'
+      )}
+    />
   )
 }
 
@@ -440,58 +475,33 @@ function FileRow({ item, onRemove }: { item: Item; onRemove: () => void }): Reac
                 ? t('component.translator.documents.error')
                 : null
   return (
-    <li className="flex items-center gap-4 rounded-xl border border-outline-variant px-5 py-4">
-      <TypeTag name={item.file.name} />
-      <div className="grid min-w-0 flex-1 gap-0.5">
-        <p className="m-0 truncate text-base font-semibold text-on-surface" title={item.file.name}>
-          {item.file.name}
-        </p>
-        <p className="m-0 text-xs text-on-surface-variant">{formatSize(item.file.size)}</p>
-      </div>
-      {item.state === 'selected' ? (
-        <IconAction
-          label={t('component.translator.documents.remove', { name: item.file.name })}
-          onClick={onRemove}
-        >
-          <XIcon {...ICON} />
-        </IconAction>
-      ) : (
-        <div className="flex shrink-0 items-center gap-3">
-          <span
-            className={cn(
-              'text-sm',
-              item.state === 'error'
-                ? 'text-error'
-                : item.state === 'done'
-                  ? 'text-success'
-                  : 'text-primary'
-            )}
+    <SettingsRow
+      role="listitem"
+      label={<FileLabel name={item.file.name} />}
+      description={formatSize(item.file.size)}
+      control={
+        item.state === 'selected' ? (
+          <IconAction
+            label={t('component.translator.documents.remove', { name: item.file.name })}
+            onClick={onRemove}
           >
-            {status}
+            <XIcon {...ICON} />
+          </IconAction>
+        ) : (
+          <span className="flex items-center gap-stack-sm">
+            <Badge
+              appearance="text"
+              tone={
+                item.state === 'error' ? 'error' : item.state === 'done' ? 'success' : 'primary'
+              }
+            >
+              {status}
+            </Badge>
+            <ProgressBar item={item} />
           </span>
-          <span
-            role="progressbar"
-            aria-label={item.file.name}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={item.progress}
-            className="h-1 w-24 overflow-hidden rounded-full bg-surface-container-high"
-          >
-            <span
-              style={{ width: `${item.progress}%` }}
-              className={cn(
-                'block h-full rounded-full transition-[width] duration-500',
-                item.state === 'error'
-                  ? 'bg-error'
-                  : item.state === 'done'
-                    ? 'bg-success'
-                    : 'bg-primary'
-              )}
-            />
-          </span>
-        </div>
-      )}
-    </li>
+        )
+      }
+    />
   )
 }
 
@@ -500,32 +510,35 @@ function ResultRow({ item }: { item: Item }): React.JSX.Element {
   const { t } = useTranslation()
   if (item.state === 'done' && item.job) {
     return (
-      <li className="flex items-center gap-4 rounded-xl border border-outline-variant px-5 py-4">
-        <TypeTag name={item.file.name} />
-        <p className="m-0 min-w-0 flex-1 truncate text-base font-semibold text-on-surface">
-          {item.job.resultFilename}
-        </p>
-        <Button asChild variant="outline" size="sm">
-          <a
-            href={`${apiBase()}${API.translatorDocumentDownload(item.job.id)}`}
-            download={item.job.resultFilename}
-          >
-            <DownloadIcon {...ICON} />
-            {t('component.translator.documents.download')}
-            <span className="sr-only">{` ${item.job.resultFilename}`}</span>
-          </a>
-        </Button>
-      </li>
+      <SettingsRow
+        role="listitem"
+        label={<FileLabel name={item.job.resultFilename} />}
+        control={
+          <Button asChild variant="outline" size="sm">
+            <a
+              href={`${apiBase()}${API.translatorDocumentDownload(item.job.id)}`}
+              download={item.job.resultFilename}
+            >
+              <DownloadIcon {...ICON} />
+              {t('component.translator.documents.download')}
+              <span className="sr-only">{` ${item.job.resultFilename}`}</span>
+            </a>
+          </Button>
+        }
+      />
     )
   }
   return (
-    <li className="flex items-center gap-4 rounded-xl border border-error px-5 py-4">
-      <TypeTag name={item.file.name} error />
-      <div className="grid min-w-0 flex-1 gap-0.5">
-        <p className="m-0 truncate text-base font-semibold text-on-surface">{item.file.name}</p>
-        <p className="m-0 text-sm text-error">{item.error}</p>
-      </div>
-    </li>
+    <SettingsRow
+      role="listitem"
+      label={<FileLabel name={item.file.name} error />}
+      description={
+        <Badge appearance="text" tone="error">
+          <AlertCircleIcon {...ICON} />
+          <span>{item.error}</span>
+        </Badge>
+      }
+    />
   )
 }
 
@@ -546,25 +559,26 @@ function History({
   if (loading) return null
   if (failed) {
     return (
-      <p role="alert" className="m-0 text-sm text-error">
-        {t('component.translator.documents.loadFailed')}
-      </p>
+      <Badge role="alert" appearance="text" tone="error">
+        <AlertCircleIcon {...ICON} />
+        <span>{t('component.translator.documents.loadFailed')}</span>
+      </Badge>
     )
   }
   if (done.length === 0) return null
   const listId = 'translator-document-history'
   return (
-    <Card className="overflow-hidden">
+    <Card>
+      {/* The whole head of the list opens and closes it, as in HAWKI. */}
       <Button
         type="button"
         variant="ghost"
         aria-expanded={open}
         aria-controls={listId}
         onClick={() => setOpen((value) => !value)}
-        // eslint-disable-next-line design-system/layout-only-classname -- the whole head of the list opens and closes it, as in HAWKI
-        className="flex h-auto w-full justify-between rounded-none px-5 py-4"
+        className="w-full justify-between"
       >
-        <span className="flex items-center gap-2 text-base font-semibold text-on-surface">
+        <span className="flex items-center gap-stack-sm">
           {t('component.translator.documents.history')}
           <Badge>{done.length}</Badge>
         </span>
@@ -574,53 +588,57 @@ function History({
         />
       </Button>
       {open ? (
-        <ul id={listId} className="m-0 list-none border-t border-outline-variant p-0">
+        <CardContent id={listId} role="list">
           {done.map((job) => (
-            <li
+            <SettingsRow
               key={job.id}
-              className="flex items-center gap-3 border-outline-variant px-5 py-3 not-first:border-t"
-            >
-              <TypeTag name={job.resultFilename} />
-              <div className="grid min-w-0 flex-1 gap-0.5">
-                <p className="m-0 truncate text-sm text-on-surface" title={job.resultFilename}>
-                  {job.resultFilename}
-                </p>
-                <p className="m-0 text-xs text-on-surface-variant">
-                  {job.resultSize !== null ? formatSize(job.resultSize) : ''}
-                </p>
-              </div>
-              <Button asChild variant="ghost" size="icon">
-                <a
-                  href={`${apiBase()}${API.translatorDocumentDownload(job.id)}`}
-                  download={job.resultFilename}
-                  aria-label={t('component.translator.documents.downloadFile', {
-                    name: job.resultFilename
-                  })}
-                  title={t('component.translator.documents.downloadShort')}
-                >
-                  <DownloadIcon {...ICON} />
-                </a>
-              </Button>
-              <IconAction
-                label={t('component.translator.documents.delete', { name: job.resultFilename })}
-                disabled={remove.isPending && remove.variables === job.id}
-                onClick={() =>
-                  remove.mutate(job.id, {
-                    onError: () =>
-                      toast({
-                        variant: 'error',
-                        title: t('component.translator.documents.deleteFailed', {
-                          name: job.resultFilename
-                        })
+              role="listitem"
+              label={<FileLabel name={job.resultFilename} />}
+              description={job.resultSize !== null ? formatSize(job.resultSize) : undefined}
+              control={
+                <span className="flex items-center">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button asChild variant="ghost" size="icon">
+                        <a
+                          href={`${apiBase()}${API.translatorDocumentDownload(job.id)}`}
+                          download={job.resultFilename}
+                          aria-label={t('component.translator.documents.downloadFile', {
+                            name: job.resultFilename
+                          })}
+                        >
+                          <DownloadIcon {...ICON} />
+                        </a>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {t('component.translator.documents.downloadShort')}
+                    </TooltipContent>
+                  </Tooltip>
+                  <IconAction
+                    label={t('component.translator.documents.delete', {
+                      name: job.resultFilename
+                    })}
+                    disabled={remove.isPending && remove.variables === job.id}
+                    onClick={() =>
+                      remove.mutate(job.id, {
+                        onError: () =>
+                          toast({
+                            variant: 'error',
+                            title: t('component.translator.documents.deleteFailed', {
+                              name: job.resultFilename
+                            })
+                          })
                       })
-                  })
-                }
-              >
-                <Trash2Icon {...ICON} />
-              </IconAction>
-            </li>
+                    }
+                  >
+                    <Trash2Icon {...ICON} />
+                  </IconAction>
+                </span>
+              }
+            />
           ))}
-        </ul>
+        </CardContent>
       ) : null}
     </Card>
   )

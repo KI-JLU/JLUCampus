@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { ArrowLeftRightIcon, LanguagesIcon, WandSparklesIcon, XIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Button, Card, Label, Textarea } from '@ki4jlu/design-system'
+import { Badge, Button, Card, Label, Stack, Textarea } from '@ki4jlu/design-system'
 import { TRANSLATE_TEXT_MAX } from '@justcampus/shared'
 import { cn } from '@/lib/utils'
-import { sourceBoardHtml } from './board-html'
+import { BOARD_INSET, boardTextSize, sourceBoardHtml } from './board-html'
 import { CopyButton, IconAction } from './copy-button'
 import { LanguageMenu } from './language-menu'
 import { isTranslateShortcut, textErrorMessage } from './languages'
@@ -31,6 +31,9 @@ const LIMIT = TRANSLATE_TEXT_MAX.toLocaleString('de-DE')
  * and the editable result side by side with their counts and actions below, and the main button
  * across the foot of the card. The button only works when something changed since the result;
  * live editing needs none and hides it.
+ *
+ * DS gap: there is no Separator, and Card's sub-parts come without rules, so the rules between
+ * the card's parts are borders in the DS's divider token (`outline-variant`).
  */
 export function TextBoard({ id, store, disabled }: TextBoardProps): React.JSX.Element {
   const { t } = useTranslation()
@@ -87,33 +90,37 @@ export function TextBoard({ id, store, disabled }: TextBoardProps): React.JSX.El
 
   return (
     <Card className="@container overflow-hidden">
-      <div
-        className={cn(
-          'grid min-h-14 items-center gap-1 border-b border-outline-variant px-2 py-2',
-          translating ? 'grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]' : 'grid-cols-1'
-        )}
+      {/* The swap button in the middle: both languages take an equal share beside it. */}
+      <Stack
+        direction="row"
+        gap="sm"
+        align="center"
+        justify="center"
+        className="min-h-14 border-b border-outline-variant p-stack-sm"
       >
-        <LanguageMenu
-          label={t('component.translator.source')}
-          allowAuto
-          value={buffer.sourceLang}
-          onChange={(language) => store.setSourceLang(language)}
-          className={translating ? 'justify-self-end' : 'justify-self-center'}
-        />
+        <div className={cn('flex min-w-0', translating && 'flex-1 justify-end')}>
+          <LanguageMenu
+            label={t('component.translator.source')}
+            allowAuto
+            value={buffer.sourceLang}
+            onChange={(language) => store.setSourceLang(language)}
+          />
+        </div>
         {translating ? (
           <>
             <IconAction label={t('component.translator.swap')} onClick={() => store.swap()}>
               <ArrowLeftRightIcon aria-hidden="true" className="size-4" />
             </IconAction>
-            <LanguageMenu
-              label={t('component.translator.target')}
-              value={buffer.targetLang}
-              onChange={(language) => store.setTargetLang(language)}
-              className="justify-self-start"
-            />
+            <div className="flex min-w-0 flex-1 justify-start">
+              <LanguageMenu
+                label={t('component.translator.target')}
+                value={buffer.targetLang}
+                onChange={(language) => store.setTargetLang(language)}
+              />
+            </div>
           </>
         ) : null}
-      </div>
+      </Stack>
       <div className="grid @2xl:grid-cols-2">
         <div className="flex min-w-0 flex-col">
           <div
@@ -155,18 +162,18 @@ export function TextBoard({ id, store, disabled }: TextBoardProps): React.JSX.El
                 setDismissed(processed)
               }}
               onBlur={() => setFocused(false)}
-              className={cn(
-                'min-h-72 flex-1 resize-none py-5 ps-6 pe-14',
-                small ? 'text-base' : 'text-xl'
-              )}
+              className={cn('min-h-72 flex-1 resize-none', BOARD_INSET, boardTextSize(small))}
             />
             {showSourceBoard ? (
               <div
                 aria-hidden="true"
-                // Over the field, which stays there for the keyboard and screenreaders.
+                // Over the field, which stays there for the keyboard and screenreaders. DS gap: no
+                // rich-text surface for a field; this one takes the field's (Card's) surface to
+                // cover its text, and its insets and size.
                 className={cn(
-                  'pointer-events-none absolute inset-0 overflow-hidden bg-surface-container-lowest py-5 ps-6 pe-14 whitespace-pre-wrap break-words text-on-surface',
-                  small ? 'text-base' : 'text-xl'
+                  'pointer-events-none absolute inset-0 overflow-hidden bg-surface-container-lowest whitespace-pre-wrap break-words text-on-surface',
+                  BOARD_INSET,
+                  boardTextSize(small)
                 )}
                 // Escaped in `sourceBoardHtml`.
                 dangerouslySetInnerHTML={{
@@ -180,14 +187,18 @@ export function TextBoard({ id, store, disabled }: TextBoardProps): React.JSX.El
               />
             ) : null}
             {buffer.source ? null : (
+              // DS gap: a field's placeholder is one line in one size; HAWKI's has two, the
+              // second smaller. Both take the placeholder's colour (fieldVariants).
               <div
                 id={`${id}-hint`}
-                className="pointer-events-none absolute inset-x-0 top-0 grid gap-6 px-6 py-5"
+                className={cn(
+                  'pointer-events-none absolute inset-x-0 top-0 grid gap-gutter text-on-surface-variant',
+                  BOARD_INSET,
+                  boardTextSize(false)
+                )}
               >
-                <p className="m-0 text-xl text-on-surface-variant">
-                  {t('component.translator.placeholder')}
-                </p>
-                <p className="m-0 max-w-md text-base text-on-surface-variant">
+                <p className="m-0">{t('component.translator.placeholder')}</p>
+                <p className={cn('m-0 max-w-md', boardTextSize(true))}>
                   {t('component.translator.placeholderDocuments')}
                 </p>
               </div>
@@ -206,12 +217,12 @@ export function TextBoard({ id, store, disabled }: TextBoardProps): React.JSX.El
             ) : null}
           </div>
           <PaneFooter>
-            <p id={`${id}-count`} className="m-0 text-sm text-on-surface-variant">
+            <Badge id={`${id}-count`} appearance="text" tone="neutral">
               {t('component.translator.count', {
                 length: count(buffer.source.length),
                 max: LIMIT
               })}
-            </p>
+            </Badge>
             <CopyButton text={buffer.source || undefined} whenEmpty="confirm" />
           </PaneFooter>
         </div>
@@ -234,10 +245,10 @@ export function TextBoard({ id, store, disabled }: TextBoardProps): React.JSX.El
             onSourceActive={setActiveSource}
           />
           <PaneFooter>
-            <p className="m-0 text-sm text-on-surface-variant">
+            <Badge appearance="text" tone="neutral">
               {t('component.translator.resultCount', { length: count(target.length) })}
-            </p>
-            <div className="flex items-center gap-1">
+            </Badge>
+            <Stack direction="row" gap="sm" align="center">
               {target && translating ? (
                 <IconAction
                   label={t('component.translator.improveResult')}
@@ -257,12 +268,12 @@ export function TextBoard({ id, store, disabled }: TextBoardProps): React.JSX.El
                 </IconAction>
               ) : null}
               <CopyButton text={store.outputText || undefined} whenEmpty="confirm" />
-            </div>
+            </Stack>
           </PaneFooter>
         </div>
       </div>
       {store.liveActive ? null : (
-        <div className="border-t border-outline-variant p-3">
+        <div className="border-t border-outline-variant p-stack-sm">
           <Button
             type="button"
             disabled={!canRun}
@@ -275,12 +286,11 @@ export function TextBoard({ id, store, disabled }: TextBoardProps): React.JSX.El
         </div>
       )}
       {error ? (
-        <p
-          role="alert"
-          className="m-0 border-t border-outline-variant px-4 py-3 text-sm text-error"
-        >
-          {'key' in error ? t(error.key) : error.text}
-        </p>
+        <div role="alert" className="border-t border-outline-variant px-stack-md py-stack-sm">
+          <Badge appearance="text" tone="error">
+            {'key' in error ? t(error.key) : error.text}
+          </Badge>
+        </div>
       ) : null}
     </Card>
   )
@@ -289,8 +299,14 @@ export function TextBoard({ id, store, disabled }: TextBoardProps): React.JSX.El
 /** The foot of a pane: its character count and what can be done with its text. */
 function PaneFooter({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
-    <div className="flex min-h-14 items-center justify-between gap-2 border-t border-outline-variant px-4 py-2">
+    <Stack
+      direction="row"
+      gap="sm"
+      align="center"
+      justify="between"
+      className="min-h-14 border-t border-outline-variant px-stack-md py-stack-sm"
+    >
       {children}
-    </div>
+    </Stack>
   )
 }

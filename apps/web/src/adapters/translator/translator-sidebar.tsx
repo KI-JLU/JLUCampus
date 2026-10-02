@@ -16,14 +16,22 @@ import {
   WandSparklesIcon
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Button, Checkbox, NavItem, Switch } from '@ki4jlu/design-system'
+import {
+  Badge,
+  Button,
+  Checkbox,
+  Label,
+  NavItem,
+  PanelSection,
+  Spinner,
+  Switch
+} from '@ki4jlu/design-system'
 import {
   REPHRASE_STYLES,
   REPHRASE_TONES,
   type TranslatorEngine,
   type TranslatorGlossary
 } from '@justcampus/shared'
-import { cn } from '@/lib/utils'
 import type { TranslatorState, TranslatorMode } from './translator-store'
 
 const ICON = { 'aria-hidden': true, className: 'size-4' } as const
@@ -60,16 +68,18 @@ export interface TranslatorSidebarProps {
   onTone: (tone: (typeof REPHRASE_TONES)[number]) => void
   onFormality: (formality: 'formal' | 'informal') => void
   onResetStyle: () => void
+  /** Whether the modes head the column; narrow screens show them above the work area instead. */
+  showModes?: boolean
 }
 
 /**
- * The translator's own column, left of its work area as in HAWKI: the modes, the language model,
- * the editing tools of the mode, and the adjustments. Model, glossaries and writing style open
- * views of their own within the column, with a heading and a way back.
+ * The translator's settings, in the shell's column right of the work area: the modes, the language
+ * model, the editing tools of the mode, and the adjustments. Model, glossaries and writing style
+ * open views of their own within the column, with a heading and a way back.
  */
 export function TranslatorSidebar(props: TranslatorSidebarProps): React.JSX.Element {
   const { t } = useTranslation()
-  const { id, state, engine } = props
+  const { id, state, engine, showModes = true } = props
   const [subview, setSubview] = useState<Subview>(null)
   const opener = useRef<HTMLButtonElement | null>(null)
   const mode = state.mode
@@ -94,38 +104,37 @@ export function TranslatorSidebar(props: TranslatorSidebarProps): React.JSX.Elem
         : t('component.translator.styleDefault')
   const glossaryCount = `${state.glossaryIds.length}/${props.glossaries?.length ?? 0}`
   const deepl = engine?.kind === 'deepl'
+  const models =
+    mode === 'create' ? props.engines.filter((option) => option.kind === 'llm') : props.engines
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col">
-      <div
-        className={cn(
-          'flex min-h-0 flex-1 flex-col gap-stack-lg overflow-y-auto p-4',
-          subview && 'invisible'
-        )}
-        aria-hidden={subview ? true : undefined}
-      >
-        <ul aria-label={t('component.translator.mode')} className="m-0 grid list-none gap-1.5 p-0">
-          {props.modes.map((option) => {
-            const active = mode === option
-            return (
-              <li key={option}>
-                <NavItem
-                  type="button"
-                  level="sub"
-                  active={active}
-                  // A choice within the page, not a page of its own.
-                  aria-current={active ? 'true' : undefined}
-                  onClick={() => props.onMode(option)}
-                >
-                  {MODE_ICONS[option]}
-                  <span className="font-semibold">{t(`component.translator.modes.${option}`)}</span>
-                </NavItem>
-              </li>
-            )
-          })}
-        </ul>
+    <>
+      {/* Kept while a view is open, so the row that opened it can take the focus back. */}
+      <div hidden={subview !== null} className="flex flex-col gap-stack-lg">
+        {showModes ? (
+          <ul aria-label={t('component.translator.mode')} className="m-0 grid list-none gap-1 p-0">
+            {props.modes.map((option) => {
+              const active = mode === option
+              return (
+                <li key={option}>
+                  <NavItem
+                    type="button"
+                    level="sub"
+                    active={active}
+                    // A choice within the page, not a page of its own.
+                    aria-current={active ? 'true' : undefined}
+                    onClick={() => props.onMode(option)}
+                  >
+                    {MODE_ICONS[option]}
+                    <span>{t(`component.translator.modes.${option}`)}</span>
+                  </NavItem>
+                </li>
+              )
+            })}
+          </ul>
+        ) : null}
 
-        <Section id={`${id}-model-title`} title={t('component.translator.engine')}>
+        <PanelSection titleId={`${id}-model-title`} title={t('component.translator.engine')}>
           <SidebarRow
             icon={<UserRoundIcon {...ICON} />}
             label={engine?.label ?? t('component.translator.selectModel')}
@@ -133,10 +142,10 @@ export function TranslatorSidebar(props: TranslatorSidebarProps): React.JSX.Elem
             onOpen={(trigger) => open('model', trigger)}
             describedBy={`${id}-model-title`}
           />
-        </Section>
+        </PanelSection>
 
         {documents ? null : (
-          <Section id={`${id}-tools-title`} title={t('component.translator.tools')}>
+          <PanelSection title={t('component.translator.tools')}>
             {mode === 'create' ? (
               <>
                 <ToggleRow
@@ -176,10 +185,10 @@ export function TranslatorSidebar(props: TranslatorSidebarProps): React.JSX.Elem
                 ) : null}
               </>
             )}
-          </Section>
+          </PanelSection>
         )}
 
-        <Section id={`${id}-options-title`} title={t('component.translator.options')}>
+        <PanelSection title={t('component.translator.options')}>
           {mode === 'translate' || documents ? (
             <SidebarRow
               icon={<BookMarkedIcon {...ICON} />}
@@ -194,17 +203,17 @@ export function TranslatorSidebar(props: TranslatorSidebarProps): React.JSX.Elem
             value={styleValue}
             onOpen={(trigger) => open('style', trigger)}
           />
-        </Section>
+        </PanelSection>
       </div>
 
       {subview === 'model' ? (
-        <Subview title={t('component.translator.engine')} onBack={close}>
+        <Subview
+          title={t('component.translator.engine')}
+          hint={models.length === 0 ? t('component.translator.noModels') : undefined}
+          onBack={close}
+        >
           <ModelList
-            engines={
-              mode === 'create'
-                ? props.engines.filter((option) => option.kind === 'llm')
-                : props.engines
-            }
+            engines={models}
             selected={engine?.id ?? null}
             llmProvider={props.llmProvider}
             onSelect={(choice) => {
@@ -219,6 +228,9 @@ export function TranslatorSidebar(props: TranslatorSidebarProps): React.JSX.Elem
         <Subview
           title={t('component.translator.glossaries.title')}
           aside={glossaryCount}
+          hint={
+            props.glossaries?.length === 0 ? t('component.translator.glossaries.none') : undefined
+          }
           onBack={close}
           footer={
             <Button
@@ -232,12 +244,16 @@ export function TranslatorSidebar(props: TranslatorSidebarProps): React.JSX.Elem
             </Button>
           }
         >
-          <GlossaryChoice
-            id={id}
-            glossaries={props.glossaries}
-            selected={state.glossaryIds}
-            onChange={props.onGlossaries}
-          />
+          {props.glossaries === undefined ? (
+            <Spinner label={t('component.translator.glossaries.loading')} className="self-center" />
+          ) : props.glossaries.length > 0 ? (
+            <GlossaryChoice
+              id={id}
+              glossaries={props.glossaries}
+              selected={state.glossaryIds}
+              onChange={props.onGlossaries}
+            />
+          ) : null}
         </Subview>
       ) : null}
 
@@ -262,27 +278,7 @@ export function TranslatorSidebar(props: TranslatorSidebarProps): React.JSX.Elem
           />
         </Subview>
       ) : null}
-    </div>
-  )
-}
-
-/** A group of the column under its small title. */
-function Section({
-  id,
-  title,
-  children
-}: {
-  id: string
-  title: string
-  children: ReactNode
-}): React.JSX.Element {
-  return (
-    <section aria-labelledby={id} className="grid gap-1">
-      <h3 id={id} className="m-0 px-3 pb-1 text-xs font-medium text-on-surface-variant">
-        {title}
-      </h3>
-      {children}
-    </section>
+    </>
   )
 }
 
@@ -309,11 +305,12 @@ function SidebarRow({
       disabled={disabled}
       aria-describedby={describedBy}
       onClick={(event) => onOpen(event.currentTarget)}
-      className={cn('disabled:cursor-not-allowed disabled:opacity-60')}
+      // DS gap: NavItem has no disabled state; this is the one `Label` and `Switch` use.
+      className="disabled:cursor-not-allowed disabled:opacity-60"
     >
       {icon}
       <span className="min-w-0 flex-1 truncate text-left">{label}</span>
-      {value ? <span className="shrink-0 text-xs text-on-surface-variant">{value}</span> : null}
+      {value ? <Badge className="shrink-0">{value}</Badge> : null}
       <ChevronRightIcon {...ICON} />
     </NavItem>
   )
@@ -336,34 +333,36 @@ function ToggleRow({
   onChange: (checked: boolean) => void
 }): React.JSX.Element {
   return (
-    <div
-      className={cn(
-        'flex min-h-10 items-center justify-between gap-3 px-3',
-        disabled && 'opacity-60'
-      )}
-    >
-      <label
-        htmlFor={id}
-        className="flex min-w-0 items-center gap-3 text-sm text-on-surface [&_svg]:text-on-surface-variant"
-      >
+    // The switch comes first, so the label greys out with it (`peer-disabled`); shown reversed.
+    <div className="flex min-h-10 flex-row-reverse items-center justify-between gap-3 px-3">
+      <Switch
+        id={id}
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={onChange}
+        className="peer"
+      />
+      <Label htmlFor={id} className="flex min-w-0 items-center gap-3">
         {icon}
         <span className="truncate">{label}</span>
-      </label>
-      <Switch id={id} checked={checked} disabled={disabled} onCheckedChange={onChange} />
+      </Label>
     </div>
   )
 }
 
-/** A view within the column: back arrow and heading on top, its content below. */
+/** A view within the column: a way back, then its heading and content. */
 function Subview({
   title,
   aside,
+  hint,
   onBack,
   footer,
   children
 }: {
   title: string
   aside?: string
+  /** Muted text under the heading, as when there is nothing to choose. */
+  hint?: string
   onBack: () => void
   footer?: ReactNode
   children: ReactNode
@@ -375,27 +374,19 @@ function Subview({
     <div
       role="region"
       aria-label={title}
-      className="absolute inset-0 flex flex-col bg-surface"
+      className="flex flex-col items-start gap-stack-md"
       onKeyDown={(event) => {
         if (event.key === 'Escape') onBack()
       }}
     >
-      <div className="flex items-center gap-3 border-b border-outline-variant px-3 py-4">
-        <Button
-          ref={back}
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={t('component.translator.back')}
-          onClick={onBack}
-        >
-          <ArrowLeftIcon {...ICON} />
-        </Button>
-        <h3 className="m-0 flex-1 text-base font-semibold text-on-surface">{title}</h3>
-        {aside ? <span className="pe-2 text-sm text-on-surface-variant">{aside}</span> : null}
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">{children}</div>
-      {footer ? <div className="border-t border-outline-variant p-4">{footer}</div> : null}
+      <Button ref={back} type="button" variant="ghost" size="sm" onClick={onBack}>
+        <ArrowLeftIcon {...ICON} />
+        {t('component.translator.back')}
+      </Button>
+      <PanelSection title={title} aside={aside} hint={hint} className="self-stretch">
+        {children}
+      </PanelSection>
+      {footer}
     </div>
   )
 }
@@ -413,13 +404,6 @@ function ModelList({
   onSelect: (engine: TranslatorEngine) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
-  if (engines.length === 0) {
-    return (
-      <p className="m-0 p-3 text-sm text-on-surface-variant">
-        {t('component.translator.noModels')}
-      </p>
-    )
-  }
   const groups = [
     { name: 'DeepL', engines: engines.filter((engine) => engine.kind === 'deepl') },
     {
@@ -428,13 +412,10 @@ function ModelList({
     }
   ].filter((group) => group.engines.length > 0)
   return (
-    <div className="grid gap-3">
+    <>
       {groups.map((group) => (
-        <section key={group.name} aria-label={group.name} className="grid gap-0.5">
-          <h4 className="m-0 px-3 py-1 text-xs font-bold tracking-wide text-on-surface uppercase">
-            {group.name}
-          </h4>
-          <ul className="m-0 grid list-none gap-0.5 p-0">
+        <PanelSection key={group.name} title={group.name}>
+          <ul className="m-0 grid list-none gap-1 p-0">
             {group.engines.map((engine) => {
               const active = engine.id === selected
               return (
@@ -446,21 +427,16 @@ function ModelList({
                     aria-current={active ? 'true' : undefined}
                     onClick={() => onSelect(engine)}
                   >
-                    <span
-                      aria-hidden="true"
-                      className="size-1.5 shrink-0 rounded-full bg-success"
-                    />
-                    <span className={cn('truncate', active && 'font-semibold')}>
-                      {engine.label}
-                    </span>
+                    <Badge appearance="text" tone="success" dot aria-hidden="true" />
+                    <span className="truncate">{engine.label}</span>
                   </NavItem>
                 </li>
               )
             })}
           </ul>
-        </section>
+        </PanelSection>
       ))}
-    </div>
+    </>
   )
 }
 
@@ -472,40 +448,20 @@ function GlossaryChoice({
   onChange
 }: {
   id: string
-  glossaries: readonly TranslatorGlossary[] | undefined
+  glossaries: readonly TranslatorGlossary[]
   selected: readonly string[]
   onChange: (ids: string[]) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
-  if (!glossaries)
-    return (
-      <p className="m-0 p-3 text-sm text-on-surface-variant">
-        {t('component.translator.glossaries.loading')}
-      </p>
-    )
-  if (glossaries.length === 0) {
-    return (
-      <p className="m-0 p-6 text-center text-sm text-on-surface-variant">
-        {t('component.translator.glossaries.none')}
-      </p>
-    )
-  }
   return (
     <ul className="m-0 grid list-none gap-1 p-0">
       {glossaries.map((glossary) => {
-        const checked = selected.includes(glossary.id)
         const checkboxId = `${id}-glossary-${glossary.id}`
         return (
-          <li
-            key={glossary.id}
-            className={cn(
-              'flex items-center gap-3 rounded-lg px-3 py-2.5',
-              checked && 'bg-secondary-container text-on-secondary-container'
-            )}
-          >
+          <li key={glossary.id} className="flex min-h-10 items-center gap-3 px-3">
             <Checkbox
               id={checkboxId}
-              checked={checked}
+              checked={selected.includes(glossary.id)}
               onCheckedChange={(value) =>
                 onChange(
                   value === true
@@ -514,15 +470,12 @@ function GlossaryChoice({
                 )
               }
             />
-            <label
-              htmlFor={checkboxId}
-              className="flex min-w-0 flex-1 items-baseline gap-2 text-sm"
-            >
-              <span className="truncate font-medium">{glossary.name}</span>
-              <span className="shrink-0 text-xs text-on-surface-variant">
+            <Label htmlFor={checkboxId} className="flex min-w-0 flex-1 items-baseline gap-2">
+              <span className="truncate">{glossary.name}</span>
+              <span className="shrink-0">
                 {`• ${t('component.translator.glossaries.terms', { count: glossary.entryCount })}`}
               </span>
-            </label>
+            </Label>
           </li>
         )
       })}
@@ -552,16 +505,12 @@ function StylePanel({
   const { t } = useTranslation()
   const standard = !state.style && !state.tone && state.formality === 'default'
   return (
-    <div className="grid gap-stack-lg p-1">
-      <NavItem
-        type="button"
-        level="sub"
+    <>
+      <ChoiceRow
+        label={t('component.translator.styleDefault')}
         active={standard}
-        aria-pressed={standard}
-        onClick={onReset}
-      >
-        <span className="font-semibold">{t('component.translator.styleDefault')}</span>
-      </NavItem>
+        onSelect={onReset}
+      />
       {full ? (
         <>
           <ChoiceGroup
@@ -593,7 +542,7 @@ function StylePanel({
           onSelect: () => onFormality(formality)
         }))}
       />
-    </div>
+    </>
   )
 }
 
@@ -605,21 +554,40 @@ function ChoiceGroup({
   options: Array<{ key: string; label: string; active: boolean; onSelect: () => void }>
 }): React.JSX.Element {
   return (
-    <section aria-label={title} className="grid gap-1">
-      <h4 className="m-0 px-3 pb-1 text-xs font-medium text-on-surface-variant">{title}</h4>
+    <PanelSection title={title}>
       {options.map((option) => (
-        <NavItem
+        <ChoiceRow
           key={option.key}
-          type="button"
-          level="sub"
+          label={option.label}
           active={option.active}
-          aria-pressed={option.active}
-          onClick={option.onSelect}
-          className="ps-6"
-        >
-          <span className={cn(option.active && 'font-semibold')}>{option.label}</span>
-        </NavItem>
+          onSelect={option.onSelect}
+        />
       ))}
-    </section>
+    </PanelSection>
+  )
+}
+
+/** One choice of the style view, pressed while it is the current one. */
+function ChoiceRow({
+  label,
+  active,
+  onSelect
+}: {
+  label: string
+  active: boolean
+  onSelect: () => void
+}): React.JSX.Element {
+  return (
+    <NavItem
+      type="button"
+      level="sub"
+      active={active}
+      aria-pressed={active}
+      // A setting, not the current page: `aria-pressed` tells which one is on.
+      aria-current={undefined}
+      onClick={onSelect}
+    >
+      <span>{label}</span>
+    </NavItem>
   )
 }

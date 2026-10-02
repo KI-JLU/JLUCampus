@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { ArrowLeftToLineIcon, Undo2Icon, WandSparklesIcon, XIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Button, MenuItem, Spinner } from '@ki4jlu/design-system'
+import { Badge, Button, Card, MenuItem, Spinner } from '@ki4jlu/design-system'
 import { cn } from '@/lib/utils'
+import { BOARD_CLASSES } from './board-html'
 import { IconAction } from './copy-button'
 import { diffWords } from './diff'
 import { sentenceTokens } from './sentences'
@@ -32,6 +33,11 @@ interface SentenceMenuProps {
  * The menu over a clicked sentence of the result: undo the user's change of it, move a sentence
  * of their own into the source, ask for other wordings of the sentence or other words for the
  * clicked word. Suggestions open below it; picking one puts it in.
+ *
+ * Both are Cards placed at the measured sentence (hence the inline position). DS gap: Popover
+ * and DropdownMenu always portal to the end of the page, where the Tab key from the board would
+ * not reach them, and close on Escape, which HAWKI's menu does not; so the panels stay in the
+ * board and take Card's surface (`shadow-card`, not the floating `shadow-overlay`).
  */
 export function SentenceMenu({
   store,
@@ -123,18 +129,20 @@ export function SentenceMenu({
 
   return (
     <>
-      <div
+      <Card
         ref={menu}
         role="toolbar"
         aria-label={t('component.translator.sentence.menu')}
         style={{ top, left: anchor.left }}
-        className="absolute z-20 flex items-center gap-0.5 rounded-xl border border-outline-variant bg-surface-container-lowest p-1 shadow-overlay"
+        className="absolute z-20 flex items-center gap-0.5 p-1"
       >
         {anchor.hasSource ? (
           <IconAction
             label={t('component.translator.sentence.undo')}
             // Without a change HAWKI only shuts the mouse out: the button looks disabled but stays
-            // in the tab order, and the keys still put the sentence back (to what it is).
+            // in the tab order, and the keys still put the sentence back (to what it is). DS gap:
+            // Button styles `disabled` only, which would take it out of the tab order; this is
+            // that look (`disabled:pointer-events-none disabled:opacity-60`) without it.
             className={changed ? undefined : 'pointer-events-none opacity-60'}
             // As in HAWKI the menu stays open over the sentence put back.
             onClick={() => store.undoSentence(anchor.index)}
@@ -153,9 +161,10 @@ export function SentenceMenu({
           </IconAction>
         )}
         <Separator />
+        {/* A ghost Button shows itself pressed by its `aria-pressed`. */}
         <Button
           type="button"
-          variant={kind === 'sentence' ? 'secondary' : 'ghost'}
+          variant="ghost"
           size="sm"
           aria-pressed={kind === 'sentence'}
           onClick={() => void load('sentence')}
@@ -165,7 +174,7 @@ export function SentenceMenu({
         <Separator />
         <Button
           type="button"
-          variant={kind === 'word' ? 'secondary' : 'ghost'}
+          variant="ghost"
           size="sm"
           aria-pressed={kind === 'word'}
           disabled={anchor.tokenIndex === null}
@@ -177,9 +186,9 @@ export function SentenceMenu({
         <IconAction label={t('component.translator.sentence.close')} onClick={onClose}>
           <XIcon aria-hidden="true" className="size-4" />
         </IconAction>
-      </div>
+      </Card>
       {kind ? (
-        <div
+        <Card
           ref={list}
           role="listbox"
           aria-label={t(
@@ -189,7 +198,8 @@ export function SentenceMenu({
           )}
           aria-busy={loading}
           style={{ top: top + height + 4, left: anchor.left }}
-          className="absolute z-20 flex w-[min(32rem,calc(100%-2rem))] flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest py-1 shadow-overlay"
+          // As wide as the board allows, keeping its inset on the right, up to 32 rem.
+          className="absolute right-4 z-20 flex max-w-lg flex-col overflow-hidden py-1"
         >
           <Proposal
             text={original}
@@ -199,6 +209,7 @@ export function SentenceMenu({
             original
             onPick={() => apply(original)}
           />
+          <Separator horizontal />
           {options.map((option) => (
             <Proposal
               key={option}
@@ -210,31 +221,47 @@ export function SentenceMenu({
               onPick={() => apply(option)}
             />
           ))}
+          {/* The status rows sit on the MenuItems' insets. */}
           {loading ? (
-            <div className="flex items-center gap-2 px-4 py-3 text-sm text-on-surface-variant">
-              <Spinner size="sm" />
-              <span className="animate-pulse rounded-sm bg-surface-container-high text-transparent">
-                {original || '...'}
-              </span>
+            <div className="px-3 py-2">
+              <Badge appearance="text" tone="neutral">
+                <Spinner size="sm" />
+                <span className={BOARD_CLASSES.loading}>{original || '...'}</span>
+              </Badge>
             </div>
           ) : failed ? (
-            <p role="alert" className="m-0 px-4 py-3 text-sm text-error">
-              {t('component.translator.sentence.failed')}
-            </p>
+            <div role="alert" className="px-3 py-2">
+              <Badge appearance="text" tone="error">
+                {t('component.translator.sentence.failed')}
+              </Badge>
+            </div>
           ) : (
             <MenuItem type="button" onClick={() => void load(kind, true)}>
               <WandSparklesIcon aria-hidden="true" className="size-4" />
               <span>{t('component.translator.sentence.more')}</span>
             </MenuItem>
           )}
-        </div>
+        </Card>
       ) : null}
     </>
   )
 }
 
-function Separator(): React.JSX.Element {
-  return <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-outline-variant" />
+/**
+ * A rule between the toolbar's groups, or under the first suggestion.
+ *
+ * DS gap: there is no Separator component (only the menus' own, bound to Radix Menu/Select);
+ * this is their rule, a hairline in `outline-variant`.
+ */
+function Separator({ horizontal = false }: { horizontal?: boolean }): React.JSX.Element {
+  return (
+    <span
+      aria-hidden="true"
+      className={
+        horizontal ? 'block h-px bg-outline-variant' : 'mx-0.5 h-5 w-px bg-outline-variant'
+      }
+    />
+  )
 }
 
 /**
@@ -282,7 +309,7 @@ function Proposal({
       .filter((part) => part.type !== 'delete')
       .map((part, index) =>
         part.type === 'insert' ? (
-          <span key={index} className="rounded-sm bg-success-container text-on-success-container">
+          <span key={index} className={BOARD_CLASSES.inserted}>
             {part.text}
           </span>
         ) : (
@@ -293,13 +320,8 @@ function Proposal({
     content = `„${text.trim()}“`
   }
   return (
-    <MenuItem
-      type="button"
-      role="option"
-      aria-selected={false}
-      onClick={onPick}
-      className={cn('whitespace-normal', original && 'border-b border-outline-variant')}
-    >
+    <MenuItem type="button" role="option" aria-selected={false} onClick={onPick}>
+      {/* The text as it is, muted. */}
       <span className={cn('block', original && 'text-on-surface-variant')}>{content}</span>
     </MenuItem>
   )

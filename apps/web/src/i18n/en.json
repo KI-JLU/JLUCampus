@@ -158,10 +158,16 @@
       },
       "mode": "Mode",
       "modes": {
-        "translate": "Translate",
-        "documents": "Translate",
+        "translate": "Translate text",
+        "documents": "Translate documents",
         "rephrase": "Rewrite",
         "create": "Create text"
+      },
+      "modesShort": {
+        "translate": "Text",
+        "documents": "Documents",
+        "rephrase": "Rewrite",
+        "create": "Create"
       },
       "notSetUpTitle": "The translator is not set up yet.",
       "notSetUpDescription": "An administrator first has to add a DeepL key or an AI endpoint.",
@@ -500,7 +506,7 @@
       "llmModelsHint": "The endpoint expects the model ID, users see the display name. “Fetch models” takes the chat models the endpoint offers and keeps your display names. At most {{max}} models.",
       "modelId": "Model ID",
       "modelLabel": "Display name",
-      "modelRow": "Model {{number}}",
+      "modelActions": "Actions",
       "removeModel": "Remove model “{{name}}”",
       "addModel": "Add model",
       "fetchModels": "Fetch models",
@@ -523,9 +529,7 @@
         "models": "Each model ID may appear only once, at most {{max}} models.",
         "modelId": "Enter a model ID of at most 200 characters.",
         "modelLabel": "Enter a display name of at most 80 characters."
-      },
-      "collapseColumn": "Collapse the settings",
-      "expandColumn": "Expand the settings"
+      }
     },
     "files": {
       "configNote": "Nothing to set up here: everyone sets up their places in the desktop app on their device.",

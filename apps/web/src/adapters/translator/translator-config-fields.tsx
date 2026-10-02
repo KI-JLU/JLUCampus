@@ -4,6 +4,9 @@ import { DownloadIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   Button,
+  FormDescription,
+  FormItem,
+  FormMessage,
   Input,
   Label,
   Select,
@@ -11,7 +14,16 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Switch
+  Switch,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
 } from '@ki4jlu/design-system'
 import {
   TRANSLATOR_DOCUMENT_TTL_HOURS,
@@ -205,148 +217,151 @@ export function TranslatorConfigFields({
           />
         )}
       </Field>
-      <fieldset
-        aria-describedby={[errors.llmModels && `${modelsId}-error`, `${modelsId}-hint`]
-          .filter(Boolean)
-          .join(' ')}
-        className="m-0 flex min-w-0 flex-col gap-2 border-0 p-0"
-      >
-        <legend
-          className={cn(
-            'mb-2 text-sm font-medium text-on-surface',
-            errors.llmModels && 'text-error'
-          )}
+      {/* The group's own error and hint. */}
+      <FormItem error={errors.llmModels}>
+        <fieldset
+          aria-describedby={[errors.llmModels && `${modelsId}-error`, `${modelsId}-hint`]
+            .filter(Boolean)
+            .join(' ')}
+          className="flex min-w-0 flex-col gap-2"
         >
-          {t('component.translator.llmModelsLabel')}
-        </legend>
-        {errors.llmModels ? (
-          <p id={`${modelsId}-error`} className="m-0 text-sm text-error">
-            {errors.llmModels}
-          </p>
-        ) : null}
-        {models.length > 0 ? (
-          <div
-            aria-hidden="true"
-            className="grid grid-cols-[1fr_1fr_2.5rem] gap-2 text-sm text-on-surface-variant"
-          >
-            <span>{t('component.translator.modelId')}</span>
-            <span>{t('component.translator.modelLabel')}</span>
-          </div>
-        ) : null}
-        {models.map((model, index) => {
-          const rowId = `${modelsId}-${index}`
-          const idError = errors[`llmModels.${index}.id`]
-          const labelError = errors[`llmModels.${index}.label`]
-          const rowName = model.label.trim() || model.id.trim() || String(index + 1)
-          return (
-            <div
-              key={index}
-              role="group"
-              aria-label={t('component.translator.modelRow', { number: index + 1 })}
-              className="grid gap-1"
+          {/* DS gap: no legend for a group of fields; `Label` gives it the label's look. */}
+          <Label asChild className={cn(errors.llmModels && 'text-error')}>
+            <legend id={`${modelsId}-legend`}>{t('component.translator.llmModelsLabel')}</legend>
+          </Label>
+          <FormMessage id={`${modelsId}-error`} />
+          {models.length > 0 ? (
+            <Table aria-labelledby={`${modelsId}-legend`}>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('component.translator.modelId')}</TableHead>
+                  <TableHead>{t('component.translator.modelLabel')}</TableHead>
+                  <TableHead>
+                    <span className="sr-only">{t('component.translator.modelActions')}</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {models.map((model, index) => {
+                  const rowId = `${modelsId}-${index}`
+                  const idError = errors[`llmModels.${index}.id`]
+                  const labelError = errors[`llmModels.${index}.label`]
+                  const rowName = model.label.trim() || model.id.trim() || String(index + 1)
+                  const removeLabel = t('component.translator.removeModel', { name: rowName })
+                  return (
+                    <TableRow key={index}>
+                      <TableCell>
+                        <FormItem error={idError}>
+                          <Label htmlFor={`${rowId}-id`} className="sr-only">
+                            {t('component.translator.modelId')}
+                          </Label>
+                          <Input
+                            id={`${rowId}-id`}
+                            value={model.id}
+                            spellCheck={false}
+                            autoComplete="off"
+                            aria-invalid={idError ? true : undefined}
+                            aria-describedby={idError ? `${rowId}-id-error` : undefined}
+                            onChange={(event) =>
+                              setModel(index, { ...model, id: event.target.value })
+                            }
+                          />
+                          <FormMessage id={`${rowId}-id-error`} />
+                        </FormItem>
+                      </TableCell>
+                      <TableCell>
+                        <FormItem error={labelError}>
+                          <Label htmlFor={`${rowId}-label`} className="sr-only">
+                            {t('component.translator.modelLabel')}
+                          </Label>
+                          <Input
+                            id={`${rowId}-label`}
+                            value={model.label}
+                            autoComplete="off"
+                            aria-invalid={labelError ? true : undefined}
+                            aria-describedby={labelError ? `${rowId}-label-error` : undefined}
+                            onChange={(event) =>
+                              setModel(index, { ...model, label: event.target.value })
+                            }
+                          />
+                          <FormMessage id={`${rowId}-label-error`} />
+                        </FormItem>
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost-destructive"
+                              size="icon"
+                              aria-label={removeLabel}
+                              onClick={() => removeModel(index)}
+                            >
+                              <Trash2Icon {...ICON} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>{removeLabel}</TooltipContent>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              id={`${modelsId}-add`}
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={models.length >= TRANSLATOR_LLM_MODELS_MAX}
+              onClick={addModel}
             >
-              <div className="grid grid-cols-[1fr_1fr_2.5rem] items-center gap-2">
-                <Label htmlFor={`${rowId}-id`} className="sr-only">
-                  {t('component.translator.modelId')}
-                </Label>
-                <Input
-                  id={`${rowId}-id`}
-                  value={model.id}
-                  spellCheck={false}
-                  autoComplete="off"
-                  aria-invalid={idError ? true : undefined}
-                  aria-describedby={idError ? `${rowId}-id-error` : undefined}
-                  onChange={(event) => setModel(index, { ...model, id: event.target.value })}
-                />
-                <Label htmlFor={`${rowId}-label`} className="sr-only">
-                  {t('component.translator.modelLabel')}
-                </Label>
-                <Input
-                  id={`${rowId}-label`}
-                  value={model.label}
-                  autoComplete="off"
-                  aria-invalid={labelError ? true : undefined}
-                  aria-describedby={labelError ? `${rowId}-label-error` : undefined}
-                  onChange={(event) => setModel(index, { ...model, label: event.target.value })}
-                />
-                <Button
-                  type="button"
-                  variant="ghost-destructive"
-                  size="icon"
-                  aria-label={t('component.translator.removeModel', { name: rowName })}
-                  title={t('component.translator.removeModel', { name: rowName })}
-                  onClick={() => removeModel(index)}
-                >
-                  <Trash2Icon {...ICON} />
-                </Button>
-              </div>
-              {idError ? (
-                <p id={`${rowId}-id-error`} className="m-0 text-sm text-error">
-                  {idError}
-                </p>
-              ) : null}
-              {labelError ? (
-                <p id={`${rowId}-label-error`} className="m-0 text-sm text-error">
-                  {labelError}
-                </p>
-              ) : null}
-            </div>
-          )
-        })}
-        <div className="flex flex-wrap gap-2">
-          <Button
-            id={`${modelsId}-add`}
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={models.length >= TRANSLATOR_LLM_MODELS_MAX}
-            onClick={addModel}
-          >
-            <PlusIcon {...ICON} />
-            {t('component.translator.addModel')}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={!config.llmBaseUrl || fetchModels.isPending}
-            aria-describedby={`${modelsId}-fetch-status`}
-            onClick={loadModels}
-          >
-            <DownloadIcon {...ICON} />
-            {fetchModels.isPending
-              ? t('component.translator.fetchingModels')
-              : t('component.translator.fetchModels')}
-          </Button>
-        </div>
-        <p
-          id={`${modelsId}-fetch-status`}
-          aria-live="polite"
-          className={cn(
-            'm-0 text-sm empty:hidden',
-            fetchStatus?.kind === 'fetched' ? 'text-on-surface-variant' : 'text-error'
-          )}
-        >
-          {fetchStatus?.kind === 'fetched'
-            ? [
-                t('component.translator.fetchedModels', { count: fetchStatus.count }),
-                fetchStatus.omitted > 0
-                  ? t('component.translator.fetchedModelsOmitted', {
-                      count: fetchStatus.omitted,
-                      max: TRANSLATOR_LLM_MODELS_MAX
-                    })
-                  : null
-              ]
-                .filter(Boolean)
-                .join(' ')
-            : fetchStatus
-              ? t(`component.translator.fetchModelsErrors.${fetchStatus.kind}`)
-              : null}
-        </p>
-        <p id={`${modelsId}-hint`} className="m-0 text-sm text-on-surface-variant">
-          {t('component.translator.llmModelsHint', { max: TRANSLATOR_LLM_MODELS_MAX })}
-        </p>
-      </fieldset>
+              <PlusIcon {...ICON} />
+              {t('component.translator.addModel')}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={!config.llmBaseUrl || fetchModels.isPending}
+              aria-describedby={`${modelsId}-fetch-status`}
+              onClick={loadModels}
+            >
+              <DownloadIcon {...ICON} />
+              {fetchModels.isPending
+                ? t('component.translator.fetchingModels')
+                : t('component.translator.fetchModels')}
+            </Button>
+          </div>
+          {/* Its own item: the group's error is not the fetch's. */}
+          <FormItem id={`${modelsId}-fetch-status`} aria-live="polite" className="empty:hidden">
+            {fetchStatus?.kind === 'fetched' ? (
+              <FormDescription>
+                {[
+                  t('component.translator.fetchedModels', { count: fetchStatus.count }),
+                  fetchStatus.omitted > 0
+                    ? t('component.translator.fetchedModelsOmitted', {
+                        count: fetchStatus.omitted,
+                        max: TRANSLATOR_LLM_MODELS_MAX
+                      })
+                    : null
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              </FormDescription>
+            ) : fetchStatus ? (
+              <FormMessage>
+                {t(`component.translator.fetchModelsErrors.${fetchStatus.kind}`)}
+              </FormMessage>
+            ) : null}
+          </FormItem>
+          <FormDescription id={`${modelsId}-hint`}>
+            {t('component.translator.llmModelsHint', { max: TRANSLATOR_LLM_MODELS_MAX })}
+          </FormDescription>
+        </fieldset>
+      </FormItem>
       <Field
         id={`${idPrefix}-default-engine`}
         label={t('component.translator.defaultEngineLabel')}
@@ -377,7 +392,7 @@ export function TranslatorConfigFields({
           </Select>
         )}
       </Field>
-      <div className="grid gap-2">
+      <FormItem>
         <div className="flex items-center justify-between gap-stack-md">
           <Label htmlFor={`${idPrefix}-documents`}>
             {t('component.translator.documentsEnabledLabel')}
@@ -389,10 +404,10 @@ export function TranslatorConfigFields({
             onCheckedChange={(documentsEnabled) => onChange({ ...config, documentsEnabled })}
           />
         </div>
-        <p id={`${idPrefix}-documents-hint`} className="m-0 text-sm text-on-surface-variant">
+        <FormDescription id={`${idPrefix}-documents-hint`}>
           {t('component.translator.documentsEnabledHint', { hours: TRANSLATOR_DOCUMENT_TTL_HOURS })}
-        </p>
-      </div>
+        </FormDescription>
+      </FormItem>
     </>
   )
 }

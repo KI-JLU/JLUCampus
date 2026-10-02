@@ -19,7 +19,11 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
+  Badge,
   Button,
+  Card,
+  CardDescription,
+  CodeBlock,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -39,17 +43,24 @@ import { parseExecutionOutput, splitOutputImages, type ExecutionOutput } from '.
 
 const ICON = { 'aria-hidden': true, className: 'size-4' } as const
 
-/** Colours of the highlighted code, in the theme's tokens. */
-export const CODE_HIGHLIGHT =
+/**
+ * Colours of the highlighted code, in the theme's tokens.
+ * DS gap: the design system has no syntax-highlighting theme (its `CodeBlock` shows plain text),
+ * so lowlight's `hljs-*` classes are coloured here, with semantic tokens only.
+ */
+const CODE_HIGHLIGHT =
   '[&_.hljs-built_in]:text-tertiary [&_.hljs-bullet]:text-tertiary [&_.hljs-number]:text-tertiary [&_.hljs-symbol]:text-tertiary [&_.hljs-type]:text-tertiary [&_.hljs-keyword]:text-error [&_.hljs-link]:text-error [&_.hljs-literal]:text-error [&_.hljs-section]:text-error [&_.hljs-selector-tag]:text-error [&_.hljs-addition]:text-success [&_.hljs-attribute]:text-success [&_.hljs-regexp]:text-success [&_.hljs-string]:text-success [&_.hljs-attr]:text-primary [&_.hljs-name]:text-primary [&_.hljs-template-variable]:text-primary [&_.hljs-title]:text-primary [&_.hljs-variable]:text-primary [&_.hljs-comment]:text-on-surface-variant [&_.hljs-comment]:italic [&_.hljs-meta]:text-on-surface-variant [&_.hljs-quote]:text-on-surface-variant [&_.hljs-deletion]:text-error'
 
-/** The branches of a Git flow diagram, which HAWKI explains below it. */
+/**
+ * The branches of a Git flow diagram, which HAWKI explains below it, as Badge tones (the design
+ * system has no tertiary tone, so "release" takes `info`).
+ */
 const GIT_BRANCHES = [
-  ['main', 'bg-primary'],
-  ['develop', 'bg-success'],
-  ['feature', 'bg-warning'],
-  ['release', 'bg-tertiary'],
-  ['hotfix', 'bg-error']
+  ['main', 'primary'],
+  ['develop', 'success'],
+  ['feature', 'warning'],
+  ['release', 'info'],
+  ['hotfix', 'error']
 ] as const
 
 /**
@@ -161,17 +172,15 @@ function CodeBlockBody({
 
   return (
     <NodeViewWrapper className="my-2 grid gap-3">
-      <div className="relative rounded-lg bg-surface-container-high">
+      {/* DS gap: the design system's `CodeBlock` is a read-only viewer of a code string; it cannot
+          hold the editable code of the document, its language, folding, diagram or run. So the
+          block is a Card with that code inside. */}
+      <Card className="overflow-hidden">
         <div
           contentEditable={false}
-          className={cn(
-            'mx-4 flex min-h-12 items-center justify-between gap-2 py-2 select-none',
-            !showDiagram && 'border-b border-outline-variant'
-          )}
+          className="flex items-center justify-between gap-2 px-4 py-2 select-none"
         >
-          {showDiagram ? (
-            <span />
-          ) : editing ? (
+          {showDiagram ? null : editing ? (
             <Input
               ref={input}
               defaultValue={language ?? 'code'}
@@ -199,7 +208,7 @@ function CodeBlockBody({
               {language ?? 'code'}
             </Button>
           )}
-          <div className="flex items-center gap-1">
+          <div className="ms-auto flex items-center gap-1">
             {minimized ? null : (
               <>
                 {isPython ? (
@@ -256,9 +265,10 @@ function CodeBlockBody({
         {showDiagram && !minimized ? (
           <MermaidPreview diagram={diagram} source={mermaidSource(code)} />
         ) : null}
+        {/* DS gap: no code typography for editable code (monospace, size), see CODE_HIGHLIGHT. */}
         <pre
           className={cn(
-            'm-0 overflow-x-auto p-4 font-mono text-sm',
+            'm-0 overflow-x-auto px-4 pb-4 font-mono text-sm',
             CODE_HIGHLIGHT,
             // The code stays in the document while the diagram stands in its place.
             showDiagram && 'pointer-events-none h-0 overflow-hidden p-0 opacity-0'
@@ -268,11 +278,11 @@ function CodeBlockBody({
             as="code"
             className={cn(
               language ? `language-${language}` : 'language-code',
-              minimized && 'block h-[1.5em] overflow-hidden text-ellipsis whitespace-nowrap'
+              minimized && 'block truncate'
             )}
           />
         </pre>
-      </div>
+      </Card>
       {isPython && !minimized && (running || saved) ? (
         <PythonOutput running={running} output={saved} onClear={() => keep(null)} />
       ) : null}
@@ -296,19 +306,24 @@ function MermaidPreview({
   return (
     <div
       contentEditable={false}
-      className="mx-4 mb-4 flex min-h-32 flex-col items-center justify-center gap-4 overflow-x-auto rounded-xl border border-outline-variant bg-surface p-10"
+      className="flex min-h-32 flex-col items-center justify-center gap-4 overflow-x-auto px-4 pb-4"
     >
       {diagram.state === 'loading' ? (
-        <span className="text-sm text-on-surface-variant">
+        <Badge appearance="text" tone="neutral">
           {t('component.translator.editor.diagramRendering')}
-        </span>
+        </Badge>
       ) : diagram.state === 'error' ? (
-        <div role="alert" className="grid justify-items-center gap-1 text-sm text-error">
-          <span className="flex items-center gap-1">
+        <div role="alert" className="grid w-full justify-items-center gap-2">
+          <Badge appearance="text" tone="error">
             <CircleAlertIcon {...ICON} />
             {t('component.translator.editor.diagramInvalid')}
-          </span>
-          <pre className="m-0 font-mono text-xs whitespace-pre-wrap">{diagram.message}</pre>
+          </Badge>
+          <CodeBlock
+            code={diagram.message}
+            copyLabel={t('component.translator.copy')}
+            copiedLabel={t('component.translator.copied')}
+            className="w-full"
+          />
         </div>
       ) : (
         <>
@@ -318,11 +333,12 @@ function MermaidPreview({
             dangerouslySetInnerHTML={{ __html: diagram.svg }}
           />
           {source.includes('gitGraph') ? (
-            <ul className="m-0 flex list-none flex-wrap justify-center gap-4 p-0 text-xs text-on-surface-variant">
-              {GIT_BRANCHES.map(([branch, colour]) => (
-                <li key={branch} className="flex items-center gap-2">
-                  <span aria-hidden="true" className={cn('size-2.5 rounded-full', colour)} />
-                  {t(`component.translator.editor.gitLegend.${branch}`)}
+            <ul className="m-0 flex list-none flex-wrap justify-center gap-4 p-0">
+              {GIT_BRANCHES.map(([branch, tone]) => (
+                <li key={branch}>
+                  <Badge appearance="text" tone={tone} dot>
+                    {t(`component.translator.editor.gitLegend.${branch}`)}
+                  </Badge>
                 </li>
               ))}
             </ul>
@@ -347,33 +363,41 @@ function PythonOutput({
   const [preview, setPreview] = useState<number | null>(null)
   const images = running ? [] : (output?.images ?? [])
   const text = running ? '' : (output?.text ?? '')
+  const failed = !running && output?.isError === true
+  const failure = t('component.translator.editor.outputFailed')
   return (
-    <section
+    <Card
+      role="region"
       contentEditable={false}
       aria-label={t('component.translator.editor.output')}
       aria-busy={running}
-      className="overflow-hidden rounded-lg border border-outline-variant bg-surface-container-low select-text"
+      className="overflow-hidden select-text"
     >
-      <div className="flex items-center justify-between gap-2 border-b border-outline-variant px-4 py-1">
-        <span className="text-xs font-semibold text-on-surface-variant">
-          {t('component.translator.editor.output')}
-        </span>
+      <div className="flex items-center justify-between gap-2 px-4 py-2">
+        <CardDescription>{t('component.translator.editor.output')}</CardDescription>
         <Button type="button" variant="ghost" size="sm" onClick={onClear}>
           {t('component.translator.editor.outputClear')}
         </Button>
       </div>
-      <div
-        aria-live="polite"
-        className={cn(
-          'grid gap-3 px-4 py-3 font-mono text-sm',
-          output?.isError && !running ? 'text-error' : 'text-on-surface'
-        )}
-      >
+      <div aria-live="polite" className="grid gap-3 px-4 pb-4">
         {running ? (
-          t('component.translator.editor.outputRunning')
-        ) : text.trim() || images.length > 0 ? (
+          <CardDescription>{t('component.translator.editor.outputRunning')}</CardDescription>
+        ) : failed || text.trim() || images.length > 0 ? (
           <>
-            {text.trim() ? <div className="whitespace-pre-wrap">{text}</div> : null}
+            {/* A failed run says so in words and colour, then shows what it printed. */}
+            {failed ? (
+              <Badge appearance="text" tone="error">
+                <CircleAlertIcon {...ICON} />
+                {failure}
+              </Badge>
+            ) : null}
+            {text.trim() && !(failed && text === failure) ? (
+              <CodeBlock
+                code={text}
+                copyLabel={t('component.translator.copy')}
+                copiedLabel={t('component.translator.copied')}
+              />
+            ) : null}
             {images.map((image, index) => (
               <div key={index} className="relative w-fit">
                 <Button
@@ -386,7 +410,7 @@ function PythonOutput({
                   <img
                     src={`data:image/png;base64,${image}`}
                     alt=""
-                    className="max-h-80 max-w-full rounded-md"
+                    className="max-h-80 max-w-full"
                   />
                 </Button>
                 <Button
@@ -407,11 +431,11 @@ function PythonOutput({
             ))}
           </>
         ) : (
-          t('component.translator.editor.outputEmpty')
+          <CardDescription>{t('component.translator.editor.outputEmpty')}</CardDescription>
         )}
       </div>
       <ImagePreview images={images} index={preview} onIndex={setPreview} />
-    </section>
+    </Card>
   )
 }
 
@@ -448,7 +472,7 @@ function ImagePreview({
     <Dialog open={image !== undefined} onOpenChange={(open) => (open ? undefined : onIndex(null))}>
       <DialogContent
         closeLabel={t('common.close')}
-        className="sm:max-w-4xl"
+        className="max-h-dvh overflow-y-auto sm:max-w-4xl"
         // The dialog itself takes the focus, so the first Escape closes it, as in HAWKI: on a
         // focused arrow button it would only close the button's tooltip.
         onOpenAutoFocus={(event) => {
@@ -482,7 +506,7 @@ function ImagePreview({
             <img
               src={`data:image/png;base64,${image}`}
               alt=""
-              className="max-h-[70dvh] min-w-0 flex-1 object-contain"
+              className="max-h-128 min-w-0 flex-1 object-contain"
             />
             {count > 1 ? (
               <IconAction

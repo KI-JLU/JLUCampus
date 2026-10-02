@@ -38,6 +38,7 @@ export function TranslatorTile({ component }: ComponentViewProps<'translator'>):
 
   return (
     <form noValidate onSubmit={submit} className="flex size-full flex-col">
+      {/* DS gap: no compact header for a dashboard tile; the same bar as the feed tiles'. */}
       <div className="flex h-9 shrink-0 items-center gap-2 border-b border-outline-variant px-3">
         <span className="flex shrink-0 text-on-surface-variant">
           <ComponentIcon icon={component.icon} iconUrl={component.iconUrl} />
@@ -99,7 +100,7 @@ export function TranslatorTile({ component }: ComponentViewProps<'translator'>):
           text={result?.translation}
           language={result?.language}
           htmlFor={`${id}-text`}
-          className="min-h-12 flex-1 px-3 py-2 text-sm"
+          className="min-h-12 flex-1"
         />
       </div>
     </form>

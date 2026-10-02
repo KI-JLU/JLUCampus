@@ -163,6 +163,12 @@
         "rephrase": "Text überarbeiten",
         "create": "Text erstellen"
       },
+      "modesShort": {
+        "translate": "Text",
+        "documents": "Dokumente",
+        "rephrase": "Überarbeiten",
+        "create": "Erstellen"
+      },
       "notSetUpTitle": "Der Übersetzer ist noch nicht eingerichtet.",
       "notSetUpDescription": "Eine Administratorin oder ein Administrator muss erst einen DeepL-Schlüssel oder einen KI-Endpunkt hinterlegen.",
       "diff": {
@@ -500,7 +506,7 @@
       "llmModelsHint": "Die Modell-ID erwartet der Endpunkt, den Anzeigenamen sehen Nutzende. „Modelle abrufen“ übernimmt die Chat-Modelle, die der Endpunkt anbietet; Ihre Anzeigenamen bleiben. Höchstens {{max}} Modelle.",
       "modelId": "Modell-ID",
       "modelLabel": "Anzeigename",
-      "modelRow": "Modell {{number}}",
+      "modelActions": "Aktionen",
       "removeModel": "Modell „{{name}}“ entfernen",
       "addModel": "Modell hinzufügen",
       "fetchModels": "Modelle abrufen",
@@ -523,9 +529,7 @@
         "models": "Jede Modell-ID darf nur einmal vorkommen, höchstens {{max}} Modelle.",
         "modelId": "Geben Sie eine Modell-ID mit höchstens 200 Zeichen ein.",
         "modelLabel": "Geben Sie einen Anzeigenamen mit höchstens 80 Zeichen ein."
-      },
-      "collapseColumn": "Einstellungen einklappen",
-      "expandColumn": "Einstellungen ausklappen"
+      }
     },
     "files": {
       "configNote": "Nichts einzustellen: Die Orte richtet jede Person in der Desktop-App auf ihrem Gerät ein.",

@@ -1,6 +1,6 @@
 import { AlertCircleIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Spinner } from '@ki4jlu/design-system'
+import { Badge, fieldVariants, Spinner } from '@ki4jlu/design-system'
 import type { TranslatorLanguage } from '@justcampus/shared'
 import { cn } from '@/lib/utils'
 import { textErrorMessage } from './languages'
@@ -40,20 +40,18 @@ export function TranslationOutput({
       aria-live="polite"
       aria-busy={pending}
       aria-label={label}
-      className={cn(
-        'block overflow-y-auto rounded-field border border-outline-variant bg-surface-container px-4 py-3',
-        className
-      )}
+      // Framed like the text field it answers: the DS field look, read-only.
+      className={cn(fieldVariants(), 'block overflow-y-auto', className)}
     >
       {pending ? (
         <span className="flex size-full items-center justify-center">
           <Spinner label={t('component.translator.translating')} />
         </span>
       ) : message ? (
-        <span className="flex items-start gap-1.5 text-error">
-          <AlertCircleIcon aria-hidden="true" className="mt-1 size-4 shrink-0" />
+        <Badge appearance="text" tone="error">
+          <AlertCircleIcon aria-hidden="true" className="size-4" />
           <span>{'text' in message ? message.text : t(message.key)}</span>
-        </span>
+        </Badge>
       ) : text !== undefined ? (
         <span
           lang={language ?? undefined}
@@ -63,7 +61,9 @@ export function TranslationOutput({
           {text}
         </span>
       ) : (
-        <span className="text-on-surface-variant">{t('component.translator.empty')}</span>
+        <Badge appearance="text" tone="neutral">
+          {t('component.translator.empty')}
+        </Badge>
       )}
     </output>
   )

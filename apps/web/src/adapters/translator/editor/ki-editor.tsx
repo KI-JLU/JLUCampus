@@ -4,26 +4,40 @@ import StarterKit from '@tiptap/starter-kit'
 import { Markdown } from '@tiptap/markdown'
 import { TableKit } from '@tiptap/extension-table'
 import {
+  BoldIcon,
   Code2Icon,
   CodeIcon,
   FileDownIcon,
   FileTextIcon,
   FileTypeIcon,
+  Heading1Icon,
+  Heading2Icon,
+  Heading3Icon,
   IndentDecreaseIcon,
   IndentIncreaseIcon,
+  ItalicIcon,
   ListIcon,
   ListOrderedIcon,
   Maximize2Icon,
   Minimize2Icon,
   RedoIcon,
+  StrikethroughIcon,
   TableIcon,
   TextQuoteIcon,
   UndoIcon
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
+  Badge,
   Button,
   Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+  PanelSection,
+  Spinner,
   Tabs,
   TabsContent,
   TabsList,
@@ -52,10 +66,16 @@ import {
 } from './export'
 
 const ICON = { 'aria-hidden': true, className: 'size-4' } as const
+const HEADINGS = { 1: Heading1Icon, 2: Heading2Icon, 3: Heading3Icon } as const
 
-/** The document's look: headings, lists, quotes, code and tables, in the theme's tokens. */
+/**
+ * The document's look: headings, lists, quotes, code and tables, in the theme's tokens.
+ * DS gap: the design system has no rich-text ("prose") styles, and Tiptap renders the document's
+ * elements itself, so they are styled from its root: headings in the DS type scale, colours in
+ * semantic tokens, list markers and table rules that Tailwind's reset takes away.
+ */
 const PROSE =
-  'min-h-72 px-8 py-8 text-base text-on-surface outline-none [&_blockquote]:border-s-4 [&_blockquote]:border-outline-variant [&_blockquote]:ps-4 [&_blockquote]:text-on-surface-variant [&_code]:rounded [&_code]:bg-surface-container-high [&_code]:px-1 [&_code]:font-mono [&_code]:text-sm [&_h1]:mt-4 [&_h1]:mb-2 [&_h1]:text-3xl [&_h1]:font-bold [&_h2]:mt-3 [&_h2]:mb-2 [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1 [&_h3]:text-xl [&_h3]:font-semibold [&_li]:my-0.5 [&_ol]:list-decimal [&_ol]:ps-6 [&_p]:my-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_table]:my-2 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-outline-variant [&_td]:p-2 [&_th]:border [&_th]:border-outline-variant [&_th]:bg-surface-container [&_th]:p-2 [&_th]:text-start [&_ul]:list-disc [&_ul]:ps-6 [&_.selectedCell]:bg-secondary-container'
+  'min-h-72 flex-1 p-6 text-body-base text-on-surface outline-none [&_blockquote]:border-s-4 [&_blockquote]:border-outline-variant [&_blockquote]:ps-4 [&_blockquote]:text-on-surface-variant [&_code]:rounded [&_code]:bg-surface-container-high [&_code]:px-1 [&_code]:font-mono [&_code]:text-sm [&_h1]:mt-4 [&_h1]:mb-2 [&_h1]:font-display-lg [&_h1]:text-display-lg [&_h2]:mt-3 [&_h2]:mb-2 [&_h2]:font-headline-md [&_h2]:text-headline-md [&_h3]:mt-3 [&_h3]:mb-1 [&_h3]:font-headline-md [&_h3]:text-headline-md-mobile [&_li]:my-0.5 [&_ol]:list-decimal [&_ol]:ps-6 [&_p]:my-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_table]:my-2 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-outline-variant [&_td]:p-2 [&_th]:border [&_th]:border-outline-variant [&_th]:bg-surface-container [&_th]:p-2 [&_th]:text-start [&_ul]:list-disc [&_ul]:ps-6 [&_.selectedCell]:bg-secondary-container'
 
 interface KiEditorProps {
   store: TranslatorStore
@@ -160,17 +180,16 @@ export function KiEditor({ store, maximized, onMaximized }: KiEditorProps): Reac
       <Tabs
         value={tab}
         onValueChange={(value) => setTab(value === 'export' ? 'export' : 'edit')}
-        className="flex min-h-0 flex-1 flex-col"
+        className="min-h-0 flex-1 gap-0"
       >
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-outline-variant px-4 py-3">
-          <span className="text-xs font-bold tracking-widest text-on-surface-variant uppercase">
-            {t('component.translator.editor.title')}
-          </span>
+        {/* Title, views and undo/redo; the equal sides keep the views in the middle. */}
+        <CardHeader className="flex-row flex-wrap items-center gap-2">
+          <CardTitle className="flex-1 basis-0">{t('component.translator.editor.title')}</CardTitle>
           <TabsList aria-label={t('component.translator.editor.views')}>
             <TabsTrigger value="edit">{t('component.translator.editor.edit')}</TabsTrigger>
             <TabsTrigger value="export">{t('component.translator.editor.export')}</TabsTrigger>
           </TabsList>
-          <div className="flex justify-end gap-1">
+          <div className="flex flex-1 basis-0 justify-end gap-1">
             <IconAction
               label={t('component.translator.editor.undo')}
               disabled={!counts?.canUndo}
@@ -190,7 +209,7 @@ export function KiEditor({ store, maximized, onMaximized }: KiEditorProps): Reac
               <RedoIcon {...ICON} />
             </IconAction>
           </div>
-        </div>
+        </CardHeader>
         <TabsContent
           value="edit"
           forceMount
@@ -214,10 +233,7 @@ export function KiEditor({ store, maximized, onMaximized }: KiEditorProps): Reac
                 {/* The document fills the area, so a click anywhere below its text types in it. */}
                 <EditorContent
                   editor={editor}
-                  className={cn(
-                    'flex flex-col [&>.tiptap]:flex-1',
-                    maximized ? 'min-h-full' : 'min-h-80'
-                  )}
+                  className={cn('flex flex-col', maximized ? 'min-h-full' : 'min-h-80')}
                 />
                 {counts?.empty ? <Placeholder /> : null}
               </>
@@ -228,14 +244,14 @@ export function KiEditor({ store, maximized, onMaximized }: KiEditorProps): Reac
               <AiMenu editor={editor} store={store} container={container} markdownMode={false} />
             ) : null}
           </div>
-          <div className="flex min-h-14 items-center justify-between gap-2 border-t border-outline-variant px-4 py-2">
-            <p className="m-0 text-sm text-on-surface-variant">
+          <CardFooter className="justify-between gap-2">
+            <CardDescription>
               {/* In the browser's number format, as HAWKI writes them. */}
               {t('component.translator.editor.counts', {
                 words: words.toLocaleString(),
                 characters: characters.toLocaleString()
               })}
-            </p>
+            </CardDescription>
             <div className="flex items-center gap-1">
               <IconAction
                 label={t(
@@ -256,7 +272,7 @@ export function KiEditor({ store, maximized, onMaximized }: KiEditorProps): Reac
                 whenEmpty="ignore"
               />
             </div>
-          </div>
+          </CardFooter>
         </TabsContent>
         <TabsContent
           value="export"
@@ -296,8 +312,8 @@ function MarkdownView({
           store.setCreateMarkdown(event.target.value)
           store.setCreateCount(event.target.value)
         }}
-        // eslint-disable-next-line design-system/layout-only-classname -- Markdown reads in a monospace font, like source text
-        className="min-h-80 w-full resize-none px-8 py-8 font-mono text-sm"
+        // eslint-disable-next-line design-system/layout-only-classname -- DS gap: no monospace field variant; Markdown reads as source text
+        className="min-h-80 w-full resize-none p-6 font-mono"
       />
       {markdown ? null : <Placeholder />}
       {state.aiContextMenu ? (
@@ -349,13 +365,12 @@ function isPristine(editor: Editor | null): boolean {
 function Placeholder(): React.JSX.Element {
   const { t } = useTranslation()
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 grid max-w-xl gap-4 px-8 py-8">
-      <p className="m-0 text-xl text-on-surface-variant">
+    // Over the document's first line, with the document's inset.
+    <div className="pointer-events-none absolute inset-x-0 top-0 grid max-w-xl gap-4 p-6">
+      <p className="m-0 text-body-base text-on-surface-variant">
         {t('component.translator.editor.placeholder')}
       </p>
-      <p className="m-0 text-base text-on-surface-variant">
-        {t('component.translator.editor.placeholderHint')}
-      </p>
+      <CardDescription>{t('component.translator.editor.placeholderHint')}</CardDescription>
     </div>
   )
 }
@@ -397,11 +412,12 @@ function Toolbar({
     run: () => void,
     content: ReactNode
   ): React.JSX.Element => (
+    // A pressed ghost button shows its state itself (the design system's toggle look).
     <Tooltip key={key}>
       <TooltipTrigger asChild>
         <Button
           type="button"
-          variant={pressed && !onMarkdown ? 'secondary' : 'ghost'}
+          variant="ghost"
           size="icon"
           aria-label={label}
           aria-pressed={onMarkdown ? undefined : pressed}
@@ -414,132 +430,138 @@ function Toolbar({
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>
   )
-  const divider = (key: string): React.JSX.Element => (
-    <span key={key} aria-hidden="true" className="mx-1 h-5 w-px bg-outline-variant" />
-  )
+  // The tools in groups, set apart by the toolbar's gap.
   return (
     <div
       role="toolbar"
       aria-label={t('component.translator.editor.toolbar')}
-      className="flex flex-wrap items-center gap-0.5 border-b border-outline-variant px-4 py-2"
+      className="flex flex-wrap items-center gap-4 px-6 pb-2"
     >
-      {([1, 2, 3] as const).map((level) =>
-        tool(
-          `h${level}`,
-          t(`component.translator.editor.heading${level}`),
-          active?.[`h${level}`],
-          { kind: 'heading', level },
-          () => chain().toggleHeading({ level }).run(),
-          <span className="text-sm font-medium">{`H${level}`}</span>
-        )
-      )}
-      {divider('d1')}
-      {tool(
-        'bold',
-        t('component.translator.editor.bold'),
-        active?.bold,
-        { kind: 'bold' },
-        () => chain().toggleBold().run(),
-        <b>B</b>
-      )}
-      {tool(
-        'italic',
-        t('component.translator.editor.italic'),
-        active?.italic,
-        { kind: 'italic' },
-        () => chain().toggleItalic().run(),
-        <i>I</i>
-      )}
-      {tool(
-        'strike',
-        t('component.translator.editor.strike'),
-        active?.strike,
-        { kind: 'strike' },
-        () => chain().toggleStrike().run(),
-        <s>S</s>
-      )}
-      {divider('d2')}
-      {tool(
-        'quote',
-        t('component.translator.editor.quote'),
-        active?.quote,
-        { kind: 'quote' },
-        () => chain().toggleBlockquote().run(),
-        <TextQuoteIcon {...ICON} />
-      )}
-      {divider('d3')}
-      {tool(
-        'bullet',
-        t('component.translator.editor.bulletList'),
-        active?.bullet,
-        { kind: 'bullet' },
-        () => chain().toggleBulletList().run(),
-        <ListIcon {...ICON} />
-      )}
-      {tool(
-        'ordered',
-        t('component.translator.editor.orderedList'),
-        active?.ordered,
-        { kind: 'ordered' },
-        () => chain().toggleOrderedList().run(),
-        <ListOrderedIcon {...ICON} />
-      )}
-      {tool(
-        'outdent',
-        t('component.translator.editor.outdent'),
-        undefined,
-        { kind: 'outdent' },
-        () => chain().liftListItem('listItem').run(),
-        <IndentDecreaseIcon {...ICON} />
-      )}
-      {tool(
-        'indent',
-        t('component.translator.editor.indent'),
-        undefined,
-        { kind: 'indent' },
-        // Outside a list, indenting starts one, as in HAWKI.
-        () =>
-          editor.isActive('listItem')
-            ? chain().sinkListItem('listItem').run()
-            : chain().toggleBulletList().run(),
-        <IndentIncreaseIcon {...ICON} />
-      )}
-      {divider('d4')}
-      {tool(
-        'code',
-        t('component.translator.editor.code'),
-        active?.code,
-        { kind: 'code' },
-        () => chain().toggleCode().run(),
-        <CodeIcon {...ICON} />
-      )}
-      {tool(
-        'codeBlock',
-        t('component.translator.editor.codeBlock'),
-        active?.codeBlock,
-        { kind: 'codeBlock' },
-        () => {
-          // A new block takes the language of the code it is made from, as in HAWKI.
-          if (editor.isActive('codeBlock')) return void chain().toggleCodeBlock().run()
-          const { from, to, $from } = editor.state.selection
-          const code =
-            from === to ? $from.parent.textContent : editor.state.doc.textBetween(from, to, '\n')
-          const language = detectCodeLanguage(code)
-          chain()
-            .toggleCodeBlock(language ? { language } : undefined)
-            .run()
-        },
-        <Code2Icon {...ICON} />
-      )}
-      {divider('d5')}
-      {tool(
-        'table',
-        t('component.translator.editor.table'),
-        undefined,
-        { kind: 'table' },
-        () => chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
-        <TableIcon {...ICON} />
-      )}
+      <div role="group" className="flex gap-1">
+        {([1, 2, 3] as const).map((level) => {
+          const Icon = HEADINGS[level]
+          return tool(
+            `h${level}`,
+            t(`component.translator.editor.heading${level}`),
+            active?.[`h${level}`],
+            { kind: 'heading', level },
+            () => chain().toggleHeading({ level }).run(),
+            <Icon {...ICON} />
+          )
+        })}
+      </div>
+      <div role="group" className="flex gap-1">
+        {tool(
+          'bold',
+          t('component.translator.editor.bold'),
+          active?.bold,
+          { kind: 'bold' },
+          () => chain().toggleBold().run(),
+          <BoldIcon {...ICON} />
+        )}
+        {tool(
+          'italic',
+          t('component.translator.editor.italic'),
+          active?.italic,
+          { kind: 'italic' },
+          () => chain().toggleItalic().run(),
+          <ItalicIcon {...ICON} />
+        )}
+        {tool(
+          'strike',
+          t('component.translator.editor.strike'),
+          active?.strike,
+          { kind: 'strike' },
+          () => chain().toggleStrike().run(),
+          <StrikethroughIcon {...ICON} />
+        )}
+      </div>
+      <div role="group" className="flex gap-1">
+        {tool(
+          'quote',
+          t('component.translator.editor.quote'),
+          active?.quote,
+          { kind: 'quote' },
+          () => chain().toggleBlockquote().run(),
+          <TextQuoteIcon {...ICON} />
+        )}
+      </div>
+      <div role="group" className="flex gap-1">
+        {tool(
+          'bullet',
+          t('component.translator.editor.bulletList'),
+          active?.bullet,
+          { kind: 'bullet' },
+          () => chain().toggleBulletList().run(),
+          <ListIcon {...ICON} />
+        )}
+        {tool(
+          'ordered',
+          t('component.translator.editor.orderedList'),
+          active?.ordered,
+          { kind: 'ordered' },
+          () => chain().toggleOrderedList().run(),
+          <ListOrderedIcon {...ICON} />
+        )}
+        {tool(
+          'outdent',
+          t('component.translator.editor.outdent'),
+          undefined,
+          { kind: 'outdent' },
+          () => chain().liftListItem('listItem').run(),
+          <IndentDecreaseIcon {...ICON} />
+        )}
+        {tool(
+          'indent',
+          t('component.translator.editor.indent'),
+          undefined,
+          { kind: 'indent' },
+          // Outside a list, indenting starts one, as in HAWKI.
+          () =>
+            editor.isActive('listItem')
+              ? chain().sinkListItem('listItem').run()
+              : chain().toggleBulletList().run(),
+          <IndentIncreaseIcon {...ICON} />
+        )}
+      </div>
+      <div role="group" className="flex gap-1">
+        {tool(
+          'code',
+          t('component.translator.editor.code'),
+          active?.code,
+          { kind: 'code' },
+          () => chain().toggleCode().run(),
+          <CodeIcon {...ICON} />
+        )}
+        {tool(
+          'codeBlock',
+          t('component.translator.editor.codeBlock'),
+          active?.codeBlock,
+          { kind: 'codeBlock' },
+          () => {
+            // A new block takes the language of the code it is made from, as in HAWKI.
+            if (editor.isActive('codeBlock')) return void chain().toggleCodeBlock().run()
+            const { from, to, $from } = editor.state.selection
+            const code =
+              from === to ? $from.parent.textContent : editor.state.doc.textBetween(from, to, '\n')
+            const language = detectCodeLanguage(code)
+            chain()
+              .toggleCodeBlock(language ? { language } : undefined)
+              .run()
+          },
+          <Code2Icon {...ICON} />
+        )}
+      </div>
+      <div role="group" className="flex gap-1">
+        {tool(
+          'table',
+          t('component.translator.editor.table'),
+          undefined,
+          { kind: 'table' },
+          () => chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+          <TableIcon {...ICON} />
+        )}
+      </div>
     </div>
   )
 }
@@ -596,45 +618,37 @@ function ExportView({ editor }: { editor: Editor }): React.JSX.Element {
   }
 
   const cards: Array<{ format: Format; icon: ReactNode }> = [
-    { format: 'docx', icon: <FileTextIcon className="size-6" aria-hidden="true" /> },
-    { format: 'pdf', icon: <FileDownIcon className="size-6" aria-hidden="true" /> },
-    { format: 'txt', icon: <FileTypeIcon className="size-6" aria-hidden="true" /> },
-    { format: 'md', icon: <Code2Icon className="size-6" aria-hidden="true" /> }
+    { format: 'docx', icon: <FileTextIcon {...ICON} /> },
+    { format: 'pdf', icon: <FileDownIcon {...ICON} /> },
+    { format: 'txt', icon: <FileTypeIcon {...ICON} /> },
+    { format: 'md', icon: <Code2Icon {...ICON} /> }
   ]
   return (
-    <section aria-labelledby="translator-export-title" className="grid gap-6 p-8">
-      <h3
-        id="translator-export-title"
-        className="m-0 text-xs font-bold tracking-widest text-on-surface-variant uppercase"
-      >
-        {t('component.translator.editor.exportAs')}
-      </h3>
-      <ul className="m-0 grid max-w-lg list-none gap-3 p-0">
-        {cards.map(({ format, icon }) => (
-          <li key={format}>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy !== null}
-              onClick={() => void run(format)}
-              // eslint-disable-next-line design-system/layout-only-classname -- export cards: icon at the start, name and format at the end, as in HAWKI
-              className="flex h-auto w-full items-center justify-between gap-4 p-5 text-start"
-            >
-              {icon}
-              <span className="grid">
-                <span className="font-semibold">
-                  {t(`component.translator.editor.formats.${format}`)}
-                </span>
-                <span className="text-xs text-on-surface-variant">
-                  {busy === format
-                    ? t('component.translator.editor.generating')
-                    : format.toUpperCase()}
-                </span>
-              </span>
-            </Button>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <CardContent>
+      <PanelSection title={t('component.translator.editor.exportAs')}>
+        <ul className="m-0 grid max-w-lg list-none gap-3 p-0">
+          {cards.map(({ format, icon }) => (
+            <li key={format}>
+              {/* Name at the start, the format at the end; a spinner while it is made. */}
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy !== null}
+                onClick={() => void run(format)}
+                className="w-full"
+              >
+                {busy === format ? (
+                  <Spinner size="sm" label={t('component.translator.editor.generating')} />
+                ) : (
+                  icon
+                )}
+                {t(`component.translator.editor.formats.${format}`)}
+                <Badge className="ms-auto">{format.toUpperCase()}</Badge>
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </PanelSection>
+    </CardContent>
   )
 }
