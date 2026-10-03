@@ -15,6 +15,7 @@ import {
   freshDashboardIds,
   groupsFromIdToken,
   pickPreset,
+  profileFromIdToken,
   rolesFromIdToken
 } from './logic.js'
 
@@ -50,6 +51,7 @@ const keycloakConfig: GenericOAuthConfig = {
  * `input: false` fields from the provider profile, so the mapping above cannot
  * carry it; instead the account row, whose ID token is refreshed on every
  * sign-in, is the trigger: read the verified token's roles and sync the user.
+ * The profile claims shown in the settings ride along the same way.
  */
 async function syncRoleFromAccount(account: {
   providerId: string
@@ -62,7 +64,13 @@ async function syncRoleFromAccount(account: {
   const role = deriveRole(roles, env.KEYCLOAK_ADMIN_ROLE)
   await db
     .update(schema.user)
-    .set({ role, keycloakRoles: roles, keycloakGroups: groups, updatedAt: new Date() })
+    .set({
+      role,
+      ...profileFromIdToken(account.idToken),
+      keycloakRoles: roles,
+      keycloakGroups: groups,
+      updatedAt: new Date()
+    })
     .where(eq(schema.user.id, account.userId))
 
   try {
